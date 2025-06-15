@@ -59,7 +59,7 @@ const GroupNode = ({ data }) => {
         if (!nodeId) return
         new BroadcastChannel('rowSelectChannel').postMessage({ nodeId })
       }}
-      className={`relative group cursor-pointer rounded-2xl break-words max-w-xs text-white shadow-md ${bgClass} p-4`}
+      className={`relative group cursor-pointer rounded-2xl text-white shadow-md ${bgClass} p-4`}
     >
       {/* group-level input handle (top left, orange) */}
       <Handle
