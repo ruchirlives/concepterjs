@@ -289,41 +289,46 @@ const App = () => {
 
 
   return (
-<div
-  className="ag-theme-quartz bg-white rounded shadow flex flex-col"
-  style={{
-    height: collapsed ? "40px" : 400,  // shrink height when collapsed
-    width: "100%",
-    overflow: "hidden",
-  }}
-  onClick={hideMenu}
-  onContextMenu={(e) => e.preventDefault()}
->
-  {/* Header with collapse button */}
-  <div className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
-    <span className="font-semibold">App Grid</span>
-    <button
-      className="text-lg font-bold"
-      onClick={() => setCollapsed((c) => !c)}
-      aria-label={collapsed ? "Expand grid" : "Collapse grid"}
-    >
-      {collapsed ? "▼" : "▲"}
-    </button>
-  </div>
+  <div
+    className="ag-theme-quartz bg-white rounded shadow flex flex-col"
+    style={{
+      height: "auto", // Let inner container manage height
+      width: "100%",
+      overflow: "hidden",
+    }}
+    onClick={hideMenu}
+    onContextMenu={(e) => e.preventDefault()}
+  >
+    {/* Header with collapse button */}
+    <div className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
+      <span className="font-semibold">App Grid</span>
+      <button
+        className="text-lg font-bold"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-label={collapsed ? "Expand grid" : "Collapse grid"}
+      >
+        {collapsed ? "▼" : "▲"}
+      </button>
+    </div>
 
-  {/* Grid content hidden when collapsed */}
-  {!collapsed && (
-    <>
-      <AgGridReact
-        rowSelection="multiple"
-        theme={myTheme} // Custom theme
-        rowData={rowData} // Grid data
-        columnDefs={columnDefs} // Grid columns
-        gridOptions={gridOptions} // Advanced grid options including the code for right clicking for menu
-        onGridReady={onGridReady} // Grid ready handler
-        onFilterChanged={onFilterChanged} // Filter change handler
-        onCellDoubleClicked={handleCellDoubleClick} // Cell double click handler
-      />
+    {/* Grid content collapsible but always mounted */}
+    <div
+      className={`transition-all duration-300 overflow-hidden`}
+      style={{ height: collapsed ? 0 : 400 }}
+    >
+      <div style={{ height: 400 }}> {/* 👈 Keep grid a fixed height always */}
+        <AgGridReact
+          rowSelection="multiple"
+          theme={myTheme}
+          rowData={rowData}
+          columnDefs={columnDefs}
+          gridOptions={gridOptions}
+          onGridReady={onGridReady}
+          onFilterChanged={onFilterChanged}
+          onCellDoubleClicked={handleCellDoubleClick}
+        />
+      </div>
+
       <ContextMenu
         ref={menuRef}
         onMenuItemClick={onMenuItemClick}
@@ -331,24 +336,20 @@ const App = () => {
         setRowData={setRowData}
         handleAddRow={handleAddRow}
       />
-      {/* <MiniMap
-        data={miniMapData} // Pass children data
-        onAddRow={addRowIfNotExists} // Pass function to add rows
-        title={`Children of ${lastSelectedRow?.Name || "N/A"}`} // Pass parent row name
-      /> */}
+
       <LoadModal
         isOpen={isLoadModalOpen}
         setIsOpen={setLoadModalOpen}
-        setRowData={setRowData} // Pass setRowData function
+        setRowData={setRowData}
         gridApiRef={gridApiRef}
         setCurrentContainer={setCurrentContainer}
-        merge={merge} // Pass merge state
+        merge={merge}
       />
+
       <NamePromptModal />
-    </>
-  )}
-</div>
-  );
+    </div>
+  </div>
+);
 };
 
 export default App;

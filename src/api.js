@@ -29,7 +29,7 @@ export const fetchContainers = async () => {
         return response.data.containers;
     } catch (error) {
         console.error("Error fetching containers:", error);
-        return [];
+        alert("Failed to fetch containers. Please check the console for details.");
     }
 };
 

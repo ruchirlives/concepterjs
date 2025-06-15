@@ -190,7 +190,29 @@ export const useSaveButtonEffect = (saveData, currentContainer) => {
         const saveButton = document.getElementById("saveContainersButton");
 
         // Define the click handler
-        const handleSaveClick = () => {
+        const handleSaveClick = async () => {
+            // First check if there are any containers in the backend by fetching them
+            const backendContainers = async () => {
+                const response = await fetchContainers();
+                if  (!response) {
+                    return false;
+                }
+                if (response.length === 0) {
+                    console.log(response);
+                    alert("No containers found. Please create a container or reload first.");
+                    return false;
+                }
+                // If there are containers, proceed to prompt for a name
+                console.log("Backend is active with the following number of containers:", response.length);
+                return true;
+
+            }
+            // Call the fetchContainers function to check if there are any containers
+            if (!await backendContainers()) {
+                return;
+            }
+
+            // If there are containers, prompt the user for a name and call saveData
             const name = prompt("Enter a name for the save:", currentContainer);
             if (name) {
                 saveData(name); // Call the save function
