@@ -66,6 +66,10 @@ export const useFetchData = (setRowData, fetchContainers) => {
         console.log("Fetching initial data..."); // Debugging line
         const fetchData = async () => {
             const data = await fetchContainers();
+            if (!data || data.length === 0) {
+                console.warn("No data fetched from the server.");
+                return;
+            }
             formatDateFields(data);
             setRowData(data);
         };

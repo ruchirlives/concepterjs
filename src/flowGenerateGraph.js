@@ -1,5 +1,6 @@
 import { fetchAndCreateEdges } from './flowFetchAndCreateEdges';
 import { fitViewToFlow } from './flowFunctions';
+export const GROUP_NODE_WIDTH = 300;
 
 export function generateNodesAndEdges(params) {
     const { rowData } = params;
@@ -24,6 +25,7 @@ export function generateNodesAndEdges(params) {
                 Tags: item.Tags || '',
             },
             type: isGroup ? 'group' : 'custom',
+            style: { width: GROUP_NODE_WIDTH }, // ← critical!
         };
     });
 

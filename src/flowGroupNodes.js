@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Handle, useNodeId } from '@xyflow/react'
+import { GROUP_NODE_WIDTH } from './flowGenerateGraph'
 
 const shades = [
   'bg-blue-100',
@@ -59,7 +60,8 @@ const GroupNode = ({ data }) => {
         if (!nodeId) return
         new BroadcastChannel('rowSelectChannel').postMessage({ nodeId })
       }}
-      className={`relative group cursor-pointer rounded-2xl text-white shadow-md ${bgClass} p-4`}
+      className={`relative group cursor-pointer text-white break-words px-3 py-2 rounded-lg shadow-md  ${bgClass} p-4`}
+      style={{ width: `${GROUP_NODE_WIDTH-20}px` }}
     >
       {/* group-level input handle (top left, orange) */}
       <Handle
@@ -138,7 +140,7 @@ const GroupNode = ({ data }) => {
       ))}
 
       {/* main node label */}
-      <div className="text-center font-medium">{Name}</div>
+      <div className="text-left font-bold ">{Name}</div>
 
       {/* description tooltip on node hover */}
       {isHovered && Description && (
