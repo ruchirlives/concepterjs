@@ -8,7 +8,7 @@ const Tooltip = ({ x, y, children }) =>
             style={{
                 position: 'fixed',
                 left: x,
-                top: y + 8, // show below the label, tweak as needed
+                top: y + 8,
                 background: '#111827',
                 color: '#f9fafb',
                 padding: '8px 10px',
@@ -27,8 +27,18 @@ const Tooltip = ({ x, y, children }) =>
         document.body
     );
 
+// simple hash → hue 0–359
+const getHueFromString = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) % 360;
+    }
+    return hash;
+};
+
 const CustomEdge = ({
     id,
+    source,            // the source node's ID
     sourceX,
     sourceY,
     targetX,
@@ -59,12 +69,19 @@ const CustomEdge = ({
         }
         setHovered(true);
     };
-
     const handleMouseLeave = () => setHovered(false);
+
+    // compute our stroke colour
+    const hue = getHueFromString(source);
+    const strokeColor = `hsl(${hue}, 70%, 50%)`;
+
+    // merge with any incoming style (e.g. strokeWidth)
+    const edgeStyle = { ...style, stroke: strokeColor };
 
     return (
         <>
-            <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+            <BaseEdge id={id} path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
+
             {data?.label && (
                 <foreignObject
                     width={200}
@@ -93,13 +110,14 @@ const CustomEdge = ({
                             whiteSpace: 'normal',
                             boxShadow: hovered ? '0 2px 6px rgba(0,0,0,0.12)' : undefined,
                             transition: 'box-shadow 0.2s',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
                         }}
                     >
                         {data.label}
                     </div>
                 </foreignObject>
             )}
+
             {hovered && data?.description && (
                 <Tooltip x={tooltipPos.x} y={tooltipPos.y}>
                     {data.description}
