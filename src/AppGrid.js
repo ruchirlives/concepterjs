@@ -272,8 +272,7 @@ const App = () => {
   useWriteBackButton(rowData);
   useLoadDataEffect(setRowData, fetchContainers, sendFilteredRows);
   useFilteredRowBroadcast(rowData, sendFilteredRows);
-
-  useAddRowButton(rowData, setRowData, handleAddRow);
+  useAddRowButton(handleAddRow);
   useLoadButtonEffect(setLoadModalOpen, setMerge);
   useImportButtonEffect(setLoadModalOpen, setMerge);
   useSaveButtonEffect(saveData, currentContainer);

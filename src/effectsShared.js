@@ -13,13 +13,28 @@ export const handleWriteBack = async (rowData) => {
 };
 
 export function formatDateFields(data) {
+    const isoRegex = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
     data.forEach((row) => {
-        const startDate = new Date(row.StartDate);
-        const endDate = new Date(row.EndDate);
-        const namedDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        const namedMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        row.StartDate = `${namedDays[startDate.getDay()]} ${startDate.getDate()} ${namedMonths[startDate.getMonth()]} ${startDate.getFullYear()}`;
-        row.EndDate = `${namedDays[endDate.getDay()]} ${endDate.getDate()} ${namedMonths[endDate.getMonth()]} ${endDate.getFullYear()}`;
+        const rawStart = row.StartDate;
+        const rawEnd = row.EndDate;
+
+        if (rawStart && isoRegex.test(rawStart)) {
+            const [, year, month, day] = rawStart.match(isoRegex).map(Number);
+            const date = new Date(year, month - 1, day);
+            row.StartDate = date && !isNaN(date) ? date.toLocaleDateString() : '';
+        } else if (rawStart) {
+            console.warn('Invalid StartDate format:', rawStart);
+            row.StartDate = '';
+        }
+
+        if (rawEnd && isoRegex.test(rawEnd)) {
+            const [, year, month, day] = rawEnd.match(isoRegex).map(Number);
+            const date = new Date(year, month - 1, day);
+            row.EndDate = date && !isNaN(date) ? date.toLocaleDateString() : '';
+        } else if (rawEnd) {
+            console.warn('Invalid EndDate format:', rawEnd);
+            row.EndDate = '';
+        }
     });
 }
 export function sendMermaidCodeToChannel(response) {

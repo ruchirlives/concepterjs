@@ -108,11 +108,17 @@ function AppMermaid() {
         renderMermaidCode(initialCode, containerRef.current, "graphDivInit");
     }, [initialCode]);
 
+    // useEffect(() => {
+    //     renderMermaidCode(mermaidCode, containerRef.current);
+    // }, [mermaidCode]);
+
     useEffect(() => {
-        renderMermaidCode(mermaidCode, containerRef.current);
+        if (mermaidCode && !mermaidCode.includes("Container not found")) {
+            renderMermaidCode(mermaidCode, containerRef.current);
+        } else {
+            console.warn("Invalid mermaid code received:", mermaidCode);
+        }
     }, [mermaidCode]);
-
-
 
     return (
         <div className="App">
