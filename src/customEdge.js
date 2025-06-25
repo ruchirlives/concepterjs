@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { getBezierPath, BaseEdge, useReactFlow } from '@xyflow/react';
+import { getBezierPath, BaseEdge } from '@xyflow/react';
 import ReactDOM from 'react-dom';
-import { black } from 'tailwindcss/colors';
 
 const Tooltip = ({ x, y, children }) =>
     ReactDOM.createPortal(

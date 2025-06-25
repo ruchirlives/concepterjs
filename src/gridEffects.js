@@ -1,62 +1,43 @@
-import { useEffect, useRef } from "react";
-import { addChildren, clearContainers, fetchContainers, requestRekey, writeBackData } from "./api"; // Import API function
+import { useEffect, useRef, useCallback } from "react";
+import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey } from "./api";
 import { setApiUrl } from "./apiConfig";
 import { formatDateFields, handleWriteBack } from "./effectsShared";
 
-export const flashAndScrollToRow = (rowId, gridApiRef) => {
-    // Highlight the row
-    // Try to get the row node by ID
-    const rowNode = gridApiRef.current.getRowNode(rowId);
-    // If the row node exists, flash and scroll to it
+// ==================== UTILITIES ====================
 
-    if (!rowNode) {
-        console.error("Row not found:", rowId);
-        return;
-    }
+export const flashAndScrollToRow = (rowId, gridApiRef) => {
+    const rowNode = getRowNodeSafely(gridApiRef, rowId);
+    if (!rowNode) return;
 
     gridApiRef.current.flashCells({ rowNodes: [rowNode] });
     gridApiRef.current.ensureNodeVisible(rowNode, "middle");
 }
 
 export const useRowSelectMessage = (rowData, setRowData, gridApiRef) => {
-    useEffect(() => {
-        const channel = new BroadcastChannel('rowSelectChannel');
-        channel.onmessage = (event) => {
-            const { nodeId } = event.data;
-            // Handle the selection logic here.
-            flashAndScrollToRow(nodeId, gridApiRef);
-            // Make row selected without deselecting others
-            const rowNode = gridApiRef.current.getRowNode(nodeId);
-            if (rowNode) {
-                rowNode.setSelected(true, true); // Select the row without deselecting others
-            } else {
-                console.error("Row not found:", nodeId);
-            }
+    const handleRowSelect = useCallback((event) => {
+        const { nodeId } = event.data;
+        flashAndScrollToRow(nodeId, gridApiRef);
 
-        };
-
-        return () => {
-            // The cleanup function closes the channel when the component unmounts.
-            channel.close();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        const rowNode = gridApiRef.current?.getRowNode(nodeId);
+        if (rowNode) {
+            rowNode.setSelected(true, true);
+        } else {
+            console.error("Row not found:", nodeId);
+        }
     }, [gridApiRef]);
+
+    useBroadcastChannel('rowSelectChannel', handleRowSelect, [handleRowSelect]);
 };
 
-// Effect to clear the rowdata and attach this to the clear button
+// ==================== BUTTON EFFECTS ====================
 export const useClearButtonEffect = (setRowData, setCurrentContainer) => {
-    useEffect(() => {
-        const clearButton = document.getElementById("clearButton");
+    const handleClearClick = useCallback(() => {
+        setRowData([]);
+        clearContainers();
+        setCurrentContainer("New");
+    }, [setRowData, setCurrentContainer]);
 
-        const handleClearClick = () => {
-            setRowData([]);
-            clearContainers();
-            setCurrentContainer("New");
-        };
-
-        clearButton?.addEventListener("click", handleClearClick);
-        return () => clearButton?.removeEventListener("click", handleClearClick);
-    });  // ← run once on mount
+    useButtonEffect("clearButton", handleClearClick, [handleClearClick]);
 };
 
 
@@ -78,166 +59,53 @@ export const useFetchData = (setRowData, fetchContainers) => {
     }, [setRowData, fetchContainers]);
 };
 
-// Effect to attach write-back button listener
 export const useWriteBackButton = (rowData) => {
-    useEffect(() => {
-        const writeBackButton = document.getElementById("writeBackButton");
-
-        const clickHandler = () => handleWriteBack(rowData);
-
-        if (writeBackButton) {
-            writeBackButton.addEventListener("click", clickHandler);
-        }
-
-        return () => {
-            if (writeBackButton) {
-                writeBackButton.removeEventListener("click", clickHandler);
-            }
-        };
-    }, [rowData]);
+    const handleWriteBackClick = useCallback(() => handleWriteBack(rowData), [rowData]);
+    useButtonEffect("writeBackButton", handleWriteBackClick, [handleWriteBackClick]);
 };
 
-// Effect to attach add-row button listener
-export const useAddRowButton = (rowData, setRowData, handleAddRow) => {
-    useEffect(() => {
-        const addRowButton = document.getElementById("addRowButton");
-
-
-
-
-        if (addRowButton) {
-            addRowButton.addEventListener("click", handleAddRow);
-        }
-
-        return () => {
-            if (addRowButton) {
-                addRowButton.removeEventListener("click", handleAddRow);
-            }
-        };
-    }, [rowData, setRowData, handleAddRow]);
+export const useAddRowButton = (handleAddRow) => {
+    useButtonEffect("addRowButton", handleAddRow, [handleAddRow]);
 };
 
 
-// Effect to attach load button listener
 export const useLoadButtonEffect = (setIsLoadModalOpen, setMerge) => {
-    useEffect(() => {
-        const loadButton = document.getElementById("loadContainersButton");
+    const handleOpenLoadModal = useCallback(() => {
+        setMerge(false);
+        setIsLoadModalOpen(true);
+    }, [setMerge, setIsLoadModalOpen]);
 
-        const handleOpenLoadModal = () => {
-            setMerge(false); // Set merge to false when load button is clicked
-            setIsLoadModalOpen(true);
-        };
-
-        if (loadButton) {
-            loadButton.addEventListener("click", handleOpenLoadModal);
-        }
-
-        return () => {
-            if (loadButton) {
-                loadButton.removeEventListener("click", handleOpenLoadModal);
-            }
-        };
-    }, [setIsLoadModalOpen, setMerge]);
+    useButtonEffect("loadContainersButton", handleOpenLoadModal, [handleOpenLoadModal]);
 };
 
 export const useImportButtonEffect = (setIsLoadModalOpen, setMerge) => {
-    useEffect(() => {
-        const importButton = document.getElementById("importContainersButton");
+    const handleOpenImportModal = useCallback(() => {
+        setMerge(true);
+        setIsLoadModalOpen(true);
+    }, [setMerge, setIsLoadModalOpen]);
 
-        const handleOpenImportModal = () => {
-            setMerge(true); // Set merge to true when import button is clicked
-            setIsLoadModalOpen(true);
-        };
+    useButtonEffect("importContainersButton", handleOpenImportModal, [handleOpenImportModal]);
+};
 
-        if (importButton) {
-            importButton.addEventListener("click", handleOpenImportModal);
-        }
-
-        return () => {
-            if (importButton) {
-                importButton.removeEventListener("click", handleOpenImportModal);
-            }
-        };
-    }, [setIsLoadModalOpen, setMerge]);
-}
-
-export const useRekeyButtonEffect = () => {
-    useEffect(() => {
-        const rekeyButton = document.getElementById("requestRekeyButton");
-        console.log("Rekey button:", rekeyButton); // Debugging line
-
-        const handleRekeyClick = async () => {
-            console.log("Rekey button clicked");
-            const resp = await requestRekey();
-            console.log("Rekey response:", resp.message); // Debugging line
-            // Reload
-            const channel = new BroadcastChannel('requestReloadChannel');
-            channel.postMessage({ type: "reload" });
-        };
-
-        if (rekeyButton) {
-            rekeyButton.addEventListener("click", handleRekeyClick);
-        }
-
-        return () => {
-            if (rekeyButton) {
-                rekeyButton.removeEventListener("click", handleRekeyClick);
-            }
-        };
-    }, []);
-}
-
-// Effect to attach save button listener
 export const useSaveButtonEffect = (saveData, currentContainer) => {
-    useEffect(() => {
-        // Get the button element from index.html
-        const saveButton = document.getElementById("saveContainersButton");
-
-        // Define the click handler
-        const handleSaveClick = async () => {
-            // First check if there are any containers in the backend by fetching them
-            const backendContainers = async () => {
-                const response = await fetchContainers();
-                if  (!response) {
-                    return false;
-                }
-                if (response.length === 0) {
-                    console.log(response);
-                    alert("No containers found. Please create a container or reload first.");
-                    return false;
-                }
-                // If there are containers, proceed to prompt for a name
-                console.log("Backend is active with the following number of containers:", response.length);
-                return true;
-
-            }
-            // Call the fetchContainers function to check if there are any containers
-            if (!await backendContainers()) {
-                return;
-            }
-
-            // If there are containers, prompt the user for a name and call saveData
-            const name = prompt("Enter a name for the save:", currentContainer);
-            if (name) {
-                saveData(name); // Call the save function
-            }
-        };
-
-        // Attach the event listener
-        if (saveButton) {
-            saveButton.addEventListener("click", handleSaveClick);
+    const handleSaveClick = useCallback(async () => {
+        // Check if there are any containers in the backend
+        const response = await fetchContainers();
+        if (!response || response.length === 0) {
+            console.log(response);
+            alert("No containers found. Please create a container or reload first.");
+            return;
         }
 
-        // Cleanup: Remove the event listener when the component unmounts
-        return () => {
-            if (saveButton) {
-                saveButton.removeEventListener("click", handleSaveClick);
-            }
-        };
-    }, [saveData, currentContainer]); // Dependency: Re-attach listener if saveData changes
+        console.log("Backend is active with the following number of containers:", response.length);
 
-    // No return value is needed for this effect
-    return null;
+        const name = prompt("Enter a name for the save:", currentContainer);
+        if (name) {
+            saveData(name);
+        }
+    }, [saveData, currentContainer]);
+
+    useButtonEffect("saveContainersButton", handleSaveClick, [handleSaveClick]);
 };
 
 // Effect to populate dropdown and attach listener
@@ -320,19 +188,12 @@ export const useLoadDataEffect = (setRowData, fetchContainers, sendFilteredRows)
 export const useFilteredRowBroadcast = (rowData, sendFilteredRows) => {
     const prevCountRef = useRef(rowData.length);
 
-    // useffect when broadcast requestRefresh received
-    useEffect(() => {
-        const channel = new BroadcastChannel('requestRefreshChannel');
-
-        channel.onmessage = (event) => {
-            console.log("Received requestRefresh message:");
-            sendFilteredRows();
-        };
-
-        return () => {
-            channel.close();
-        };
+    const handleRequestRefresh = useCallback(() => {
+        console.log("Received requestRefresh message:");
+        sendFilteredRows();
     }, [sendFilteredRows]);
+
+    useBroadcastChannel('requestRefreshChannel', handleRequestRefresh, [handleRequestRefresh]);
 
     useEffect(() => {
         const refreshButton = document.getElementById("refreshButton");
@@ -385,58 +246,46 @@ export const useAddChildChannel = (gridApiRef, setRowData) => {
 };
 
 export const useAddTagsChannel = (gridApiRef, setRowData) => {
-    useEffect(() => {
-        const channel = new BroadcastChannel('addTagsChannel');
+    const handleAddTags = useCallback(async (event) => {
+        const { selectedIds, tags } = event.data;
+        console.log("Received addTags request:", tags);
 
-        channel.onmessage = async (event) => {
-            const { selectedIds, tags } = event.data;
-            console.log("Received addTags request:", tags);
-
-            try {
-                const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
-                addTagToNodes(selectedNodes, tags, gridApiRef.current);
-                setRowData((prev) => {
-                    const updated = [...prev, ...selectedNodes.map(node => node.data)];
-                    writeBackData(updated);
-                    return updated;
-                });
-            } catch (error) {
-                console.error("Error handling addTags request:", error);
-            }
-        };
-
-        return () => {
-            channel.close();
-        };
+        try {
+            const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
+            addTagToNodes(selectedNodes, tags, gridApiRef.current);
+            setRowData((prev) => {
+                const updated = [...prev, ...selectedNodes.map(node => node.data)];
+                writeBackData(updated);
+                return updated;
+            });
+        } catch (error) {
+            console.error("Error handling addTags request:", error);
+        }
     }, [gridApiRef, setRowData]);
+
+    useBroadcastChannel('addTagsChannel', handleAddTags, [handleAddTags]);
 }
 
 // removeTagsChannel
 export const useRemoveTagsChannel = (gridApiRef, setRowData) => {
-    useEffect(() => {
-        const channel = new BroadcastChannel('removeTagsChannel');
+    const handleRemoveTags = useCallback(async (event) => {
+        const { selectedIds, tags } = event.data;
+        console.log("Received removeTags request:", tags);
 
-        channel.onmessage = async (event) => {
-            const { selectedIds, tags } = event.data;
-            console.log("Received removeTags request:", tags);
-
-            try {
-                const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
-                removeTagFromNodes(selectedNodes, tags, gridApiRef.current);
-                setRowData((prev) => {
-                    const updated = [...prev, ...selectedNodes.map(node => node.data)];
-                    writeBackData(updated);
-                    return updated;
-                });
-            } catch (error) {
-                console.error("Error handling removeTags request:", error);
-            }
-        };
-
-        return () => {
-            channel.close();
-        };
+        try {
+            const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
+            removeTagFromNodes(selectedNodes, tags, gridApiRef.current);
+            setRowData((prev) => {
+                const updated = [...prev, ...selectedNodes.map(node => node.data)];
+                writeBackData(updated);
+                return updated;
+            });
+        } catch (error) {
+            console.error("Error handling removeTags request:", error);
+        }
     }, [gridApiRef, setRowData]);
+
+    useBroadcastChannel('removeTagsChannel', handleRemoveTags, [handleRemoveTags]);
 };
 
 export const useRequestReloadChannel = (setRowData) => {
@@ -454,17 +303,85 @@ export const useRequestReloadChannel = (setRowData) => {
     }, [setRowData]);
 }
 
+export const useRekeyButtonEffect = () => {
+    const handleRekeyClick = useCallback(async () => {
+        console.log("Rekey button clicked");
+        const resp = await requestRekey();
+        console.log("Rekey response:", resp.message);
+        // Reload
+        const channel = new BroadcastChannel('requestReloadChannel');
+        channel.postMessage({ type: "reload" });
+    }, []);
 
-function asyncDataLoaderWithDateFormatting(fetchContainers, setRowData) {
+    useButtonEffect("requestRekeyButton", handleRekeyClick, [handleRekeyClick]);
+};
+
+
+/**
+ * Reusable hook for attaching button event listeners
+ */
+const useButtonEffect = (buttonId, handler, dependencies = []) => {
+    useEffect(() => {
+        const button = document.getElementById(buttonId);
+
+        if (button) {
+            button.addEventListener("click", handler);
+        }
+
+        return () => {
+            if (button) {
+                button.removeEventListener("click", handler);
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [buttonId, handler, ...dependencies]);
+};
+
+/**
+ * Reusable hook for broadcast channels
+ */
+const useBroadcastChannel = (channelName, messageHandler, dependencies = []) => {
+    useEffect(() => {
+        const channel = new BroadcastChannel(channelName);
+        channel.onmessage = messageHandler;
+
+        return () => {
+            channel.close();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [channelName, messageHandler, ...dependencies]);
+};
+
+/**
+ * Async data loader with date formatting
+ */
+const asyncDataLoaderWithDateFormatting = (fetchContainers, setRowData) => {
     return async () => {
         const data = await fetchContainers();
-        console.log("Reloaded"); // Debugging line
-        // Change StartDate and EndDate to be in MM-DD-YYYY format
+        console.log("Reloaded");
         formatDateFields(data);
         setRowData(data);
     };
-}
+};
 
+/**
+ * Utility to get row node safely
+ */
+const getRowNodeSafely = (gridApi, nodeId) => {
+    if (!gridApi?.current) {
+        console.error("Grid API not available");
+        return null;
+    }
+
+    const rowNode = gridApi.current.getRowNode(nodeId);
+    if (!rowNode) {
+        console.error("Row not found:", nodeId);
+    }
+
+    return rowNode;
+};
+
+// ==================== GRID UTILITIES ====================
 export function addTagToNodes(selectedNodes, tag, gridApi) {
     selectedNodes.forEach((node) => {
         const existingTags = node.data.Tags;
