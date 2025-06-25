@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { getBezierPath, BaseEdge } from '@xyflow/react';
+import { getBezierPath, BaseEdge, useReactFlow } from '@xyflow/react';
 import ReactDOM from 'react-dom';
+import { black } from 'tailwindcss/colors';
 
 const Tooltip = ({ x, y, children }) =>
     ReactDOM.createPortal(
@@ -77,6 +78,10 @@ const CustomEdge = ({
 
     // merge with any incoming style (e.g. strokeWidth)
     const edgeStyle = { ...style, stroke: strokeColor };
+
+    // if source only has a single target, we can use a simple marker
+    // const { getNode } = useReactFlow();
+    // const sourceNode = getNode(source);
 
     return (
         <>
