@@ -44,7 +44,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const label = c.position && typeof c.position === 'object' ? c.position.label : c.position;
             if (!childRelationshipLabels[cid]) childRelationshipLabels[cid] = new Set();
             childRelationshipLabels[cid].add(label);
-            
+
             // Track successor relationships specifically
             if (label === 'successor') {
                 if (!successorChildToParent[cid]) successorChildToParent[cid] = [];
@@ -114,17 +114,17 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const isHiddenChild = hiddenChildIds.has(n.id);
             const isSuccessor = childRelationshipLabels[n.id]?.has('successor');
             const successorParents = successorChildToParent[n.id] || [];
-            
+
             // For successor nodes, check if parent is directly visible (not hidden)
             const hasDirectlyVisibleParent = successorParents.some(pid => {
                 const parentExists = computedNodes.some(m => m.id === pid);
                 const parentNotHidden = !hiddenChildIds.has(pid);
                 return parentExists && parentNotHidden;
             });
-            
+
             return isGroup
-              || !isHiddenChild
-              || (isSuccessor && hasDirectlyVisibleParent);
+                || !isHiddenChild
+                || (isSuccessor && hasDirectlyVisibleParent);
         });
     }
 
@@ -160,7 +160,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 edge,
                 sourceNode,
                 targetNode
-            }); 
+            });
             return; // Skip if either node is not found
         }
     });

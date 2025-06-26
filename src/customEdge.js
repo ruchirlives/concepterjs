@@ -53,12 +53,42 @@ const CustomEdge = ({
     const hue = getHueFromString(source);
     const strokeColor = `hsl(${hue}, 70%, 50%)`;
 
-    // compute bezier path using default positions
+    // For successor edges, add gaps at start and end
+    let adjustedSourceX = sourceX;
+    let adjustedSourceY = sourceY;
+    let adjustedTargetX = targetX;
+    let adjustedTargetY = targetY;
+    
+    if (data?.label === 'successor') {
+        const sourceGapSize = 20; // pixels to gap from source end
+        const targetGapSize = 20; // smaller gap at target end
+
+        // Calculate direction vector
+        const dx = targetX - sourceX;
+        const dy = targetY - sourceY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+
+        if (length > (sourceGapSize + targetGapSize)) { // Only add gaps if edge is long enough
+            // Normalize direction vector
+            const unitX = dx / length;
+            const unitY = dy / length;
+
+            // Adjust start point (move away from source)
+            adjustedSourceX = sourceX + unitX * sourceGapSize;
+            adjustedSourceY = sourceY + unitY * sourceGapSize;
+
+            // Adjust end point (move away from target) - smaller gap to minimize arrow shift
+            adjustedTargetX = targetX - unitX * targetGapSize;
+            adjustedTargetY = targetY - unitY * targetGapSize;
+        }
+    }
+
+    // compute bezier path using adjusted positions
     const [edgePath, labelX, labelY] = getBezierPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
+        sourceX: adjustedSourceX,
+        sourceY: adjustedSourceY,
+        targetX: adjustedTargetX,
+        targetY: adjustedTargetY,
         sourcePosition,
         targetPosition,
     });
@@ -79,17 +109,18 @@ const CustomEdge = ({
 
     // merge with any incoming style and set stroke color
     const edgeStyle = { ...style, stroke: strokeColor };
+
     if (data?.label === 'successor') {
-        // thick dashed style for successor relationships
+        // thick solid style for successor relationships
         edgeStyle.strokeWidth = 8;
-        edgeStyle.strokeDasharray = '4 2';
+        // Remove strokeDasharray to make it solid
     }
 
     return (
         <>
             <BaseEdge id={id} path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
 
-            {data?.label && (
+            {data?.label && data.label !== 'successor' && (
                 <foreignObject
                     width={200}
                     height={75}

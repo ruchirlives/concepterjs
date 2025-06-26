@@ -1,4 +1,5 @@
 import colors from "tailwindcss/colors";
+import { MarkerType } from '@xyflow/react';
 
 export function buildVisibleEdges(params) {
     const { childMap, computedNodes: visibleNodes, allNodes, } = params;
@@ -64,14 +65,46 @@ export function buildVisibleEdges(params) {
                     }
 
                     // assemble edge object
-                    const edgeObj = {
+                    let edgeObj = {
                         id: edgeId,
-                        type: 'customEdge',
                         source: parentId,
                         target: childId,
                         data: data,
                         style: { stroke: colors.black }
                     };
+
+                    // Add arrow marker for successor relationships and use custom edge type for gap
+                    if (c.position &&
+                        ((typeof c.position === 'object' && c.position.label === 'successor') ||
+                            (typeof c.position === 'string' && c.position === 'successor'))) {
+                        // Generate dynamic color based on source node (same logic as customEdge.js)
+                        const getHueFromString = (str) => {
+                            let hash = 0;
+                            for (let i = 0; i < str.length; i++) {
+                                hash = (hash * 31 + str.charCodeAt(i)) % 360;
+                            }
+                            return hash;
+                        };
+                        const hue = getHueFromString(parentId);
+                        const strokeColor = `hsl(${hue}, 70%, 50%)`;
+
+                        edgeObj.markerEnd = {
+                            type: MarkerType.ArrowClosed,
+                            color: strokeColor,
+                            width: 8,
+                            height: 8,
+                        };
+                        // Use custom edge type for successor edges to get gap functionality
+                        edgeObj.type = 'customEdge';
+                        edgeObj.style = {
+                            stroke: strokeColor,
+                            strokeWidth: 8
+                        };
+                    } else {
+                        // Use custom edge type for non-successor edges
+                        edgeObj.type = 'customEdge';
+                    }
+
                     newEdges.push(edgeObj);
                 }
                 return;

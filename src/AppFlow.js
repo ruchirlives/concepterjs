@@ -149,6 +149,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       onConnect={onEdgeConnect}
       nodeTypes={{ custom: FlowNode, group: GroupNode }}
       edgeTypes={edgeTypes}
+      defaultMarkerColor="#000000"
       onConnectEnd={onConnectEnd} onEdgeContextMenu={handleEdgeMenu} onNodeContextMenu={handleContextMenu} onSelectionContextMenu={selectionContextMenu} // Handle right-click for context menu
       // [ADDED] onNodeDoubleClick drills into group
       onNodeDoubleClick={(e, node) => {
