@@ -34,6 +34,25 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         });
     }
 
+    // Build map of child node IDs to relationship labels for successor override
+    const childRelationshipLabels = {};
+    // Build map of successor child node IDs to their specific parent IDs
+    const successorChildToParent = {};
+    for (const [parentId, children] of Object.entries(childMap)) {
+        children.forEach(c => {
+            const cid = c.id.toString();
+            const label = c.position && typeof c.position === 'object' ? c.position.label : c.position;
+            if (!childRelationshipLabels[cid]) childRelationshipLabels[cid] = new Set();
+            childRelationshipLabels[cid].add(label);
+            
+            // Track successor relationships specifically
+            if (label === 'successor') {
+                if (!successorChildToParent[cid]) successorChildToParent[cid] = [];
+                successorChildToParent[cid].push(parentId);
+            }
+        });
+    }
+
     // Inject children & parents
 
 
@@ -78,21 +97,47 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         const directKids = new Set(
             (childMap[activeGroup] || []).map(c => c.id.toString())
         );
-        computedNodes = computedNodes.filter(n => directKids.has(n.id));
-    } else {
+        // Build set of successor children of the activeGroup specifically
+        const activeGroupSuccessors = new Set();
+        (childMap[activeGroup] || []).forEach(c => {
+            const label = c.position && typeof c.position === 'object' ? c.position.label : c.position;
+            if (label === 'successor') {
+                activeGroupSuccessors.add(c.id.toString());
+            }
+        });
         computedNodes = computedNodes.filter(n =>
-            n.type === 'group' || !hiddenChildIds.has(n.id)
+            directKids.has(n.id) && !activeGroupSuccessors.has(n.id)
         );
+    } else {
+        computedNodes = computedNodes.filter(n => {
+            const isGroup = n.type === 'group';
+            const isHiddenChild = hiddenChildIds.has(n.id);
+            const isSuccessor = childRelationshipLabels[n.id]?.has('successor');
+            const successorParents = successorChildToParent[n.id] || [];
+            
+            // For successor nodes, check if parent is directly visible (not hidden)
+            const hasDirectlyVisibleParent = successorParents.some(pid => {
+                const parentExists = computedNodes.some(m => m.id === pid);
+                const parentNotHidden = !hiddenChildIds.has(pid);
+                return parentExists && parentNotHidden;
+            });
+            
+            return isGroup
+              || !isHiddenChild
+              || (isSuccessor && hasDirectlyVisibleParent);
+        });
     }
 
     computedNodes = computedNodes.filter(n => {
-        // if (n.type !== 'group') return true;
         const parents = n.data.parents || [];
         const hasVisibleGroupParent = parents.some(p => {
             const pid = p.id.toString();
             return computedNodes.some(m => m.id === pid && m.type === 'group');
         });
-        return !hasVisibleGroupParent;
+        if (activeGroup) {
+            return !hasVisibleGroupParent;
+        }
+        return !hasVisibleGroupParent || childRelationshipLabels[n.id]?.has('successor');
     });
 
     // ──────────────────────────────────────────────────────────

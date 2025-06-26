@@ -49,6 +49,11 @@ const CustomEdge = ({
     markerEnd,
     data,
 }) => {
+    // compute our stroke colour
+    const hue = getHueFromString(source);
+    const strokeColor = `hsl(${hue}, 70%, 50%)`;
+
+    // compute bezier path using default positions
     const [edgePath, labelX, labelY] = getBezierPath({
         sourceX,
         sourceY,
@@ -58,6 +63,7 @@ const CustomEdge = ({
         targetPosition,
     });
 
+    // hover and tooltip state for edge label
     const [hovered, setHovered] = useState(false);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
     const labelRef = useRef();
@@ -71,16 +77,13 @@ const CustomEdge = ({
     };
     const handleMouseLeave = () => setHovered(false);
 
-    // compute our stroke colour
-    const hue = getHueFromString(source);
-    const strokeColor = `hsl(${hue}, 70%, 50%)`;
-
-    // merge with any incoming style (e.g. strokeWidth)
+    // merge with any incoming style and set stroke color
     const edgeStyle = { ...style, stroke: strokeColor };
-
-    // if source only has a single target, we can use a simple marker
-    // const { getNode } = useReactFlow();
-    // const sourceNode = getNode(source);
+    if (data?.label === 'successor') {
+        // thick dashed style for successor relationships
+        edgeStyle.strokeWidth = 8;
+        edgeStyle.strokeDasharray = '4 2';
+    }
 
     return (
         <>

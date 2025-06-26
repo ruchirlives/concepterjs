@@ -27,19 +27,39 @@ const GroupNode = ({ data }) => {
   const groupOutputId = `out-group-${nodeId}`
 
   // in GroupNode.js
-  // give yourself a 15% padding at top & bottom:
-  const inset = 15;
-  const span = 100 - inset * 2;
+  // give yourself padding at top & bottom, and avoid center area for group handles:
+  const topInset = 15;
+  const bottomInset = 15;
+  const centerExclusionZone = 20; // 20% around center (40-60%)
+
+  const topSpan = 50 - topInset - centerExclusionZone / 2; // 0-35%
+  const bottomSpan = 50 - bottomInset - centerExclusionZone / 2; // 65-100%
 
   const filteredPositions = children.filter(child => child.tags?.includes('input') || child.tags?.includes('output'));
 
-  // calculate the positions of child handles
-  const childPositions = filteredPositions.map((child, idx) => ({
-    top: inset + span * ((idx + 1) / (filteredPositions.length + 1)),
-    id: child.id,
-    label: child.name,
-    tags: child.tags,
-  }));
+  // calculate the positions of child handles, avoiding center
+  const childPositions = filteredPositions.map((child, idx) => {
+    const totalPositions = filteredPositions.length;
+    const halfPositions = Math.ceil(totalPositions / 2);
+
+    let top;
+    if (idx < halfPositions) {
+      // Place in top section (15% to 40%)
+      top = topInset + topSpan * ((idx + 1) / (halfPositions + 1));
+    } else {
+      // Place in bottom section (60% to 85%)
+      const bottomIdx = idx - halfPositions;
+      const bottomPositions = totalPositions - halfPositions;
+      top = 60 + bottomSpan * ((bottomIdx + 1) / (bottomPositions + 1));
+    }
+
+    return {
+      top,
+      id: child.id,
+      label: child.name,
+      tags: child.tags,
+    };
+  });
 
   const childInputHandles = childPositions.filter(({ tags }) => tags?.includes('input'));
   const childOutputHandles = childPositions.filter(({ tags }) => tags?.includes('output'));
@@ -61,38 +81,38 @@ const GroupNode = ({ data }) => {
         new BroadcastChannel('rowSelectChannel').postMessage({ nodeId })
       }}
       className={`relative group cursor-pointer text-white break-words px-3 py-2 rounded-lg shadow-md  ${bgClass} p-4`}
-      style={{ width: `${GROUP_NODE_WIDTH-20}px` }}
+      style={{ width: `${GROUP_NODE_WIDTH - 20}px` }}
     >
-      {/* group-level input handle (top left, orange) */}
+      {/* group-level input handle (center left, orange) */}
       <Handle
         className="group-handle group-in opacity-0 transition-opacity group-hover:opacity-100"
         type="target"
         position="left"
         id={groupInputId}
-        style={{ top: 0, left: 0, transform: 'translate(-50%, 50%)', backgroundColor: '#FF5722', cursor: 'pointer' }}
+        style={{ top: '50%', left: 0, transform: 'translate(-50%, -50%)', backgroundColor: '#FF5722', cursor: 'pointer' }}
         onMouseEnter={() => setHoveredHandle(groupInputId)}
         onMouseLeave={() => setHoveredHandle(null)}
       />
       {hoveredHandle === groupInputId && (
         <div className="absolute text-xs bg-gray-800 text-white px-1 py-0.5 rounded pointer-events-none"
-          style={{ top: 0, left: 0 }}>
+          style={{ top: '50%', left: 0, transform: 'translateY(-50%)' }}>
           Group In
         </div>
       )}
 
-      {/* group-level output handle (top right, green) */}
+      {/* group-level output handle (center right, green) */}
       <Handle
         className="group-handle group-out opacity-0 transition-opacity group-hover:opacity-100"
         type="source"
         position="right"
         id={groupOutputId}
-        style={{ top: 0, right: 0, transform: 'translate(50%, 50%)', backgroundColor: '#3a9330', cursor: 'pointer' }}
+        style={{ top: '50%', right: 0, transform: 'translate(50%, -50%)', backgroundColor: '#3a9330', cursor: 'pointer' }}
         onMouseEnter={() => setHoveredHandle(groupOutputId)}
         onMouseLeave={() => setHoveredHandle(null)}
       />
       {hoveredHandle === groupOutputId && (
         <div className="absolute text-xs bg-gray-800 text-white px-1 py-0.5 rounded pointer-events-none"
-          style={{ top: 0, right: 0 }}>
+          style={{ top: '50%', right: 0, transform: 'translateY(-50%)' }}>
           Group Out
         </div>
       )}

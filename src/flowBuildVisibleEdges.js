@@ -51,24 +51,28 @@ export function buildVisibleEdges(params) {
 
             // A) both visible → direct edge
             if (childVisible) {
-                if (!newEdges.some(e => e.id === edgeId)) { // avoid duplicates by id
-
-                    // if c.position is a json object, use c.position.label =========
+                if (!newEdges.some(e => e.id === edgeId)) {
+                    // build edge data
                     let data;
                     if (c.position !== null && typeof c.position === 'object') {
-                        // For label trim to 20 chars
                         const label = c.position.label.length > 20
                             ? c.position.label.substring(0, 20) + '...'
                             : c.position.label;
-                        const description = c.position.description;
-                        data = { label: label, description: description };
-                    }
-                    else {
+                        data = { label: label, description: c.position.description };
+                    } else {
                         data = { label: c.position };
                     }
-                    // ===============================================================
 
-                    newEdges.push({ id: edgeId, type: 'customEdge', source: parentId, target: childId, data: data, style: { stroke: colors.black } });
+                    // assemble edge object
+                    const edgeObj = {
+                        id: edgeId,
+                        type: 'customEdge',
+                        source: parentId,
+                        target: childId,
+                        data: data,
+                        style: { stroke: colors.black }
+                    };
+                    newEdges.push(edgeObj);
                 }
                 return;
             }
