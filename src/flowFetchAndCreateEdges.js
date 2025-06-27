@@ -97,34 +97,24 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         const directKids = new Set(
             (childMap[activeGroup] || []).map(c => c.id.toString())
         );
-        // Build set of successor children of the activeGroup specifically
-        const activeGroupSuccessors = new Set();
-        (childMap[activeGroup] || []).forEach(c => {
-            const label = c.position && typeof c.position === 'object' ? c.position.label : c.position;
-            if (label === 'successor') {
-                activeGroupSuccessors.add(c.id.toString());
-            }
-        });
-        computedNodes = computedNodes.filter(n =>
-            directKids.has(n.id) && !activeGroupSuccessors.has(n.id)
-        );
+        // Show direct children of activeGroup (including successors now)
+        computedNodes = computedNodes.filter(n => directKids.has(n.id));
     } else {
         computedNodes = computedNodes.filter(n => {
             const isGroup = n.type === 'group';
             const isHiddenChild = hiddenChildIds.has(n.id);
             const isSuccessor = childRelationshipLabels[n.id]?.has('successor');
             const successorParents = successorChildToParent[n.id] || [];
-            
+
             // For successor nodes, check if parent is directly visible (not hidden)
             const hasDirectlyVisibleParent = successorParents.some(pid => {
                 const parentExists = computedNodes.some(m => m.id === pid);
                 const parentNotHidden = !hiddenChildIds.has(pid);
                 return parentExists && parentNotHidden;
             });
-            
-            return isGroup
-              || !isHiddenChild
-              || (isSuccessor && hasDirectlyVisibleParent);
+
+            return isGroup || !isHiddenChild
+                || (isSuccessor && hasDirectlyVisibleParent);
         });
     }
 
@@ -132,13 +122,59 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         const parents = n.data.parents || [];
         const hasVisibleGroupParent = parents.some(p => {
             const pid = p.id.toString();
-            return computedNodes.some(m => m.id === pid && m.type === 'group');
+            return allNodes.some(m => m.id === pid && m.type === 'group');
         });
+        
         if (activeGroup) {
-            return !hasVisibleGroupParent;
+            // Hide the activeGroup node itself when we're inside it
+            if (n.id === activeGroup) {
+                return false;
+            }
+            // Show children if their group parent IS the activeGroup, hide if it's a different group
+            const hasActiveGroupAsParent = parents.some(p => p.id === activeGroup);
+            return hasActiveGroupAsParent || !hasVisibleGroupParent;
         }
-        return !hasVisibleGroupParent || childRelationshipLabels[n.id]?.has('successor');
+        
+        // For nodes outside activeGroup, check if they should be visible
+        const isDirectChild = !hasVisibleGroupParent;
+        const isSuccessorWithVisibleChain = childRelationshipLabels[n.id]?.has('successor') && 
+            hasVisibleSuccessorChain(n.id, successorChildToParent, allNodes, new Set());
+        
+        return isDirectChild || isSuccessorWithVisibleChain;
     });
+
+    // Helper function to check if a successor chain leads to a visible node
+    function hasVisibleSuccessorChain(nodeId, successorChildToParent, allNodes, visited) {
+        // Prevent infinite loops
+        if (visited.has(nodeId)) return false;
+        visited.add(nodeId);
+        
+        const successorParents = successorChildToParent[nodeId] || [];
+        
+        for (const parentId of successorParents) {
+            const parentNode = allNodes.find(n => n.id === parentId);
+            if (!parentNode) continue;
+            
+            // Check if this parent is directly visible (not a child of a group)
+            const parentIsDirectlyVisible = !parentNode.data.parents?.some(p => {
+                const pid = p.id.toString();
+                return allNodes.some(m => m.id === pid && m.type === 'group');
+            });
+            
+            if (parentIsDirectlyVisible) {
+                return true; // Found a visible node in the chain
+            }
+            
+            // If parent is also a successor, recursively check its chain
+            if (childRelationshipLabels[parentId]?.has('successor')) {
+                if (hasVisibleSuccessorChain(parentId, successorChildToParent, allNodes, visited)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false; // No visible node found in any chain
+    }
 
     // ──────────────────────────────────────────────────────────
     // const visibleIds = new Set(computedNodes.map(n => n.id));

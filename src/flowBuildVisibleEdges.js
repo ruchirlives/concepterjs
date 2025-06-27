@@ -2,8 +2,10 @@ import colors from "tailwindcss/colors";
 import { MarkerType } from '@xyflow/react';
 
 export function buildVisibleEdges(params) {
-    const { childMap, computedNodes: visibleNodes, allNodes, } = params;
 
+    // params: { childMap, computedNodes, allNodes }
+    // - childMap: map of parentId → array of children
+    const { childMap, computedNodes: visibleNodes, allNodes, } = params;
     const newEdges = [];
 
     // console log the count of visible nodes and edges
