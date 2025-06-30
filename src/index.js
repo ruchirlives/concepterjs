@@ -4,6 +4,7 @@ import './index.css';
 import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
+import AppMatrix from './AppMatrix'; // Add this import
 import reportWebVitals from './reportWebVitals';
 
 const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setServer }) => {
@@ -79,6 +80,11 @@ const App = () => {
           <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
         </section>
 
+        {/* Add the AppMatrix section here */}
+        <section id="matrix" className="p-4 border rounded bg-white shadow">
+          <AppMatrix />
+        </section>
+
         <section id="sub" className="p-4 border rounded bg-white shadow">
           <AppFlow
             keepLayout={keepLayout}
@@ -90,8 +96,6 @@ const App = () => {
           <AppMermaid />
         </section>
       </main>
-
-
 
       {/* Floating panel */}
       <ButtonPanel
