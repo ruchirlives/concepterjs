@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { getPosition, setPosition } from "./api";
+import { manyChildren, setPosition } from "./api"; // Use manyChildren instead
 
 const AppMatrix = () => {
   const [rowData, setRowData] = useState([]);
@@ -20,32 +20,87 @@ const AppMatrix = () => {
     return () => channel.close();
   }, []);
 
-  // Memoize the loadRelationships function
+  // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
     if (rowData.length === 0) return;
 
     setLoading(true);
-    const newRelationships = {};
 
-    for (let i = 0; i < rowData.length; i++) {
-      for (let j = 0; j < rowData.length; j++) {
-        if (i !== j) {
-          const sourceId = rowData[i].id;
-          const targetId = rowData[j].id;
-          const key = `${sourceId}-${targetId}`;
+    try {
+      // Extract container IDs (same as flowFetchAndCreateEdges.js)
+      const containerIds = rowData.map((container) => container.id);
+      console.log("Loading relationships for containers:", containerIds);
 
-          try {
-            const relationship = await getPosition(sourceId, targetId);
-            newRelationships[key] = relationship || "";
-          } catch (error) {
-            console.error(`Error loading relationship ${sourceId}-${targetId}:`, error);
+      // Use existing manyChildren API
+      const parentChildMap = await manyChildren(containerIds);
+
+      if (!parentChildMap) {
+        console.warn("No parent-child data returned");
+        setRelationships({});
+        setLoading(false);
+        return;
+      }
+
+      // Build relationships map from parent-child data
+      const newRelationships = {};
+
+      // Process the parent-child map (same logic as flowFetchAndCreateEdges.js)
+      parentChildMap.forEach(({ container_id, children }) => {
+        const parentId = container_id.toString();
+
+        children.forEach((child) => {
+          const childId = child.id.toString();
+          const key = `${parentId}-${childId}`;
+
+          // Extract relationship from position (same as flowFetchAndCreateEdges.js)
+          let relationship = "";
+          if (child.position) {
+            if (typeof child.position === "object") {
+              relationship = child.position.label || "";
+            } else {
+              relationship = child.position.toString();
+            }
+          }
+
+          newRelationships[key] = relationship;
+        });
+      });
+
+      // Initialize empty relationships for pairs that don't exist
+      for (let i = 0; i < rowData.length; i++) {
+        for (let j = 0; j < rowData.length; j++) {
+          if (i !== j) {
+            const sourceId = rowData[i].id;
+            const targetId = rowData[j].id;
+            const key = `${sourceId}-${targetId}`;
+
+            // Only set if not already set from parent-child data
+            if (!(key in newRelationships)) {
+              newRelationships[key] = "";
+            }
+          }
+        }
+      }
+
+      console.log("Processed relationships from manyChildren:", newRelationships);
+      setRelationships(newRelationships);
+    } catch (error) {
+      console.error("Error loading relationships:", error);
+      // Initialize empty relationships on error
+      const newRelationships = {};
+      for (let i = 0; i < rowData.length; i++) {
+        for (let j = 0; j < rowData.length; j++) {
+          if (i !== j) {
+            const sourceId = rowData[i].id;
+            const targetId = rowData[j].id;
+            const key = `${sourceId}-${targetId}`;
             newRelationships[key] = "";
           }
         }
       }
+      setRelationships(newRelationships);
     }
 
-    setRelationships(newRelationships);
     setLoading(false);
   }, [rowData]);
 

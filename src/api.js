@@ -143,15 +143,27 @@ export const manyChildren = async (containerIds) => {
 
 export const getPosition = async (sourceId, targetId) => {
     try {
-        console.log("Fetching positions from API...");
+        console.log(`Fetching positions from API: ${sourceId} -> ${targetId}`);
         const response = await apiClient.get(`${getApiUrl()}/get_positions/${sourceId}/${targetId}`);
-        // strip the response to get the relationship string without the /newline characters
-        const relationshipString = response.data.relationshipString;
-
-        return relationshipString;
+        
+        // Debug the response
+        console.log("API Response:", response.data);
+        
+        if (response.data && response.data.relationshipString) {
+            const relationshipString = response.data.relationshipString.trim(); // Remove newlines
+            console.log("Found relationship:", relationshipString);
+            return relationshipString;
+        } else {
+            console.log("No relationship found, returning empty string");
+            return "";
+        }
     } catch (error) {
-        console.error("Error fetching positions:", error);
-        return "error";
+        if (error.response?.status === 500) {
+            console.warn(`No relationship exists between ${sourceId} and ${targetId} (500 error expected)`);
+        } else {
+            console.error("Error fetching positions:", error);
+        }
+        return ""; // Return empty string instead of "error"
     }
 };
 
