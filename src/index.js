@@ -4,8 +4,39 @@ import './index.css';
 import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
-import AppMatrix from './AppMatrix'; // Add this import
+import AppMatrix from './AppMatrix';
 import reportWebVitals from './reportWebVitals';
+
+// Create a collapsible wrapper component for AppFlow
+const CollapsibleAppFlow = ({ keepLayout, setKeepLayout }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="bg-white rounded shadow">
+      {/* Header with collapse button */}
+      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
+        <span className="font-semibold">Flow Diagram</span>
+        <button 
+          className="text-lg font-bold" 
+          onClick={() => setCollapsed((c) => !c)} 
+          aria-label={collapsed ? "Expand flow diagram" : "Collapse flow diagram"}
+        >
+          {collapsed ? "▼" : "▲"}
+        </button>
+      </div>
+
+      {/* Flow content */}
+      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 'auto' }}>
+        <div className="p-4">
+          <AppFlow
+            keepLayout={keepLayout}
+            setKeepLayout={setKeepLayout}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
@@ -33,7 +64,7 @@ const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setS
         </button>
       ))}
 
-      {/* ✅ Server Selector */}
+      {/* Server Selector */}
       <select
         id="ServerSelector"
         className="border border-gray-300 text-sm px-2 py-1 rounded min-w-[150px]"
@@ -45,7 +76,7 @@ const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setS
         <option value="2">Server B</option>
       </select>
 
-      {/* ✅ Keep Layout Toggle */}
+      {/* Keep Layout Toggle */}
       <label className="inline-flex items-center space-x-2 text-sm">
         <input
           type="checkbox"
@@ -56,7 +87,6 @@ const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setS
         />
         <span>Keep Layout</span>
       </label>
-
     </div>
   );
 };
@@ -75,24 +105,23 @@ const App = () => {
 
       {/* Main content wrapper */}
       <main className="flex-1 flex flex-col gap-4 px-6 py-4 overflow-y-auto">
-
-        <section id="grid" className="p-4 border rounded bg-white shadow">
+        <section id="grid">
           <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
         </section>
 
-        {/* Add the AppMatrix section here */}
-        <section id="matrix" className="p-4 border rounded bg-white shadow">
+        <section id="matrix">
           <AppMatrix />
         </section>
 
-        <section id="sub" className="p-4 border rounded bg-white shadow">
+        {/* Remove wrapper styling since AppFlow now handles its own container */}
+        <section id="sub">
           <AppFlow
             keepLayout={keepLayout}
             setKeepLayout={setKeepLayout}
           />
         </section>
 
-        <section id="mermaid" className="p-4 border rounded bg-white shadow mb-28">
+        <section id="mermaid" className="mb-28">
           <AppMermaid />
         </section>
       </main>

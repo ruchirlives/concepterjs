@@ -15,6 +15,7 @@ import CustomEdge from './customEdge';
 import { Toaster } from 'react-hot-toast';
 
 const App = ({ keepLayout, setKeepLayout }) => {
+  const [collapsed, setCollapsed] = useState(false);
   // Step 1: Active group state and history ---
   const [activeGroup, setActiveGroup] = useState(null);
   const [history, setHistory] = useState([]);
@@ -110,77 +111,97 @@ const App = ({ keepLayout, setKeepLayout }) => {
     customEdge: CustomEdge,
   };
 
-  return <div
-    ref={flowWrapperRef}
-    className="w-full bg-white rounded shadow relative"
-    style={styles}
-    onClick={hideMenu}>
-
-    {/* [ADDED] Back button and name of activegroup when in a subgroup */}
-    {activeGroup && (
-      <div
-        className="absolute top-2 left-20 z-50 flex items-center space-x-4 bg-white bg-opacity-80 rounded shadow p-3"
-        style={{ backdropFilter: 'blur(4px)' }}
-      >
+  return (
+    <div className="bg-white rounded shadow">
+      {/* Header with collapse button */}
+      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
+        <span className="font-semibold">Flow Diagram</span>
         <button
-          className="bg-gray-200 rounded p-3"
-          onClick={() => {
-            const prev = history[history.length - 1] || null;
-            setHistory(h => h.slice(0, -1));
-            setActiveGroup(prev);
-          }}
+          className="text-lg font-bold"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand flow diagram" : "Collapse flow diagram"}
         >
-          ← Back
+          {collapsed ? "▼" : "▲"}
         </button>
-
-        <h1 className="text-lg font-bold p-3">
-          {rowData.find(n => n.id === activeGroup)?.Name || activeGroup}
-        </h1>
       </div>
-    )}
 
-    <ReactFlow
-      fitView
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onEdgeDoubleClick={onEdgeDoubleClick}
-      onConnect={onEdgeConnect}
-      nodeTypes={{ custom: FlowNode, group: GroupNode }}
-      edgeTypes={edgeTypes}
-      defaultMarkerColor="#000000"
-      onConnectEnd={onConnectEnd} onEdgeContextMenu={handleEdgeMenu} onNodeContextMenu={handleContextMenu} onSelectionContextMenu={selectionContextMenu} // Handle right-click for context menu
-      // [ADDED] onNodeDoubleClick drills into group
-      onNodeDoubleClick={(e, node) => {
-        if (node.type === 'group') {
-          // [ADDED] push current activeGroup onto history
-          setHistory(h => [...h, activeGroup]);
-          setActiveGroup(node.id);
-          setKeepLayout(false);
-          // Refresh the nodes and edges
+      {/* Flow content */}
+      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 600 }}>
+        <div
+          ref={flowWrapperRef}
+          className="w-full bg-white relative"
+          style={{ height: 600 }}
+          onClick={hideMenu}
+        >
 
-        }
-      }}
-    >
-      <Controls position="top-left">
-        <ControlButton onClick={(e) => gearContextMenu(e)}>
-          <GearIcon />
-        </ControlButton>
-      </Controls>
-      <MiniMap />
-      <Background
-        variant="dots"
-        gap={12}
-        size={1}
-        color="#e5e7eb" // Tailwind's gray-200
-        style={{ backgroundColor: '#f9fafb' }} // Tailwind's gray-50
-      />
-    </ReactFlow>
-    <ContextMenu ref={contextMenuRef} onMenuItemClick={onContextMenuItemClick} menuItems={menuItems} />
-    <EdgeMenu ref={edgeMenuRef} onMenuItemClick={onEdgeMenuItemClick} rowData={rowData} setRowData={setRowData} edges={edges} setEdges={setEdges} />
-    <Toaster position="top-right" />
-  </div>;
+          {/* [ADDED] Back button and name of activegroup when in a subgroup */}
+          {activeGroup && (
+            <div
+              className="absolute top-2 left-20 z-50 flex items-center space-x-4 bg-white bg-opacity-80 rounded shadow p-3"
+              style={{ backdropFilter: 'blur(4px)' }}
+            >
+              <button
+                className="bg-gray-200 rounded p-3"
+                onClick={() => {
+                  const prev = history[history.length - 1] || null;
+                  setHistory(h => h.slice(0, -1));
+                  setActiveGroup(prev);
+                }}
+              >
+                ← Back
+              </button>
+
+              <h1 className="text-lg font-bold p-3">
+                {rowData.find(n => n.id === activeGroup)?.Name || activeGroup}
+              </h1>
+            </div>
+          )}
+
+          <ReactFlow
+            fitView
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onEdgeDoubleClick={onEdgeDoubleClick}
+            onConnect={onEdgeConnect}
+            nodeTypes={{ custom: FlowNode, group: GroupNode }}
+            edgeTypes={edgeTypes}
+            defaultMarkerColor="#000000"
+            onConnectEnd={onConnectEnd} onEdgeContextMenu={handleEdgeMenu} onNodeContextMenu={handleContextMenu} onSelectionContextMenu={selectionContextMenu} // Handle right-click for context menu
+            // [ADDED] onNodeDoubleClick drills into group
+            onNodeDoubleClick={(e, node) => {
+              if (node.type === 'group') {
+                // [ADDED] push current activeGroup onto history
+                setHistory(h => [...h, activeGroup]);
+                setActiveGroup(node.id);
+                setKeepLayout(false);
+                // Refresh the nodes and edges
+
+              }
+            }}
+          >
+            <Controls position="top-left">
+              <ControlButton onClick={(e) => gearContextMenu(e)}>
+                <GearIcon />
+              </ControlButton>
+            </Controls>
+            <MiniMap />
+            <Background
+              variant="dots"
+              gap={12}
+              size={1}
+              color="#e5e7eb" // Tailwind's gray-200
+              style={{ backgroundColor: '#f9fafb' }} // Tailwind's gray-50
+            />
+          </ReactFlow>
+          <ContextMenu ref={contextMenuRef} onMenuItemClick={onContextMenuItemClick} menuItems={menuItems} />
+          <EdgeMenu ref={edgeMenuRef} onMenuItemClick={onEdgeMenuItemClick} rowData={rowData} setRowData={setRowData} edges={edges} setEdges={setEdges} />
+          <Toaster position="top-right" />
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const AppWithProvider = (props) => (
