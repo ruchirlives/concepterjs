@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { manyChildren, setPosition } from "./api"; // Use manyChildren instead
 
 const AppMatrix = () => {
@@ -14,7 +14,6 @@ const AppMatrix = () => {
     const channel = new BroadcastChannel("tagSelectChannel");
     channel.onmessage = (event) => {
       const { tagFilter } = event.data;
-      console.log("Matrix received filtered data:", tagFilter);
       setRowData(tagFilter || []);
     };
     return () => channel.close();
@@ -22,20 +21,19 @@ const AppMatrix = () => {
 
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
-    if (rowData.length === 0) return;
+    // Don't fetch if no data OR if collapsed
+    if (rowData.length === 0 || collapsed) return;
 
     setLoading(true);
 
     try {
       // Extract container IDs (same as flowFetchAndCreateEdges.js)
       const containerIds = rowData.map((container) => container.id);
-      console.log("Loading relationships for containers:", containerIds);
 
       // Use existing manyChildren API
       const parentChildMap = await manyChildren(containerIds);
 
       if (!parentChildMap) {
-        console.warn("No parent-child data returned");
         setRelationships({});
         setLoading(false);
         return;
@@ -82,7 +80,6 @@ const AppMatrix = () => {
         }
       }
 
-      console.log("Processed relationships from manyChildren:", newRelationships);
       setRelationships(newRelationships);
     } catch (error) {
       console.error("Error loading relationships:", error);
@@ -102,12 +99,20 @@ const AppMatrix = () => {
     }
 
     setLoading(false);
-  }, [rowData]);
+  }, [rowData, collapsed]); // Add collapsed to dependencies
 
-  // Load existing relationships when rowData changes
+  // Load existing relationships when rowData changes OR when collapsed state changes
   useEffect(() => {
     loadRelationships();
   }, [loadRelationships]);
+
+  // Additional effect to trigger fetch when expanding with existing data
+  useEffect(() => {
+    // Only fetch if we have data, not collapsed, and no relationships loaded yet
+    if (rowData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
+      loadRelationships();
+    }
+  }, [collapsed, rowData.length, relationships, loadRelationships]);
 
   // Memoize event handlers
   const handleCellClick = useCallback((sourceId, targetId) => {
@@ -164,49 +169,7 @@ const AppMatrix = () => {
     }
   }, [editingCell]);
 
-  // Memoize the MatrixCell component to prevent unnecessary re-renders
-  const MatrixCell = useMemo(() => {
-    return React.memo(({ sourceId, targetId, isHeader = false, children }) => {
-      const key = `${sourceId}-${targetId}`;
-      const isEditing = editingCell?.key === key;
-      const value = relationships[key] || "";
-      const isDiagonal = sourceId === targetId;
-
-      if (isHeader) {
-        return (
-          <th className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[100px] max-w-[100px] truncate">{children}</th>
-        );
-      }
-
-      if (isDiagonal) {
-        return <td className="p-2 bg-gray-200 border border-gray-300 text-center min-w-[100px] max-w-[100px]">—</td>;
-      }
-
-      return (
-        <td
-          className="p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50"
-          onClick={() => handleCellClick(sourceId, targetId)}
-        >
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              defaultValue={value}
-              className="w-full px-1 py-0 text-xs border-0 outline-none bg-white"
-              onKeyDown={handleKeyDown}
-              onBlur={handleBlur}
-            />
-          ) : (
-            <span className="text-xs block truncate" title={value}>
-              {value || "—"}
-            </span>
-          )}
-        </td>
-      );
-    });
-  }, [editingCell, relationships, handleCellClick, handleKeyDown, handleBlur]);
-
-  // Memoize the empty state component
+  // Fix the EmptyState component
   const EmptyState = useMemo(
     () => (
       <div className="bg-white rounded shadow p-4">
@@ -217,11 +180,13 @@ const AppMatrix = () => {
           </button>
         </div>
         {!collapsed && (
-          <div className="text-gray-500 text-center py-8">No data available. Filter containers in the grid above to populate the matrix.</div>
+          <div className="text-gray-500 text-center py-8">
+            No data available. Filter containers in the grid above to populate the matrix.
+          </div>
         )}
       </div>
     ),
-    [collapsed]
+    [collapsed] // ✅ useMemo uses dependency array correctly
   );
 
   if (rowData.length === 0) {
@@ -240,53 +205,99 @@ const AppMatrix = () => {
 
       {/* Matrix content */}
       <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 400 }}>
-        <div className="p-4 h-full overflow-auto">
+        <div className="h-full flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-gray-500">Loading relationships...</div>
             </div>
           ) : (
-            <div className="overflow-auto border border-gray-300">
-              <table className="border-collapse">
-                <thead>
-                  <tr>
-                    <MatrixCell isHeader>
-                      <div className="w-0 h-0 border-l-[50px] border-l-transparent border-b-[30px] border-b-gray-400 relative">
-                        <span className="absolute -bottom-6 -left-12 text-xs">From</span>
-                        <span className="absolute -bottom-2 left-2 text-xs">To</span>
-                      </div>
-                    </MatrixCell>
-                    {rowData.map((container) => (
-                      <MatrixCell key={container.id} isHeader>
-                        <div title={container.Name}>{container.Name}</div>
-                        <div className="text-gray-500">({container.id})</div>
-                      </MatrixCell>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rowData.map((sourceContainer) => (
-                    <tr key={sourceContainer.id}>
-                      <MatrixCell isHeader>
-                        <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
-                        <div className="text-gray-500">({sourceContainer.id})</div>
-                      </MatrixCell>
-                      {rowData.map((targetContainer) => (
-                        <MatrixCell key={`${sourceContainer.id}-${targetContainer.id}`} sourceId={sourceContainer.id} targetId={targetContainer.id} />
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            <>
+              {/* Table container with freeze panes - Fixed scrolling */}
+              <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-hidden">
+                {/* Scrollable table container with explicit height */}
+                <div className="overflow-auto w-full h-full" style={{ maxHeight: "300px" }}>
+                  <table className="border-collapse w-full">
+                    {/* Sticky header row */}
+                    <thead className="sticky top-0 z-20">
+                      <tr>
+                        {/* Top-left corner cell - sticky both ways */}
+                        <th className="sticky left-0 z-30 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px]">
+                          <div className="w-0 h-0 border-l-[50px] border-l-transparent border-b-[30px] border-b-gray-400 relative">
+                            <span className="absolute -bottom-6 -left-12 text-xs">From</span>
+                            <span className="absolute -bottom-2 left-2 text-xs">To</span>
+                          </div>
+                        </th>
+                        {/* Column headers - sticky top */}
+                        {rowData.map((container) => (
+                          <th
+                            key={container.id}
+                            className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[100px] max-w-[100px] truncate whitespace-nowrap"
+                          >
+                            <div title={container.Name}>{container.Name}</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rowData.map((sourceContainer) => (
+                        <tr key={sourceContainer.id}>
+                          {/* Row header - sticky left */}
+                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px] truncate whitespace-nowrap">
+                            <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
+                          </th>
+                          {/* Data cells */}
+                          {rowData.map((targetContainer) => {
+                            const key = `${sourceContainer.id}-${targetContainer.id}`;
+                            const isEditing = editingCell?.key === key;
+                            const value = relationships[key] || "";
+                            const isDiagonal = sourceContainer.id === targetContainer.id;
 
-          {!loading && (
-            <div className="mt-4 text-sm text-gray-600">
-              <p>• Click on any cell to edit the relationship</p>
-              <p>• Press Enter to save, Escape to cancel</p>
-              <p>• Diagonal cells (same container) are disabled</p>
-            </div>
+                            if (isDiagonal) {
+                              return (
+                                <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-center min-w-[100px] max-w-[100px]">
+                                  —
+                                </td>
+                              );
+                            }
+
+                            return (
+                              <td
+                                key={key}
+                                className="p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 bg-white"
+                                onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
+                              >
+                                {isEditing ? (
+                                  <input
+                                    ref={inputRef}
+                                    type="text"
+                                    defaultValue={value}
+                                    className="w-full px-1 py-0 text-xs border-0 outline-none bg-white"
+                                    onKeyDown={handleKeyDown}
+                                    onBlur={handleBlur}
+                                  />
+                                ) : (
+                                  <span className="text-xs block truncate" title={value}>
+                                    {value || "—"}
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Instructions below the table */}
+              <div className="mt-4 text-sm text-gray-600 flex-shrink-0">
+                <p>• Click on any cell to edit the relationship</p>
+                <p>• Press Enter to save, Escape to cancel</p>
+                <p>• Diagonal cells (same container) are disabled</p>
+                <p>• Headers are frozen for easy navigation</p>
+              </div>
+            </>
           )}
         </div>
       </div>
