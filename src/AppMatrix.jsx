@@ -224,6 +224,14 @@ const AppMatrix = () => {
     return EmptyState;
   }
 
+  // Color coding for different relationship types
+  const getRelationshipColor = (value) => {
+    if (!value) return "bg-white";
+    if (value.includes("parent")) return "bg-blue-50";
+    if (value.includes("child")) return "bg-green-50";
+    return "bg-yellow-50";
+  };
+
   return (
     <div className="bg-white rounded shadow">
       {/* Header with collapse button and hide empty toggle */}
@@ -310,7 +318,9 @@ const AppMatrix = () => {
                             return (
                               <td
                                 key={key}
-                                className="p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 bg-white"
+                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(
+                                  value
+                                )}`}
                                 onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
                               >
                                 {isEditing ? (
