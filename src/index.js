@@ -5,6 +5,7 @@ import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
 import AppMatrix from './AppMatrix';
+import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 
 // Create a collapsible wrapper component for AppFlow
@@ -38,14 +39,15 @@ const CollapsibleAppFlow = ({ keepLayout, setKeepLayout }) => {
   );
 };
 
-const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setServer }) => {
+const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
     { id: "writeBackButton", text: "Write Back Data" },
     { id: "loadDataButton", text: "Reload Data" },
     { id: "addRowButton", text: "Create Container" },
-    { id: "loadContainersButton", text: "Load Containers" },
+    { id: "loadContainersButton", text: "Load Containers", onClick: onLoadContainers },
     { id: "saveContainersButton", text: "Save Containers" },
     { id: "importContainersButton", text: "Import Containers" },
+    { id: "createFromContentButton", text: "Create from Content", onClick: onCreateFromContent },
     { id: "clearButton", text: "Clear" },
     { id: "refreshButton", text: "Refresh" },
     { id: "requestRekeyButton", text: "Request Rekey" },
@@ -93,8 +95,21 @@ const ButtonPanel = ({ onLoadContainers, keepLayout, setKeepLayout, server, setS
 
 const App = () => {
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [isCreateFromContentModalOpen, setIsCreateFromContentModalOpen] = useState(false);
   const [keepLayout, setKeepLayout] = useState(false);
   const [server, setServer] = useState("0");
+
+  const handleCreateFromContent = (result) => {
+    console.log('Containers created:', result);
+    // You can add a toast notification here
+    alert(`${result.message}\nCreated ${result.container_ids.length} containers`);
+    
+    // Optionally trigger a data reload in AppGrid
+    // You might want to broadcast this via the existing channel system
+    const channel = new BroadcastChannel("containerUpdateChannel");
+    channel.postMessage({ type: "CONTAINERS_CREATED", data: result });
+    channel.close();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -113,9 +128,8 @@ const App = () => {
           <AppMatrix />
         </section>
 
-        {/* Remove wrapper styling since AppFlow now handles its own container */}
         <section id="sub">
-          <AppFlow
+          <CollapsibleAppFlow
             keepLayout={keepLayout}
             setKeepLayout={setKeepLayout}
           />
@@ -133,6 +147,14 @@ const App = () => {
         server={server}
         setServer={setServer}
         onLoadContainers={() => setIsLoadModalOpen(true)}
+        onCreateFromContent={() => setIsCreateFromContentModalOpen(true)}
+      />
+
+      {/* Modals */}
+      <CreateFromContentModal
+        isOpen={isCreateFromContentModalOpen}
+        setIsOpen={setIsCreateFromContentModalOpen}
+        onCreateContainers={handleCreateFromContent}
       />
     </div>
   );

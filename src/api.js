@@ -422,3 +422,18 @@ export const clearContainers = async () => {
         return null;
     }
 };
+
+// Add this to api.js
+export const createContainersFromContent = async (prompt, content) => {
+    try {
+        console.log("Creating containers from content...");
+        const response = await apiClient.post(`${getApiUrl()}/create_containers_from_content`, {
+            prompt: prompt || undefined,
+            content: content,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error creating containers from content:", error);
+        throw error; // Re-throw to let the modal handle the error display
+    }
+};
