@@ -89,10 +89,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
   const onConnectEnd = useOnConnectEnd({ setEdges, setNodes, screenToFlowPosition, setRowData, addEdge, activeGroup, setLayoutPositions });
   const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
-  const styles = {
-    width: '100%',
-    height: 600
-  };
 
   // Step 5: Context menu and edge menu logic ---
   useTagsChange(rowData, setRowData, keepLayout);
