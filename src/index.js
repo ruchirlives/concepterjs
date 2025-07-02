@@ -8,36 +8,6 @@ import AppMatrix from './AppMatrix';
 import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 
-// Create a collapsible wrapper component for AppFlow
-const CollapsibleAppFlow = ({ keepLayout, setKeepLayout }) => {
-  const [collapsed, setCollapsed] = useState(false);
-
-  return (
-    <div className="bg-white rounded shadow">
-      {/* Header with collapse button */}
-      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-        <span className="font-semibold">Flow Diagram</span>
-        <button 
-          className="text-lg font-bold" 
-          onClick={() => setCollapsed((c) => !c)} 
-          aria-label={collapsed ? "Expand flow diagram" : "Collapse flow diagram"}
-        >
-          {collapsed ? "▼" : "▲"}
-        </button>
-      </div>
-
-      {/* Flow content */}
-      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 'auto' }}>
-        <div className="p-4">
-          <AppFlow
-            keepLayout={keepLayout}
-            setKeepLayout={setKeepLayout}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
@@ -129,10 +99,7 @@ const App = () => {
         </section>
 
         <section id="sub">
-          <CollapsibleAppFlow
-            keepLayout={keepLayout}
-            setKeepLayout={setKeepLayout}
-          />
+          <AppFlow/>
         </section>
 
         <section id="mermaid" className="mb-28">

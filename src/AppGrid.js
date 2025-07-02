@@ -39,7 +39,7 @@ const App = () => {
   // State to store name of the current container
   const [currentContainer, setCurrentContainer] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(true);
 
   // Reference to the grid API
   const gridApiRef = useRef(null); // Ref to store gridApi

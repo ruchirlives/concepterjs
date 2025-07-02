@@ -6,7 +6,7 @@ const AppMatrix = () => {
   const [relationships, setRelationships] = useState({});
   const [loading, setLoading] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const inputRef = useRef(null);
 

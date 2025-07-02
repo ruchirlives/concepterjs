@@ -15,7 +15,7 @@ import CustomEdge from './customEdge';
 import { Toaster } from 'react-hot-toast';
 
 const App = ({ keepLayout, setKeepLayout }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   // Step 1: Active group state and history ---
   const [activeGroup, setActiveGroup] = useState(null);
   const [history, setHistory] = useState([]);
