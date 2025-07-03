@@ -1,5 +1,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
+import { useAppContext } from './AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
 import { setPosition } from './api';
 import { createNewRow } from './ModalNewContainer';
@@ -310,6 +311,7 @@ export const useCreateNodesAndEdges = (params) => {
 
 
 export const useTagsChange = (rowData, setRowData, keepLayout) => {
+    const { rows: tagFilter } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     // Keep ref updated
@@ -318,35 +320,19 @@ export const useTagsChange = (rowData, setRowData, keepLayout) => {
     }, [rowData]);
 
     useEffect(() => {
-        const channel = new BroadcastChannel('tagSelectChannel');
-
-        channel.onmessage = (event) => {
-            const { tagFilter } = event.data;
-            console.log('Tag filter changed:');
-            console.log("Keep node setting:", keepLayout);
-            const keepLayoutetting = keepLayout;
-            var filteredTagFilter = [];
-            if (keepLayoutetting) {
-                // Remove rows from tagFilter that are not in rowDataRef
-                filteredTagFilter = tagFilter.filter((row) =>
-                    rowDataRef.current.some((r) => r.id === row.id)
-                );
-
-            }
-            else {
-                // Keep all rows in tagFilter
-                filteredTagFilter = tagFilter;
-                console.log('Keeping all rows in tagFilter');
-            }
-            setRowData(filteredTagFilter);
-            console.log('Row data at time of event (outdated)');
-        };
-
-        return () => {
-            channel.close();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        console.log('Tag filter changed:');
+        console.log("Keep node setting:", keepLayout);
+        let filteredTagFilter = [];
+        if (keepLayout) {
+            filteredTagFilter = tagFilter.filter((row) =>
+                rowDataRef.current.some((r) => r.id === row.id)
+            );
+        } else {
+            filteredTagFilter = tagFilter;
+            console.log('Keeping all rows in tagFilter');
+        }
+        setRowData(filteredTagFilter);
+    }, [tagFilter, keepLayout, setRowData]);
 };
 
 

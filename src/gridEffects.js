@@ -185,15 +185,8 @@ export const useLoadDataEffect = (setRowData, fetchContainers, sendFilteredRows)
     }, [setRowData, fetchContainers, sendFilteredRows]);
 };
 
-export const useFilteredRowBroadcast = (rowData, sendFilteredRows) => {
+export const useFilteredRowContext = (rowData, sendFilteredRows) => {
     const prevCountRef = useRef(rowData.length);
-
-    const handleRequestRefresh = useCallback(() => {
-        console.log("Received requestRefresh message:");
-        sendFilteredRows();
-    }, [sendFilteredRows]);
-
-    useBroadcastChannel('requestRefreshChannel', handleRequestRefresh, [handleRequestRefresh]);
 
     useEffect(() => {
         const refreshButton = document.getElementById("refreshButton");
@@ -203,7 +196,7 @@ export const useFilteredRowBroadcast = (rowData, sendFilteredRows) => {
             refreshButton.addEventListener("click", handleRefreshClick);
         }
 
-        // Only broadcast when row count actually changes
+        // Update when row count changes
         if (rowData.length !== prevCountRef.current) {
             sendFilteredRows();
             prevCountRef.current = rowData.length;

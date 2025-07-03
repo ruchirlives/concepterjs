@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AppProvider } from './AppContext';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import AppGrid from './AppGrid';
@@ -135,7 +136,9 @@ const App = () => {
 const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(
   <React.StrictMode>
-    <App />
+    <AppProvider>
+      <App />
+    </AppProvider>
   </React.StrictMode>
 );
 

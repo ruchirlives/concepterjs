@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useAppContext } from "./AppContext";
 
 const AppPrioritiser = () => {
-  const [rowData, setRowData] = useState([]);
+  const { rows: rowData, setRows: setRowData } = useAppContext();
   const [positions, setPositions] = useState({});
   const [collapsed, setCollapsed] = useState(true);
   const containerRef = useRef(null);
   const draggingRef = useRef(null);
-
-  // Listen for filtered rows from AppGrid
-  useEffect(() => {
-    const channel = new BroadcastChannel("tagSelectChannel");
-    channel.onmessage = (event) => {
-      const { tagFilter } = event.data;
-      setRowData(tagFilter || []);
-    };
-    return () => channel.close();
-  }, []);
 
   // Initialize positions from rowData's built-in Impact/Effort fields
   useEffect(() => {

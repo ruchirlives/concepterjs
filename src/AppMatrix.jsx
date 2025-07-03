@@ -1,24 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { manyChildren, setPosition } from "./api";
+import { useAppContext } from "./AppContext";
 
 const AppMatrix = () => {
-  const [rowData, setRowData] = useState([]);
+  const { rows: rowData } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [loading, setLoading] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const inputRef = useRef(null);
-
-  // Listen for row data updates from other components
-  useEffect(() => {
-    const channel = new BroadcastChannel("tagSelectChannel");
-    channel.onmessage = (event) => {
-      const { tagFilter } = event.data;
-      setRowData(tagFilter || []);
-    };
-    return () => channel.close();
-  }, []);
 
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {

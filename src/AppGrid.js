@@ -1,5 +1,6 @@
 // React imports
 import React, { useState, useRef, useEffect } from "react";
+import { useAppContext } from "./AppContext";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry } from "ag-grid-community";
 import { createNewRow } from "./ModalNewContainer"; // Import the function to create a new row
@@ -13,7 +14,7 @@ import columnDefs from "./gridColumnDefs";
 import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } from "./api";
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
-  useSaveButtonEffect, useDropDownEffect, useLoadDataEffect, useFilteredRowBroadcast,
+  useSaveButtonEffect, useDropDownEffect, useLoadDataEffect, useFilteredRowContext,
   useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestReloadChannel, useRekeyButtonEffect, useAddTagsChannel, useRemoveTagsChannel
 } from "./gridEffects";
 import { handleWriteBack } from "./effectsShared";
@@ -29,7 +30,7 @@ import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const App = () => {
-  const [rowData, setRowData] = useState([]); // State to hold fetched data
+  const { rows: rowData, setRows: setRowData } = useAppContext();
   // const [miniMapData, setMiniMapData] = useState([]); // Mini-map children data
   // const [lastSelectedRow, setLastSelectedRow] = useState(null); // Last selected row
   const [isLoadModalOpen, setLoadModalOpen] = useState(false); // State for load modal
@@ -177,14 +178,8 @@ const App = () => {
       }
     }
 
-    // console.log('Filtered rows:', filteredRowData);
-
-    // Create BroadcastChannel
-    const channel = new BroadcastChannel('tagSelectChannel');
-    // Send message
-    channel.postMessage({ tagFilter: filteredRowData });
-    // Close the channel
-    channel.close();
+    // Update context with filtered rows
+    setRowData(filteredRowData);
   }
 
   // OnFilter
@@ -271,7 +266,7 @@ const App = () => {
   useFetchData(setRowData, fetchContainers);
   useWriteBackButton(rowData);
   useLoadDataEffect(setRowData, fetchContainers, sendFilteredRows);
-  useFilteredRowBroadcast(rowData, sendFilteredRows);
+  useFilteredRowContext(rowData, sendFilteredRows);
   useAddRowButton(handleAddRow);
   useLoadButtonEffect(setLoadModalOpen, setMerge);
   useImportButtonEffect(setLoadModalOpen, setMerge);
