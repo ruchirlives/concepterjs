@@ -5,6 +5,7 @@ import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
 import AppMatrix from './AppMatrix';
+import AppPrioritiser from './AppPrioritiser';
 import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 
@@ -96,6 +97,10 @@ const App = () => {
 
         <section id="matrix">
           <AppMatrix />
+        </section>
+
+        <section id="prioritiser">
+          <AppPrioritiser />
         </section>
 
         <section id="sub">
