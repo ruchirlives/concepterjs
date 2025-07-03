@@ -437,29 +437,3 @@ export const createContainersFromContent = async (prompt, content) => {
         throw error; // Re-throw to let the modal handle the error display
     }
 };
-
-export const fetchImpactEffort = async (containerIds) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/get_impact_effort`, {
-            container_ids: containerIds,
-        });
-        return response.data; // {id: {impact: number, effort: number}}
-    } catch (error) {
-        console.error("Error fetching impact/effort:", error);
-        return {};
-    }
-};
-
-export const setImpactEffort = async (id, impact, effort) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/set_impact_effort`, {
-            id,
-            impact,
-            effort,
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error setting impact/effort:", error);
-        return null;
-    }
-};

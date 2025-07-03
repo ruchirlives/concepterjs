@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { fetchImpactEffort, setImpactEffort } from "./api";
 
 const AppPrioritiser = () => {
   const [rowData, setRowData] = useState([]);
@@ -18,18 +17,16 @@ const AppPrioritiser = () => {
     return () => channel.close();
   }, []);
 
-  // Load impact/effort values whenever rowData changes
+  // Initialize positions from rowData's built-in Impact/Effort fields
   useEffect(() => {
-    if (rowData.length === 0) return;
-    const ids = rowData.map((c) => c.id);
-    fetchImpactEffort(ids).then((data) => {
-      const newPos = {};
-      ids.forEach((id) => {
-        if (data && data[id]) newPos[id] = data[id];
-        else newPos[id] = { impact: 50, effort: 50 };
-      });
-      setPositions(newPos);
+    const newPos = {};
+    rowData.forEach((c) => {
+      newPos[c.id] = {
+        impact: typeof c.Impact === "number" ? c.Impact : 50,
+        effort: typeof c.Effort === "number" ? c.Effort : 50,
+      };
     });
+    setPositions(newPos);
   }, [rowData]);
 
   const handleMouseDown = (e, id) => {
@@ -55,7 +52,10 @@ const AppPrioritiser = () => {
     const id = draggingRef.current;
     if (id) {
       const { impact, effort } = positions[id] || { impact: 50, effort: 50 };
-      setImpactEffort(id, impact, effort);
+      // just update the in‐memory copy
+      setRowData(r =>
+        r.map(c => c.id === id ? { ...c, Impact: impact, Effort: effort } : c)
+      );
     }
     draggingRef.current = null;
   };
