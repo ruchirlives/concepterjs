@@ -260,7 +260,7 @@ const App = () => {
     return () => {
       channel.close(); // Close the channel when the component unmounts
     }
-  }, [rowData]);
+  }, [rowData, setRowData]); // Add rowData and setRowData to dependencies
 
   // Use custom hooks for effects
   useFetchData(setRowData, fetchContainers);

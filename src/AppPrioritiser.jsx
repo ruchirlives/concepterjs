@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAppContext } from "./AppContext";
 
 const AppPrioritiser = () => {
@@ -39,7 +39,7 @@ const AppPrioritiser = () => {
     }));
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     const id = draggingRef.current;
     if (id) {
       const { impact, effort } = positions[id] || { impact: 50, effort: 50 };
@@ -49,12 +49,19 @@ const AppPrioritiser = () => {
       );
     }
     draggingRef.current = null;
-  };
+  }, [positions, setRowData]);
+
+  // 1) global mouseup listener so we never miss a release
+  useEffect(() => {
+    const onDocMouseUp = () => handleMouseUp();
+    document.addEventListener("mouseup", onDocMouseUp);
+    return () => document.removeEventListener("mouseup", onDocMouseUp);
+  }, [handleMouseUp]);
 
   return (
     <div className="bg-white rounded shadow">
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-        <span className="font-semibold">App Prioritiser</span>
+        <span className="font-semibold">Prioritiser</span>
         <button
           className="text-lg font-bold"
           onClick={() => setCollapsed((c) => !c)}
@@ -64,15 +71,27 @@ const AppPrioritiser = () => {
         </button>
       </div>
       <div
-        className={`transition-all duration-300 overflow-hidden`}
-        style={{ height: collapsed ? 0 : 400 }}
+        // now scrollable and taller
+        className={`transition-all duration-300 overflow-y-auto`}
+        style={{ height: collapsed ? 0 : 650 }}
       >
         <div
           ref={containerRef}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          className="relative h-96 border m-4 select-none"
+          onMouseLeave={handleMouseUp}
+          className="relative h-full border m-4 select-none"
         >
+          {/* axis labels */}
+          <div className="absolute bottom-0 left-0 mb-2 ml-2 text-xs text-gray-500">
+            Low Effort
+          </div>
+          <div className="absolute bottom-0 right-0 mb-2 mr-2 text-xs text-gray-500">
+            High Effort
+          </div>
+          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -rotate-90 text-xs text-gray-500">
+            Low → High Impact
+          </div>
           <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-300" />
           <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-300" />
           {rowData.map((container) => {
@@ -88,7 +107,9 @@ const AppPrioritiser = () => {
                   transform: "translate(-50%, -50%)",
                 }}
                 className="cursor-pointer bg-blue-100 text-xs px-2 py-1 rounded shadow"
-                title={`${container.Name} (Impact ${Math.round(pos.impact)}, Effort ${Math.round(pos.effort)})`}
+                title={`${container.Name} (Impact ${Math.round(
+                  pos.impact
+                )}, Effort ${Math.round(pos.effort)})`}
               >
                 {container.Name}
               </div>
