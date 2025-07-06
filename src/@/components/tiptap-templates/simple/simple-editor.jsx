@@ -1,5 +1,8 @@
 import * as React from "react"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
+import { Extension } from "@tiptap/core"
+import { Plugin, PluginKey } from "prosemirror-state"
+import { Decoration, DecorationSet } from "prosemirror-view"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -74,6 +77,52 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
+
+// --- Ghost Text Extension ---
+const GhostTextExtension = Extension.create({
+  name: 'ghostText',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('ghostText'),
+        state: {
+          init() {
+            return DecorationSet.empty;
+          },
+          apply(tr, decorationSet) {
+            decorationSet = decorationSet.map(tr.mapping, tr.doc);
+
+            const ghostMeta = tr.getMeta('ghostText');
+            if (ghostMeta) {
+              if (ghostMeta.clear) {
+                return DecorationSet.empty;
+              } else if (ghostMeta.suggestion && ghostMeta.pos !== undefined) {
+                const decoration = Decoration.widget(
+                  ghostMeta.pos,
+                  () => {
+                    const span = document.createElement('span');
+                    span.className = 'ghost-text';
+                    span.textContent = ghostMeta.suggestion;
+                    return span;
+                  },
+                  { key: 'ghost' }
+                );
+                return DecorationSet.create(tr.doc, [decoration]);
+              }
+            }
+            return decorationSet;
+          },
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state);
+          },
+        },
+      }),
+    ];
+  },
+});
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -197,6 +246,7 @@ export function SimpleEditor({ onEditorReady}) {
       }),
       TrailingNode,
       Link.configure({ openOnClick: false }),
+      GhostTextExtension,
     ],
     content: content,
   })
