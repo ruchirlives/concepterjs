@@ -5,7 +5,7 @@ const AppTiptap = () => {
     const [collapsed, setCollapsed] = useState(true);
 
     return (
-        <div className="p-4 bg-white rounded shadow">
+        <div className="p-4 rounded shadow">
             <div
                 className="flex justify-between items-center cursor-pointer user-select-text px-4 py-2"
                 onClick={() => setCollapsed(!collapsed)}
@@ -20,11 +20,11 @@ const AppTiptap = () => {
             </div>
 
             <div
-                className={`transition-all duration-300 overflow-hidden ${collapsed ? "h-0" : "max-h-[400px] overflow-y-auto"
+                className={`transition-all duration-300 overflow-hidden ${collapsed ? "" : "max-h-[400px] overflow-y-auto"
                     }`}
             >
                 {!collapsed && (
-                    <div className="mt-4 prose prose-sm user-select-text pointer-events-auto">
+                    <div>
                         <SimpleEditor />
                     </div>
                 )}
