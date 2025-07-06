@@ -76,7 +76,7 @@ const App = () => {
     console.log('Containers created:', result);
     // You can add a toast notification here
     alert(`${result.message}\nCreated ${result.container_ids.length} containers`);
-    
+
     // Optionally trigger a data reload in AppGrid
     // You might want to broadcast this via the existing channel system
     const channel = new BroadcastChannel("containerUpdateChannel");
