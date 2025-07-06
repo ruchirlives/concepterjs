@@ -145,21 +145,21 @@ export const getPosition = async (sourceId, targetId) => {
     try {
         console.log(`Fetching position from API: ${sourceId} -> ${targetId}`);
         const response = await apiClient.get(`${getApiUrl()}/get_position/${sourceId}/${targetId}`);
-        
+
         // Debug the response
         console.log("API Response:", response.data);
-        
+
         if (response.data && response.data.label) {
             const label = response.data.label.trim(); // Remove newlines
-            console.log("Found relationship:", label);
+            console.log("Found relationship label:", label);
             return label;
         } else {
-            console.log("No relationship found, returning empty string");
+            console.log("No relationship label found, returning empty string");
             return "";
         }
     } catch (error) {
         if (error.response?.status === 500) {
-            console.warn(`No relationship exists between ${sourceId} and ${targetId} (500 error expected)`);
+            console.warn(`No relationship label exists between ${sourceId} and ${targetId} (500 error expected)`);
         } else {
             console.error("Error fetching position:", error);
         }
@@ -173,11 +173,26 @@ export const setPosition = async (sourceId, targetId, label) => {
         const response = await apiClient.post(`${getApiUrl()}/set_position`, {
             source_id: sourceId,
             target_id: targetId,
-            position: {"label": label},
+            position: { "label": label },
         });
         return response.data;
     } catch (error) {
         console.error("Error setting positions:", error);
+        return null;
+    }
+}
+
+export const setNarrative = async (sourceId, targetId, narrative) => {
+    try {
+        console.log("Setting narrative in API...");
+        const response = await apiClient.post(`${getApiUrl()}/set_position`, {
+            source_id: sourceId,
+            target_id: targetId,
+            position: {"narrative": narrative},
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error setting narrative:", error);
         return null;
     }
 }
