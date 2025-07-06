@@ -4,9 +4,11 @@ import { createNewRow } from './ModalNewContainer';
 import { addChildren } from "./api";
 import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
+import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
+    const { tiptapContent } = useAppContext();
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
@@ -66,6 +68,15 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             console.log("Edit narrative action triggered");
             // You can implement the logic to edit the narrative of the edge here
         }
+        else if (action === "replace narrative") {
+            // Handle replace narrative action here
+            console.log("Replace narrative action triggered");
+            // You can implement the logic to replace the narrative of the edge here
+            // Get tiptapContent from AppContext
+            console.log("Tiptap Content:", tiptapContent);
+
+
+        }
         ;
         hideMenu();
 
@@ -100,7 +111,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "insert node", "edit edge", "edit narrative"].map((action) => (
+            {["delete edge", "insert node", "edit edge", "edit narrative", "replace narrative"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}
