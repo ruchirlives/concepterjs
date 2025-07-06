@@ -1,14 +1,14 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import { createNewRow } from './ModalNewContainer';
-import { addChildren } from "./api";
+import { addChildren, getPosition, setNarrative } from "./api";
 import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent } = useAppContext();
+    const { tiptapContent, setTiptapContent } = useAppContext();
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
@@ -19,6 +19,14 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     };
 
     const onMenuItemClick = async (action, rowData, setRowData, edges, setEdges) => {
+        // Get source and target nodes from the edge
+        const edgeId = menuRef.current.edgeId;
+        const edge = edges.find((e) => e.id === edgeId);
+        const sourceNodeId = edge.source;
+        const targetNodeId = edge.target;
+        console.log("Source Node ID:", sourceNodeId);
+        console.log("Target Node ID:", targetNodeId);
+
         if (action === "delete edge") {
             const edgeId = menuRef.current.edgeId;
             console.log("Edge Id:", action, edgeId);
@@ -34,13 +42,6 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         else if (action === "insert node") {
             // Handle insert node action here
             console.log("Insert node action triggered");
-            // Get source and target nodes from the edge
-            const edgeId = menuRef.current.edgeId;
-            const edge = edges.find((e) => e.id === edgeId);
-            const sourceNodeId = edge.source;
-            const targetNodeId = edge.target;
-            console.log("Source Node ID:", sourceNodeId);
-            console.log("Target Node ID:", targetNodeId);
             // Insert a new node between the source and target nodes
 
             // First remove the edge
@@ -66,18 +67,23 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         else if (action === "edit narrative") {
             // Handle edit narrative action here
             console.log("Edit narrative action triggered");
-            // You can implement the logic to edit the narrative of the edge here
+            // Get the narrative from the edge
+            const position = await getPosition(sourceNodeId, targetNodeId);
+            const narrative = position?.narrative || null;
+            setTiptapContent(narrative); // Set the narrative in the AppContext
+            console.log("Position:", position);
+
         }
         else if (action === "replace narrative") {
             // Handle replace narrative action here
             console.log("Replace narrative action triggered");
             // You can implement the logic to replace the narrative of the edge here
-            // Get tiptapContent from AppContext
-            console.log("Tiptap Content:", tiptapContent);
-
-
-        }
-        ;
+            console.log("Tiptap Content:", tiptapContent); // Log the tiptapContent from AppContext
+            // Set relationship position content using export const setPosition = async (sourceId, targetId, label) => {
+            const narrative = tiptapContent; // Replace with the actual narrative you want to set
+            const response = await setNarrative(sourceNodeId, targetNodeId, {"narrative": narrative });
+            console.log("Response from setNarrative:", response);
+        };
         hideMenu();
 
         function removeEdgeById(edgeId) {

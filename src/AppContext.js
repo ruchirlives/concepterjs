@@ -8,7 +8,7 @@ export const AppProvider = ({ children }) => {
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
     type: "doc",
-    content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }],
+    content: [{ type: "paragraph", content: [{ type: "text", text: "Edit here..." }] }],
   });
 
   const value = {

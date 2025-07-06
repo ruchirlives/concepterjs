@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { fetchAutoComplete } from "api";
-
+import { useAppContext } from "AppContext";
 // Create a Tiptap extension for ghost text
 
 
 const AppTiptap = () => {
+    const {tiptapContent, setTiptapContent} = useAppContext();
     const [editor, setEditor] = useState(null);
     const [collapsed, setCollapsed] = useState(true);
     const [suggestions, setSuggestions] = useState([]);
@@ -14,6 +15,21 @@ const AppTiptap = () => {
     const [ghostSuggestion, setGhostSuggestion] = useState('');
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);
+
+    // Use effect to set the initial Tiptap content
+    useEffect(() => {
+        if (editor) {
+            editor.commands.setContent(tiptapContent);
+        }
+    }, [editor, tiptapContent, setTiptapContent]);
+
+    // Use effect to ensure tiptap content is updated when editor changes
+    useEffect(() => {
+        if (editor) {
+            const content = editor.getJSON();
+            setTiptapContent(content);
+        }
+    }, [editor, setTiptapContent]);
 
     // Function to show ghost text
     const showGhostText = useCallback((suggestion) => {

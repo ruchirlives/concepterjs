@@ -194,7 +194,7 @@ export const setPosition = async (sourceId, targetId, label) => {
         console.error("Error setting positions:", error);
         return null;
     }
-}
+};
 
 export const setNarrative = async (sourceId, targetId, narrative) => {
     try {
