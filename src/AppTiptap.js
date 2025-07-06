@@ -1,59 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
-import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from 'prosemirror-state';
-import { Decoration, DecorationSet } from 'prosemirror-view';
 import { fetchAutoComplete } from "api";
 
 // Create a Tiptap extension for ghost text
-const GhostTextExtension = Extension.create({
-    name: 'ghostText',
-
-    addProseMirrorPlugins() {
-        return [
-            new Plugin({
-                key: new PluginKey('ghostText'),
-                state: {
-                    init() {
-                        return DecorationSet.empty;
-                    },
-                    apply(tr, decorationSet) {
-                        // Clear decorations on any transaction
-                        decorationSet = decorationSet.map(tr.mapping, tr.doc);
-
-                        // Check for ghost text meta
-                        const ghostMeta = tr.getMeta('ghostText');
-                        if (ghostMeta) {
-                            if (ghostMeta.clear) {
-                                return DecorationSet.empty;
-                            } else if (ghostMeta.suggestion && ghostMeta.pos !== undefined) {
-                                // *** WIDGET DECORATION HERE ***
-                                console.log("Rendering ghost text widget:", ghostMeta.suggestion);
-                                const decoration = Decoration.widget(
-                                    ghostMeta.pos,
-                                    () => {
-                                        const span = document.createElement('span');
-                                        span.className = 'ghost-text';
-                                        span.textContent = ghostMeta.suggestion;
-                                        return span;
-                                    },
-                                    { key: 'ghost' }
-                                );
-                                return DecorationSet.create(tr.doc, [decoration]);
-                            }
-                        }
-                        return decorationSet;
-                    },
-                },
-                props: {
-                    decorations(state) {
-                        return this.getState(state);
-                    },
-                },
-            }),
-        ];
-    },
-});
 
 
 const AppTiptap = () => {
@@ -248,10 +197,7 @@ const AppTiptap = () => {
             >
                 {!collapsed && (
                     <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
-                        <SimpleEditor
-                            onEditorReady={setEditor}
-                            extensions={[GhostTextExtension]}
-                        />
+                        <SimpleEditor onEditorReady={setEditor} />
                         {showSuggestions && (
                             <ul
                                 className="autocomplete-suggestions"
