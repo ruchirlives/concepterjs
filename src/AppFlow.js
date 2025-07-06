@@ -122,7 +122,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       </div>
 
       {/* Flow content */}
-      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 600 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
         <div
           ref={flowWrapperRef}
           className="w-full bg-white relative"

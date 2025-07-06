@@ -136,7 +136,7 @@ function AppMermaid() {
             </div>
 
             {/* Mermaid content */}
-            <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 'auto' }}>
+            <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 'auto' }}>
                 <div className="p-4">
                     {/* This container will receive the rendered SVG */}
                     <div ref={containerRef} />

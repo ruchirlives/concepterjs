@@ -1,37 +1,35 @@
 import React, { useState } from "react";
-import { SimpleEditor } from "./@/components/tiptap-templates/simple/simple-editor";
+import { SimpleEditor } from '@/components/tiptap-templates/simple/simple-editor'
 
 const AppTiptap = () => {
     const [collapsed, setCollapsed] = useState(true);
 
     return (
-            <div className="p-4 rounded shadow">
-                <div
-                    className="flex justify-between items-center cursor-pointer user-select-text px-4 py-2"
-                    onClick={() => setCollapsed(!collapsed)}
+        <div className="bg-white rounded shadow">
+            <div
+                className="flex justify-between items-center cursor-pointer select-none px-4 py-2"
+                onClick={() => setCollapsed(!collapsed)}
+            >
+                <span className="font-semibold text-lg">Editor</span>
+                <button
+                    aria-label={collapsed ? "Expand editor" : "Collapse editor"}
+                    className="text-xl font-bold"
                 >
-                    <span className="font-semibold text-lg select-text">Rich Text Editor</span>
-                    <button
-                        aria-label={collapsed ? "Expand editor" : "Collapse editor"}
-                        className="text-xl font-bold select-text"
-                    >
-                        {collapsed ? "▼" : "▲"}
-                    </button>
-                </div>
-
-                <div
-                    className={`transition-all duration-300 overflow-hidden ${collapsed ? "" : "max-h-[800px] overflow-y-auto"
-                        }`}
-                >
-                    {!collapsed && (
-                        <div>
-                            <SimpleEditor />
-                        </div>
-                    )}
-                </div>
-
-
+                    {collapsed ? "▼" : "▲"}
+                </button>
             </div>
+
+            <div
+                className="transition-all duration-300 overflow-auto"
+                style={{ height: collapsed ? 0 : '400px' }}
+            >
+                {!collapsed && (
+                    <div className="h-full overflow-y-auto">
+                        <SimpleEditor />
+                    </div>
+                )}
+            </div>
+        </div>
     );
 };
 

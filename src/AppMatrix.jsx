@@ -250,7 +250,7 @@ const AppMatrix = () => {
       </div>
 
       {/* Matrix content */}
-      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 400 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 400 }}>
         <div className="h-full flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-32">
@@ -259,7 +259,7 @@ const AppMatrix = () => {
           ) : (
             <>
               {/* Table container with freeze panes */}
-              <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-hidden">
+              <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
                 <div className="overflow-auto w-full h-full" style={{ maxHeight: "300px" }}>
                   <table className="border-collapse w-full">
                     {/* Sticky header row */}

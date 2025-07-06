@@ -57,7 +57,7 @@ export function buildVisibleEdges(params) {
                 if (!newEdges.some(e => e.id === edgeId)) {
                     // build edge data
                     let data;
-                    console.log('DEBUG EDGE POSITION:', c.position);
+                    // console.log('DEBUG EDGE POSITION:', c.position);
                     if (c.position !== null && typeof c.position === 'object' && c.position.label) {
                         const label = c.position.label.length > 20
                             ? c.position.label.substring(0, 20) + '...'

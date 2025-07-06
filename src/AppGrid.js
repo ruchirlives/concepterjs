@@ -307,7 +307,7 @@ const App = () => {
 
     {/* Grid content collapsible but always mounted */}
     <div
-      className={`transition-all duration-300 overflow-hidden`}
+      className={`transition-all duration-300 overflow-auto`}
       style={{ height: collapsed ? 0 : 400 }}
     >
       <div style={{ height: 400 }}> {/* 👈 Keep grid a fixed height always */}

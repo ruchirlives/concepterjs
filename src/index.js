@@ -85,14 +85,18 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
+    <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col overflow-auto">
       {/* Header */}
       <header className="px-6 pt-6 pb-4 bg-white border-b shadow-sm">
         <h1 className="text-3xl font-semibold text-gray-800">Concepter</h1>
       </header>
 
       {/* Main content wrapper */}
-      <main className="flex-1 flex flex-col gap-4 px-6 py-4 overflow-y-auto">
+      <main className="flex-1 flex flex-col gap-4 px-6 py-4 overflow-auto">
+        <section id="tiptap">
+          <AppTiptap />
+        </section>
+
         <section id="grid">
           <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
         </section>
@@ -103,10 +107,6 @@ const App = () => {
 
         <section id="prioritiser">
           <AppPrioritiser />
-        </section>
-
-        <section id="tiptap">
-          <AppTiptap />
         </section>
 
         <section id="sub">
