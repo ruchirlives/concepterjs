@@ -79,8 +79,13 @@ const AppTiptap = () => {
                 } else {
                     // Fetch new suggestions
                     tabPressCount.current = 1;
-                    const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n", "\0");
-                    fetchSuggestions(text);
+                    const { selection } = editor.state;
+                    const cursorPos = selection.from;
+
+                    // Get all text from start of document to cursor
+                    const allTextToCursor = editor.state.doc.textBetween(0, cursorPos, "\n", "\0");
+
+                    fetchSuggestions(allTextToCursor);
                 }
             }
 
