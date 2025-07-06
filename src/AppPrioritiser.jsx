@@ -60,11 +60,10 @@ const AppPrioritiser = () => {
 
   return (
     <div className="bg-white rounded shadow">
-      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
+      <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <span className="font-semibold">Prioritiser</span>
         <button
           className="text-lg font-bold"
-          onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? "Expand prioritiser" : "Collapse prioritiser"}
         >
           {collapsed ? "▼" : "▲"}

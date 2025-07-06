@@ -294,11 +294,10 @@ const App = () => {
     onContextMenu={(e) => e.preventDefault()}
   >
     {/* Header with collapse button */}
-    <div className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
+    <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
       <span className="font-semibold">Container Grid</span>
       <button
         className="text-lg font-bold"
-        onClick={() => setCollapsed((c) => !c)}
         aria-label={collapsed ? "Expand grid" : "Collapse grid"}
       >
         {collapsed ? "▼" : "▲"}

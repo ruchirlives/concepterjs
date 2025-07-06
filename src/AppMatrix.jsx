@@ -197,9 +197,9 @@ const AppMatrix = () => {
   const EmptyState = useMemo(
     () => (
       <div className="bg-white rounded shadow p-4">
-        <div className="flex justify-between items-center mb-4">
+        <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between items-center mb-4">
           <span className="font-semibold">Relationship Matrix</span>
-          <button className="text-lg font-bold" onClick={() => setCollapsed((c) => !c)}>
+          <button className="text-lg font-bold">
             {collapsed ? "▼" : "▲"}
           </button>
         </div>
