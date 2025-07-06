@@ -143,16 +143,16 @@ export const manyChildren = async (containerIds) => {
 
 export const getPosition = async (sourceId, targetId) => {
     try {
-        console.log(`Fetching positions from API: ${sourceId} -> ${targetId}`);
-        const response = await apiClient.get(`${getApiUrl()}/get_positions/${sourceId}/${targetId}`);
+        console.log(`Fetching position from API: ${sourceId} -> ${targetId}`);
+        const response = await apiClient.get(`${getApiUrl()}/get_position/${sourceId}/${targetId}`);
         
         // Debug the response
         console.log("API Response:", response.data);
         
-        if (response.data && response.data.relationshipString) {
-            const relationshipString = response.data.relationshipString.trim(); // Remove newlines
-            console.log("Found relationship:", relationshipString);
-            return relationshipString;
+        if (response.data && response.data.label) {
+            const label = response.data.label.trim(); // Remove newlines
+            console.log("Found relationship:", label);
+            return label;
         } else {
             console.log("No relationship found, returning empty string");
             return "";
@@ -161,19 +161,19 @@ export const getPosition = async (sourceId, targetId) => {
         if (error.response?.status === 500) {
             console.warn(`No relationship exists between ${sourceId} and ${targetId} (500 error expected)`);
         } else {
-            console.error("Error fetching positions:", error);
+            console.error("Error fetching position:", error);
         }
         return ""; // Return empty string instead of "error"
     }
 };
 
-export const setPosition = async (sourceId, targetId, relationshipString) => {
+export const setPosition = async (sourceId, targetId, label) => {
     try {
         console.log("Setting positions in API...");
         const response = await apiClient.post(`${getApiUrl()}/set_position`, {
             source_id: sourceId,
             target_id: targetId,
-            relationship_string: relationshipString,
+            position: {"label": label},
         });
         return response.data;
     } catch (error) {
