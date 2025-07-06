@@ -149,10 +149,10 @@ export const getPosition = async (sourceId, targetId) => {
         // Debug the response
         console.log("API Response:", response.data);
 
-        if (response.data && response.data.label) {
-            const label = response.data.label.trim(); // Remove newlines
-            console.log("Found relationship label:", label);
-            return label;
+        if (response.data) {
+            const data = response.data; // Remove newlines
+            console.log("Found relationship data:", data);
+            return data;
         } else {
             console.log("No relationship label found, returning empty string");
             return "";

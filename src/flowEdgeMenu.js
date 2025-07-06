@@ -71,8 +71,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             const position = await getPosition(sourceNodeId, targetNodeId);
             const narrative = position?.narrative || null;
             setTiptapContent(narrative); // Set the narrative in the AppContext
-            console.log("Position:", position);
-
+            console.log("setTiptapContent called with:", narrative);
         }
         else if (action === "replace narrative") {
             // Handle replace narrative action here
@@ -81,7 +80,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             console.log("Tiptap Content:", tiptapContent); // Log the tiptapContent from AppContext
             // Set relationship position content using export const setPosition = async (sourceId, targetId, label) => {
             const narrative = tiptapContent; // Replace with the actual narrative you want to set
-            const response = await setNarrative(sourceNodeId, targetNodeId, {"narrative": narrative });
+            const response = await setNarrative(sourceNodeId, targetNodeId, narrative);
             console.log("Response from setNarrative:", response);
         };
         hideMenu();

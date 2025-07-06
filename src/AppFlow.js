@@ -171,7 +171,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
                 // [ADDED] push current activeGroup onto history
                 setHistory(h => [...h, activeGroup]);
                 setActiveGroup(node.id);
-                setKeepLayout(false);
+                // If setKeepLayout exists, set it to false
+                if (typeof setKeepLayout === 'function') { 
+                  setKeepLayout(false);
+                }
                 // Refresh the nodes and edges
 
               }
