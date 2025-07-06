@@ -1,35 +1,124 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from 'prosemirror-state';
+import { Decoration, DecorationSet } from 'prosemirror-view';
 import { fetchAutoComplete } from "api";
+
+// Create a Tiptap extension for ghost text
+const GhostTextExtension = Extension.create({
+    name: 'ghostText',
+
+    addProseMirrorPlugins() {
+        return [
+            new Plugin({
+                key: new PluginKey('ghostText'),
+                state: {
+                    init() {
+                        return DecorationSet.empty;
+                    },
+                    apply(tr, decorationSet) {
+                        // Clear decorations on any transaction
+                        decorationSet = decorationSet.map(tr.mapping, tr.doc);
+
+                        // Check for ghost text meta
+                        const ghostMeta = tr.getMeta('ghostText');
+                        if (ghostMeta) {
+                            if (ghostMeta.clear) {
+                                return DecorationSet.empty;
+                            } else if (ghostMeta.suggestion && ghostMeta.pos !== undefined) {
+                                // *** WIDGET DECORATION HERE ***
+                                console.log("Rendering ghost text widget:", ghostMeta.suggestion);
+                                const decoration = Decoration.widget(
+                                    ghostMeta.pos,
+                                    () => {
+                                        const span = document.createElement('span');
+                                        span.className = 'ghost-text';
+                                        span.textContent = ghostMeta.suggestion;
+                                        return span;
+                                    },
+                                    { key: 'ghost' }
+                                );
+                                return DecorationSet.create(tr.doc, [decoration]);
+                            }
+                        }
+                        return decorationSet;
+                    },
+                },
+                props: {
+                    decorations(state) {
+                        return this.getState(state);
+                    },
+                },
+            }),
+        ];
+    },
+});
+
 
 const AppTiptap = () => {
     const [editor, setEditor] = useState(null);
     const [collapsed, setCollapsed] = useState(true);
-
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [ghostSuggestion, setGhostSuggestion] = useState('');
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);
+
+    // Function to show ghost text
+    const showGhostText = useCallback((suggestion) => {
+        if (!editor) return;
+
+        const { selection } = editor.state;
+        const transaction = editor.state.tr.setMeta('ghostText', {
+            suggestion,
+            pos: selection.from
+        });
+
+        editor.view.dispatch(transaction);
+        setGhostSuggestion(suggestion);
+    }, [editor]);
+
+    // Function to clear ghost text
+    const clearGhostText = useCallback(() => {
+        if (!editor) return;
+
+        const transaction = editor.state.tr.setMeta('ghostText', { clear: true });
+        editor.view.dispatch(transaction);
+        setGhostSuggestion('');
+    }, [editor]);
+
+    // Function to accept ghost text
+    const acceptGhostText = useCallback(() => {
+        if (!editor || !ghostSuggestion) return;
+
+        clearGhostText();
+        editor.commands.insertContent(ghostSuggestion + " ");
+        setGhostSuggestion('');
+    }, [editor, ghostSuggestion, clearGhostText]);
 
     const fetchSuggestions = useCallback(async (prompt) => {
         if (!prompt.trim()) return;
 
         try {
             const data = await fetchAutoComplete(prompt);
-            // console.log("Fetched data:", data);
             if (data.suggestions && data.suggestions.length > 0) {
                 setSuggestions(data.suggestions);
                 setShowSuggestions(true);
                 setSelectedIndex(0);
+                // Show ghost text for first suggestion
+                showGhostText(data.suggestions[0]);
             } else {
                 setShowSuggestions(false);
+                clearGhostText();
             }
         } catch (err) {
             console.error("Autocomplete fetch error:", err);
             setShowSuggestions(false);
+            clearGhostText();
         }
-    }, []);
+    }, [showGhostText, clearGhostText]);
 
     const applySuggestion = useCallback(
         (suggestion) => {
@@ -38,35 +127,38 @@ const AppTiptap = () => {
             const container = containerRef.current;
             const previousScrollTop = container.scrollTop;
 
-            // Focus editor view directly (avoid wrapper focus)
+            clearGhostText();
             editor.view.focus();
 
-            // Insert suggestion with slight delay to avoid scroll glitches
             setTimeout(() => {
                 editor.commands.insertContent(suggestion + " ");
-                // Restore scroll position to prevent jump
                 container.scrollTop = previousScrollTop;
             }, 10);
 
             setShowSuggestions(false);
+            setGhostSuggestion('');
             tabPressCount.current = 0;
         },
-        [editor]
+        [editor, clearGhostText]
     );
 
     const onKeyDown = useCallback(
         (e) => {
             if (!editor) return;
+
             if (e.key === "Tab") {
                 e.preventDefault();
                 e.stopPropagation();
-                // console.log("Tab key pressed in Tiptap editor");
+
+                if (ghostSuggestion && !showSuggestions) {
+                    // Accept ghost text with Tab
+                    acceptGhostText();
+                    return;
+                }
             }
-            // if (!editor) return;
 
             if (!showSuggestions) {
                 if (e.key === "Tab") {
-                    // e.preventDefault();
                     tabPressCount.current = 1;
                     const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n", "\0");
                     fetchSuggestions(text);
@@ -84,32 +176,43 @@ const AppTiptap = () => {
                     break;
                 case "ArrowDown":
                     e.preventDefault();
-                    setSelectedIndex((i) => (i + 1) % suggestions.length);
+                    setSelectedIndex((i) => {
+                        const newIndex = (i + 1) % suggestions.length;
+                        showGhostText(suggestions[newIndex]);
+                        return newIndex;
+                    });
                     tabPressCount.current = 0;
                     break;
                 case "ArrowUp":
                     e.preventDefault();
-                    setSelectedIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+                    setSelectedIndex((i) => {
+                        const newIndex = (i - 1 + suggestions.length) % suggestions.length;
+                        showGhostText(suggestions[newIndex]);
+                        return newIndex;
+                    });
                     tabPressCount.current = 0;
                     break;
                 case "Escape":
                     e.preventDefault();
                     setShowSuggestions(false);
+                    clearGhostText();
                     tabPressCount.current = 0;
                     break;
                 default:
                     setShowSuggestions(false);
+                    clearGhostText();
                     tabPressCount.current = 0;
                     break;
             }
         },
-        [editor, showSuggestions, suggestions, selectedIndex, applySuggestion, fetchSuggestions]
+        [editor, showSuggestions, suggestions, selectedIndex, applySuggestion, fetchSuggestions, ghostSuggestion, acceptGhostText, showGhostText, clearGhostText]
     );
 
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (!event.target.closest(".autocomplete-suggestions")) {
                 setShowSuggestions(false);
+                clearGhostText();
                 tabPressCount.current = 0;
             }
         };
@@ -117,7 +220,7 @@ const AppTiptap = () => {
             document.addEventListener("click", handleClickOutside);
         }
         return () => document.removeEventListener("click", handleClickOutside);
-    }, [showSuggestions]);
+    }, [showSuggestions, clearGhostText]);
 
     return (
         <div
@@ -144,8 +247,11 @@ const AppTiptap = () => {
                 style={{ height: collapsed ? 0 : "400px" }}
             >
                 {!collapsed && (
-                    <div className="h-full flex flex-col justify-center items-center overflow-y-auto mx-auto px-4 py-2">
-                        <SimpleEditor onEditorReady={setEditor} />
+                    <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
+                        <SimpleEditor
+                            onEditorReady={setEditor}
+                            extensions={[GhostTextExtension]}
+                        />
                         {showSuggestions && (
                             <ul
                                 className="autocomplete-suggestions"
