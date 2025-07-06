@@ -61,6 +61,11 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
 
             requestReloadChannel(); // Call the function to reload the channel with the new node ID
         }
+        else if (action === "edit narrative") {
+            // Handle edit narrative action here
+            console.log("Edit narrative action triggered");
+            // You can implement the logic to edit the narrative of the edge here
+        }
         ;
         hideMenu();
 
@@ -95,7 +100,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "insert node", "edit edge"].map((action) => (
+            {["delete edge", "insert node", "edit edge", "edit narrative"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}

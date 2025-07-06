@@ -9,6 +9,7 @@ import AppMatrix from './AppMatrix';
 import AppPrioritiser from './AppPrioritiser';
 import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
+import AppTiptap from './AppTiptap';
 
 
 const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
@@ -102,6 +103,10 @@ const App = () => {
 
         <section id="prioritiser">
           <AppPrioritiser />
+        </section>
+
+        <section id="tiptap">
+          <AppTiptap />
         </section>
 
         <section id="sub">
