@@ -21,3 +21,14 @@ main {
   overflow-y: auto !important;
 }
 
+/* Add this to your CSS file or component styles */
+.simple-editor-content {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.content-wrapper {
+    width: 100% !important;
+    max-width: none !important;
+}
+

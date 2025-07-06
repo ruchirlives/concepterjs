@@ -167,6 +167,20 @@ export const getPosition = async (sourceId, targetId) => {
     }
 };
 
+export const fetchAutoComplete = async (prompt) => {
+    try {
+        // console.log("Fetching autocomplete suggestions from API...");
+        const response = await apiClient.post(`${getApiUrl()}/autocomplete`, {
+            prompt: prompt,
+        });
+        // console.log("Autocomplete response:", response.data);
+        return response.data || [];
+    } catch (error) {
+        console.error("Error fetching autocomplete suggestions:", error);
+        return [];
+    }
+}
+
 export const setPosition = async (sourceId, targetId, label) => {
     try {
         console.log("Setting positions in API...");

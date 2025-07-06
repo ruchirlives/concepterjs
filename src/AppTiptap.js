@@ -1,9 +1,9 @@
-import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
-import { EditorContext } from "@tiptap/react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
+import { fetchAutoComplete } from "api";
 
 const AppTiptap = () => {
-    const { editor } = useContext(EditorContext);
+    const [editor, setEditor] = useState(null);
     const [collapsed, setCollapsed] = useState(true);
 
     const [suggestions, setSuggestions] = useState([]);
@@ -16,15 +16,8 @@ const AppTiptap = () => {
         if (!prompt.trim()) return;
 
         try {
-            const res = await fetch("/api/autocomplete", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt }),
-            });
-
-            if (!res.ok) throw new Error("Failed to fetch autocomplete");
-
-            const data = await res.json();
+            const data = await fetchAutoComplete(prompt);
+            // console.log("Fetched data:", data);
             if (data.suggestions && data.suggestions.length > 0) {
                 setSuggestions(data.suggestions);
                 setShowSuggestions(true);
@@ -64,10 +57,16 @@ const AppTiptap = () => {
     const onKeyDown = useCallback(
         (e) => {
             if (!editor) return;
+            if (e.key === "Tab") {
+                e.preventDefault();
+                e.stopPropagation();
+                // console.log("Tab key pressed in Tiptap editor");
+            }
+            // if (!editor) return;
 
             if (!showSuggestions) {
                 if (e.key === "Tab") {
-                    e.preventDefault();
+                    // e.preventDefault();
                     tabPressCount.current = 1;
                     const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n", "\0");
                     fetchSuggestions(text);
@@ -123,8 +122,8 @@ const AppTiptap = () => {
     return (
         <div
             ref={containerRef}
-            className="relative bg-white rounded shadow"
-            onKeyDown={onKeyDown}
+            className="relative bg-white rounded shadow w-full"
+            onKeyDownCapture={onKeyDown}
             style={{ outline: "none" }}
         >
             <div
@@ -141,18 +140,18 @@ const AppTiptap = () => {
             </div>
 
             <div
-                className="transition-all duration-300 overflow-auto"
+                className="transition-all duration-300 overflow-auto w-full"
                 style={{ height: collapsed ? 0 : "400px" }}
             >
                 {!collapsed && (
-                    <div className="h-full overflow-y-auto">
-                        <SimpleEditor />
+                    <div className="h-full flex flex-col justify-center items-center overflow-y-auto mx-auto px-4 py-2">
+                        <SimpleEditor onEditorReady={setEditor} />
                         {showSuggestions && (
                             <ul
                                 className="autocomplete-suggestions"
                                 style={{
                                     position: "absolute",
-                                    bottom: "100%",
+                                    top: "100%",
                                     left: 0,
                                     right: 0,
                                     backgroundColor: "white",
