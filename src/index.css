@@ -5,3 +5,19 @@
 @import '@/styles/_variables.scss';
 @import '@/styles/_keyframe-animations.scss';
 
+/* Override Tiptap SimpleEditor global styles that prevent scrolling */
+body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Ensure the main app container can scroll properly */
+#app {
+  overflow-y: auto !important;
+}
+
+/* Alternative: if you want to be more specific, you can target the main content area */
+main {
+  overflow-y: auto !important;
+}
+
