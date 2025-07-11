@@ -320,6 +320,20 @@ export const mergeContainers = async (containerIds) => {
     }
 };
 
+// Function to join containers
+export const joinContainers = async (containerIds) => {
+    try {
+        console.log("Joining containers:", containerIds);
+        const response = await apiClient.post(`${getApiUrl()}/join_containers`, {
+            "containers": containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error joining containers:", error);
+        return null;
+    }
+};
+
 // Write back updated data
 export const writeBackData = async (data) => {
     console.log("Writing back data:");

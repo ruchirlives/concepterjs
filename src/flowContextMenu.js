@@ -7,6 +7,7 @@ import {
     fetchChildren,
     exportSelectedContainers,
     mergeContainers,
+    joinContainers,
     categorizeContainers,
     embed_containers,
     buildRelationshipsContainers,
@@ -38,6 +39,7 @@ export const menuItems = [
     { handler: "exportDocx", label: "Export to Docx" },
     { handler: "exportSelected", label: "Export Selected" },
     { handler: "mergeSelected", label: "Merge Selected" },
+    { handler: "joinSelected", label: "Join Selected" },
     { handler: "addSelected", label: "Add Selected" },
     { handler: "addSimilar", label: "Add Similar" },
     { handler: "buildChainBeam", label: "Build Chain Beam" },
@@ -173,6 +175,20 @@ async function mergeSelected({ selectedIds, activeGroup }) {
         alert("Containers merged successfully.");
     } else {
         alert("Failed to merge containers.");
+    }
+    // add ids as children to the active group
+    console.log("ID: ", ok.id, "Active group: ", activeGroup);
+    await addChildren(activeGroup, [ok.id]);
+    // brief delay to allow the request to complete
+    requestReloadChannel();
+}
+
+async function joinSelected({ selectedIds, activeGroup }) {
+    const ok = await joinContainers(selectedIds, true);
+    if (ok) {
+        alert("Containers joined successfully.");
+    } else {
+        alert("Failed to join containers.");
     }
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
