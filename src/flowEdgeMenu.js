@@ -69,6 +69,8 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             console.log("Suggest relationship action triggered");
             const suggestedRelationship = await suggestRelationship(sourceNodeId, targetNodeId);
             console.log("Suggested Relationship:", suggestedRelationship);
+            // reload the channel to reflect the suggested relationship
+            requestReloadChannel();
         }
         else if (action === "edit narrative") {
             // Handle edit narrative action here

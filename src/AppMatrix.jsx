@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { manyChildren, setPosition } from "./api";
 import { useAppContext } from "./AppContext";
+import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and useEdgeMenu
 
 const AppMatrix = () => {
   const { rows: rowData } = useAppContext();
@@ -9,7 +10,27 @@ const AppMatrix = () => {
   const [editingCell, setEditingCell] = useState(null);
   const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
+  const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
   const inputRef = useRef(null);
+
+  // Setup EdgeMenu hook
+  const flowWrapperRef = useRef(null);
+  const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
+
+  // Hide menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      // If menuRef exists and click is outside the menu, hide it
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        hideMenu();
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuRef, hideMenu]);
 
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
@@ -223,8 +244,33 @@ const AppMatrix = () => {
     return "bg-yellow-50";
   };
 
+  // Tooltip component
+  const RelationshipTooltip = ({ text, position }) => {
+    if (!text) return null;
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: position.y + 12,
+          left: position.x + 12,
+          zIndex: 1000,
+          background: "rgba(0,0,0,0.85)",
+          color: "#fff",
+          padding: "8px 12px",
+          borderRadius: "6px",
+          fontSize: "13px",
+          maxWidth: "320px",
+          wordBreak: "break-word",
+          pointerEvents: "none",
+        }}
+      >
+        {text}
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-white rounded shadow">
+    <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header with collapse button and hide empty toggle */}
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <div className="flex items-center gap-4">
@@ -250,7 +296,7 @@ const AppMatrix = () => {
       </div>
 
       {/* Matrix content */}
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 400 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 700 }}>
         <div className="h-full flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-32">
@@ -258,11 +304,9 @@ const AppMatrix = () => {
             </div>
           ) : (
             <>
-              {/* Table container with freeze panes */}
               <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
-                <div className="overflow-auto w-full h-full" style={{ maxHeight: "300px" }}>
+                <div className="overflow-auto w-full h-full" style={{ maxHeight: "600px" }}>
                   <table className="border-collapse w-full">
-                    {/* Sticky header row */}
                     <thead className="sticky top-0 z-20">
                       <tr>
                         {/* Top-left corner cell */}
@@ -306,13 +350,26 @@ const AppMatrix = () => {
                               );
                             }
 
+                            // Construct a minimal edge object for useEdgeMenu
+                            const edge = { id: key, source: sourceContainer.id, target: targetContainer.id };
+
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(
-                                  value
-                                )}`}
+                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
                                 onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
+                                onContextMenu={(e) => handleEdgeMenu(e, edge)} // <-- Add right-click handler
+                                onMouseEnter={(e) => {
+                                  if (value) {
+                                    const rect = e.target.getBoundingClientRect();
+                                    setHoveredCell({
+                                      key,
+                                      text: value,
+                                      position: { x: rect.left, y: rect.top },
+                                    });
+                                  }
+                                }}
+                                onMouseLeave={() => setHoveredCell(null)}
                               >
                                 {isEditing ? (
                                   <input
@@ -324,8 +381,8 @@ const AppMatrix = () => {
                                     onBlur={handleBlur}
                                   />
                                 ) : (
-                                  <span className="text-xs block truncate" title={value}>
-                                    {value || "—"}
+                                  <span className="text-xs block truncate">
+                                    {value.length > 20 ? value.slice(0, 20) + "..." : value || "—"}
                                   </span>
                                 )}
                               </td>
@@ -335,6 +392,23 @@ const AppMatrix = () => {
                       ))}
                     </tbody>
                   </table>
+                  {/* Render the tooltip only once, outside the table */}
+                  {hoveredCell && <RelationshipTooltip text={hoveredCell.text} position={hoveredCell.position} />}
+                  {/* EdgeMenu component */}
+                  <EdgeMenu
+                    ref={menuRef}
+                    onMenuItemClick={onMenuItemClick}
+                    rowData={rowData}
+                    setRowData={() => {}}
+                    edges={filteredRowData.map((source) =>
+                      filteredRowData.map((target) => ({
+                        id: `${source.id}-${target.id}`,
+                        source: source.id,
+                        target: target.id,
+                      }))
+                    ).flat()}
+                    setEdges={() => {}}
+                  />
                 </div>
               </div>
 
