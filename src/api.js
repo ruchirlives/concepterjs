@@ -140,6 +140,31 @@ export const manyChildren = async (containerIds) => {
     }
 };
 
+export const suggestRelationship = async (sourceId, targetId) => {
+    try {
+        console.log(`Suggesting relationship from API: ${sourceId} -> ${targetId}`);
+        const response = await apiClient.post(`${getApiUrl()}/suggest_relationship`, {
+            source_id: sourceId,
+            target_id: targetId,
+        });
+        // Debug the response
+        console.log("API Response:", response.data);
+        if (response.data) {
+            const data = response.data; // Remove newlines
+            console.log("Found relationship suggestion:", data);
+            return data;
+        } else {
+            console.log("No relationship suggestion found, returning empty string");
+            return "";
+        }
+    } catch (error) {
+        if (error.response?.status === 500) {
+            console.warn(`No relationship suggestion exists between ${sourceId} and ${targetId} (500 error expected)`);
+        }
+        console.error("Error suggesting relationship:", error);
+        return ""; // Return empty string instead of "error"
+    }
+};
 
 export const getPosition = async (sourceId, targetId) => {
     try {

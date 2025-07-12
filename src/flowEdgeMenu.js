@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import { createNewRow } from './ModalNewContainer';
-import { addChildren, getPosition, setNarrative } from "./api";
+import { addChildren, getPosition, setNarrative, suggestRelationship } from "./api";
 import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
@@ -64,6 +64,12 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
 
             requestReloadChannel(); // Call the function to reload the channel with the new node ID
         }
+        else if (action === "suggest relationship") {
+            // Handle suggest relationship action here
+            console.log("Suggest relationship action triggered");
+            const suggestedRelationship = await suggestRelationship(sourceNodeId, targetNodeId);
+            console.log("Suggested Relationship:", suggestedRelationship);
+        }
         else if (action === "edit narrative") {
             // Handle edit narrative action here
             console.log("Edit narrative action triggered");
@@ -116,7 +122,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "insert node", "edit edge", "edit narrative", "replace narrative"].map((action) => (
+            {["delete edge", "insert node", "edit edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}
