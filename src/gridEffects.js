@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey } from "./api";
 import { setApiUrl } from "./apiConfig";
 import { formatDateFields, handleWriteBack } from "./effectsShared";
+import API_URLS from "./globalconfig";
 
 // ==================== UTILITIES ====================
 
@@ -112,44 +113,29 @@ export const useSaveButtonEffect = (saveData, currentContainer) => {
 export const useDropDownEffect = () => {
     useEffect(() => {
         const dropDown = document.getElementById("ServerSelector");
-        const REACT_APP_API_URLS = process.env.REACT_APP_API_URLS;
 
-        // Parse the JSON string
-        var urls = {};
-        if (REACT_APP_API_URLS) {
-            try {
-                urls = JSON.parse(REACT_APP_API_URLS);
-            } catch (error) {
-                console.error("Failed to parse REACT_APP_API_URLS:", error);
-            }
-        }
+        // Use imported API_URLS
+        const urls = API_URLS;
 
         // Populate the dropdown menu
         if (dropDown) {
-            // Clear existing options
             dropDown.innerHTML = "";
 
-            // Add a default option
             const defaultOption = document.createElement("option");
             defaultOption.value = "";
             defaultOption.textContent = "Select Server";
             dropDown.appendChild(defaultOption);
 
-            // Add options from urls which is a json dictionary
             if (urls) {
-                console.log(urls);
                 Object.keys(urls).forEach((key) => {
                     const option = document.createElement("option");
                     option.value = urls[key];
                     option.textContent = key;
                     dropDown.appendChild(option);
                 });
-
             }
-
         }
 
-        // Event listener for dropdown change
         const handleDropDownChange = (event) => {
             setApiUrl(event.target.value);
         };
