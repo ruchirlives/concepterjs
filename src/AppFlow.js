@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useAppContext } from './AppContext';
 import {
   ReactFlow, ReactFlowProvider // This is the provider component linked to Zustand store
   , MiniMap, Controls, Background, useNodesState, useEdgesState, useReactFlow, addEdge, ControlButton
@@ -22,7 +23,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Step 2: Zustand store for nodes and edges ---
   const flowWrapperRef = React.useRef(null);
-  const [rowData, setRowData] = useState([]);
+  const { rows: rowData, setRows: setRowData } = useAppContext();
   const [layoutPositions, setLayoutPositions] = useState({});
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useEdgesState();
