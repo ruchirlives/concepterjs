@@ -7,6 +7,7 @@ import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
 import AppMatrix from './AppMatrix';
 import AppPrioritiser from './AppPrioritiser';
+import AppLayers from './AppLayers';
 import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
@@ -109,8 +110,12 @@ const App = () => {
           <AppPrioritiser />
         </section>
 
+        <section id="layers">
+          <AppLayers />
+        </section>
+
         <section id="sub">
-          <AppFlow/>
+          <AppFlow keepLayout={keepLayout} setKeepLayout={setKeepLayout} />
         </section>
 
         <section id="mermaid" className="mb-28">

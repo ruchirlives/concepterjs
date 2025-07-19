@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
+import { useAppContext } from './AppContext';
 import {
     deleteContainers,
     renameContainer,
@@ -320,6 +321,18 @@ async function unmakeOutputNode({ selectedIds }) {
     ch.close();
 }
 
+async function addLayerTag({ selectedIds }, layer) {
+    const ch = new BroadcastChannel("addTagsChannel");
+    ch.postMessage({ selectedIds, tags: layer });
+    ch.close();
+}
+
+async function removeLayerTag({ selectedIds }, layer) {
+    const ch = new BroadcastChannel("removeTagsChannel");
+    ch.postMessage({ selectedIds, tags: layer });
+    ch.close();
+}
+
 
 const handlersByName = menuItems.reduce((map, { handler }) => {
     // eslint-disable-next-line
@@ -328,10 +341,28 @@ const handlersByName = menuItems.reduce((map, { handler }) => {
     else map[handler] = fn;
     return map;
 }, {});
+/* Extra handlers for dynamic layer actions */
+function getDynamicHandler(action) {
+    if (action.startsWith('addLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => addLayerTag(ctx, layer);
+    }
+    if (action.startsWith('removeLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => removeLayerTag(ctx, layer);
+    }
+    return null;
+}
 /* eslint-enable no-unused-vars */
 
-export function useContextMenu(flowWrapperRef, activeGroup, menuItems, nodes, rowData, setRowData, history) {
+export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
+    const { layerOptions } = useAppContext();
+    const layerMenus = [
+        { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
+        { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
+    ];
+    const allMenuItems = [...baseMenuItems, ...layerMenus];
 
     const handleContextMenu = (event, node) => {
         event.preventDefault();
@@ -363,7 +394,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, menuItems, nodes, ro
         }
 
         const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history };
-        const handler = handlersByName[action];
+        const handler = handlersByName[action] || getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
         if (m) m.style.setProperty("display", "none", "important");
@@ -375,7 +406,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, menuItems, nodes, ro
     };
 
     return {
-        menuItems,
+        menuItems: allMenuItems,
         menuRef,
         handleContextMenu,
         onMenuItemClick,

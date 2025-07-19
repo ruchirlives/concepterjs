@@ -1,10 +1,12 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { fetchParentContainers, addChildren, removeChildren, deleteContainers, get_docx, mergeContainers, fetchContainerById, fetchChildren } from "./api"; // Import API function
 import { sendGanttToChannel, sendMermaidToChannel, writeBackUpdatedData } from "./effectsShared";
-import { addTagToNodes } from "./gridEffects";
+import { addTagToNodes, removeTagFromNodes } from "./gridEffects";
 
 // Context menu rendering
-const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData, handleAddRow }, ref) => {
+const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData, handleAddRow, activeLayers = [], layerOptions = [] }, ref) => {
+    const [showAddMenu, setShowAddMenu] = useState(false);
+    const [showRemoveMenu, setShowRemoveMenu] = useState(false);
 
     return (
         <div
@@ -95,6 +97,40 @@ const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData,
             >
                 Add Tag
             </div>
+            {/* Add to layer */}
+            <div
+                onMouseEnter={() => setShowAddMenu(true)}
+                onMouseLeave={() => setShowAddMenu(false)}
+                style={{ padding: "8px", cursor: "pointer", position: "relative" }}
+            >
+                Add to Layer
+                {showAddMenu && (
+                    <div style={{ position: "absolute", left: "100%", top: 0, backgroundColor: "#fff", border: "1px solid #ccc", zIndex: 1000 }}>
+                        {layerOptions.map((l) => (
+                            <div key={l} style={{ padding: "4px 8px", cursor: "pointer" }} onClick={() => onMenuItemClick("add layer", gridApiRef, setRowData, null, l)}>
+                                {l}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {/* Remove from layer */}
+            <div
+                onMouseEnter={() => setShowRemoveMenu(true)}
+                onMouseLeave={() => setShowRemoveMenu(false)}
+                style={{ padding: "8px", cursor: "pointer", position: "relative" }}
+            >
+                Remove from Layer
+                {showRemoveMenu && (
+                    <div style={{ position: "absolute", left: "100%", top: 0, backgroundColor: "#fff", border: "1px solid #ccc", zIndex: 1000 }}>
+                        {layerOptions.map((l) => (
+                            <div key={l} style={{ padding: "4px 8px", cursor: "pointer" }} onClick={() => onMenuItemClick("remove layer", gridApiRef, setRowData, null, l)}>
+                                {l}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
             {/* Export to mermaid */}
             <div
                 onClick={() => onMenuItemClick("export mermaid", gridApiRef)}
@@ -151,7 +187,7 @@ export const useContextMenu = () => {
         }
     };
 
-    const onMenuItemClick = async (action, gridApiRef, setRowData, handleAddRow) => {
+    const onMenuItemClick = async (action, gridApiRef, setRowData, handleAddRow, layer) => {
         // const { setRowData, handleAddRow } = options;
         const menu = menuRef.current;
         const rowId = menu ? menu.dataset.rowId : null;
@@ -261,6 +297,16 @@ export const useContextMenu = () => {
             if (tag) {
                 // Loop through selected rows and add tag
                 addTagToNodes(selectedNodes, tag, gridApi);
+            }
+        } else if (action === "add layer") {
+            const selectedNodes = gridApi.getSelectedNodes();
+            if (layer) {
+                addTagToNodes(selectedNodes, layer, gridApi);
+            }
+        } else if (action === "remove layer") {
+            const selectedNodes = gridApi.getSelectedNodes();
+            if (layer) {
+                removeTagFromNodes(selectedNodes, layer, gridApi);
             }
         }
         else if (action === "export mermaid") {
