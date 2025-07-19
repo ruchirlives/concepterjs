@@ -335,7 +335,14 @@ export const useTagsChange = (rowData, setRowData, keepLayout) => {
             console.log('Keeping all rows in tagFilter');
         }
         filteredTagFilter = filteredTagFilter.filter(r => rowInLayers(r, activeLayers));
-        setRowData(filteredTagFilter);
+
+        const currentRows = rowDataRef.current;
+        const isSameLength = filteredTagFilter.length === currentRows.length;
+        const isSameIds = isSameLength && filteredTagFilter.every((row, idx) => row.id === currentRows[idx].id);
+
+        if (!isSameIds) {
+            setRowData(filteredTagFilter);
+        }
     }, [tagFilter, keepLayout, setRowData, activeLayers]);
 };
 
