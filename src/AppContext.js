@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { requestReloadChannel } from './effectsShared';
 
 const AppContext = createContext();
 
@@ -24,6 +25,7 @@ export const AppProvider = ({ children }) => {
   const removeLayer = (layer) => {
     setLayerOptions((prev) => prev.filter((l) => l !== layer));
     setActiveLayers((prev) => prev.filter((l) => l !== layer));
+    requestReloadChannel();
   };
 
   const toggleLayer = (layer) => {
@@ -32,6 +34,7 @@ export const AppProvider = ({ children }) => {
         ? prev.filter((l) => l !== layer)
         : [...prev, layer]
     );
+    requestReloadChannel();
   };
 
   const value = {
