@@ -56,11 +56,14 @@ export const useAppContext = () => useContext(AppContext);
 // Utility to check if a row belongs to any active layer
 export const rowInLayers = (row, layers = []) => {
   if (!layers.length) return true;
-  const tags = (row.Tags || '')
+  const tagList = (row.Tags || '')
     .split(',')
-    .map((t) => t.trim())
+    .map((t) => t.trim().toLowerCase())
     .filter(Boolean);
-  return tags.some((t) => layers.includes(t));
+
+  const layerList = layers.map((l) => l.trim().toLowerCase());
+
+  return tagList.some((t) => layerList.includes(t));
 };
 
 export default AppContext;
