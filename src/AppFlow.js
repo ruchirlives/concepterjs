@@ -95,9 +95,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
   useTagsChange(rowData, setRowData, keepLayout);
   useSelectNode(nodes, edges, setNodes, rowData, handleTransform, centerNode); // Use the custom context menu logic
 
-  const { menuRef: contextMenuRef, handleContextMenu, onMenuItemClick: onContextMenuItemClick,
-    hideMenu: hideContextMenu, selectionContextMenu, gearContextMenu, } =
-    useContextMenu(flowWrapperRef, activeGroup, menuItems, nodes, rowData, setRowData, history); // Custom onConnect and onDisconnect hooks
+  const {
+    menuRef: contextMenuRef,
+    menuItems: contextMenuItems,
+    handleContextMenu,
+    onMenuItemClick: onContextMenuItemClick,
+    hideMenu: hideContextMenu,
+    selectionContextMenu,
+    gearContextMenu,
+  } = useContextMenu(
+    flowWrapperRef,
+    activeGroup,
+    menuItems,
+    nodes,
+    rowData,
+    setRowData,
+    history
+  ); // Custom onConnect and onDisconnect hooks
 
   const { menuRef: edgeMenuRef, handleEdgeMenu, onMenuItemClick: onEdgeMenuItemClick, hideMenu: hideEdgeMenu,
   } = useEdgeMenu(flowWrapperRef, activeGroup); // Custom edge menu logic
@@ -194,7 +208,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
               style={{ backgroundColor: '#f9fafb' }} // Tailwind's gray-50
             />
           </ReactFlow>
-          <ContextMenu ref={contextMenuRef} onMenuItemClick={onContextMenuItemClick} menuItems={menuItems} />
+          <ContextMenu
+            ref={contextMenuRef}
+            onMenuItemClick={onContextMenuItemClick}
+            menuItems={contextMenuItems}
+          />
           <EdgeMenu ref={edgeMenuRef} onMenuItemClick={onEdgeMenuItemClick} rowData={rowData} setRowData={setRowData} edges={edges} setEdges={setEdges} />
           <Toaster position="top-right" />
         </div>
