@@ -1,6 +1,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useAppContext } from './AppContext';
+import { useAppContext, rowInLayers } from './AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
 import { setPosition } from './api';
 import { createNewRow } from './ModalNewContainer';
@@ -10,12 +10,13 @@ import { handleEdgeConnection, handleEdgeRemoval, requestAddChild } from './flow
 
 export const useOnConnectEnd = (params) => {
     const { setEdges, addEdge, setNodes, setRowData, screenToFlowPosition, activeGroup, setLayoutPositions } = params;
+    const { activeLayers } = useAppContext();
 
     const onConnectEnd = useCallback(
         (event, connectionState) => {
 
             const createNode = async (event) => {
-                const newRowFunc = createNewRow(setRowData, activeGroup);
+                const newRowFunc = createNewRow(setRowData, activeGroup, activeLayers);
                 const newRows = await newRowFunc(); // returns array or null
 
                 if (!Array.isArray(newRows) || newRows.length === 0) {
@@ -296,6 +297,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
     const { rowData, activeGroup } = params;
+    const { activeLayers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     // Keep ref updated
@@ -304,14 +306,15 @@ export const useCreateNodesAndEdges = (params) => {
     }, [rowData]);
 
     useEffect(() => {
-        generateNodesAndEdges(params);
+        const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
+        generateNodesAndEdges({ ...params, rowData: filtered });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rowData, activeGroup]);
+    }, [rowData, activeGroup, activeLayers]);
 };
 
 
 export const useTagsChange = (rowData, setRowData, keepLayout) => {
-    const { rows: tagFilter } = useAppContext();
+    const { rows: tagFilter, activeLayers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     // Keep ref updated
@@ -331,8 +334,9 @@ export const useTagsChange = (rowData, setRowData, keepLayout) => {
             filteredTagFilter = tagFilter;
             console.log('Keeping all rows in tagFilter');
         }
+        filteredTagFilter = filteredTagFilter.filter(r => rowInLayers(r, activeLayers));
         setRowData(filteredTagFilter);
-    }, [tagFilter, keepLayout, setRowData]);
+    }, [tagFilter, keepLayout, setRowData, activeLayers]);
 };
 
 

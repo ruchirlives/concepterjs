@@ -8,7 +8,7 @@ import { useAppContext } from './AppContext'; // Import the AppContext to access
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent, setTiptapContent } = useAppContext();
+    const { tiptapContent, setTiptapContent, activeLayers } = useAppContext();
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
@@ -48,7 +48,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             removeEdgeById(edgeId);
 
             // Use createNewRow to create a new node(s)
-            const newNodes = await createNewRow(setRowData, activeGroup)();
+            const newNodes = await createNewRow(setRowData, activeGroup, activeLayers)();
             console.log("New Nodes:", newNodes);
 
             // For each new node, use the addChildren function to add the new node as a child of the source node
