@@ -96,7 +96,7 @@ export const useOnConnectEnd = (params) => {
             }
         },
         // Notice we removed rowData from the dependency array.
-        [setNodes, setRowData, screenToFlowPosition, setEdges, addEdge, activeGroup, setLayoutPositions]
+        [setNodes, setRowData, screenToFlowPosition, setEdges, addEdge, activeGroup, setLayoutPositions, activeLayers]
     );
 
     return onConnectEnd;
