@@ -1,7 +1,7 @@
 import { addChildren, createContainer, writeBackData } from "./api";
 import { openNamePrompt } from "./ModalNamePrompt";
 
-export function createNewRow(setRowData, activeGroup=null) {
+export function createNewRow(setRowData, activeGroup=null, activeLayers=[]) {
     return async () => {
         console.log("Creating new rows");
 
@@ -30,7 +30,7 @@ export function createNewRow(setRowData, activeGroup=null) {
                 id: id,
                 Name: fullText,
                 Description: fullText,                  // Full text
-                Tags: "",
+                Tags: activeLayers.join(', '),
                 StartDate: new Date().toISOString().split("T")[0],
                 EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
                     .toISOString()

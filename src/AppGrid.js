@@ -1,6 +1,6 @@
 // React imports
-import React, { useState, useRef, useEffect } from "react";
-import { useAppContext } from "./AppContext";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useAppContext, rowInLayers } from "./AppContext";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry } from "ag-grid-community";
 import { createNewRow } from "./ModalNewContainer"; // Import the function to create a new row
@@ -23,6 +23,7 @@ import { handleWriteBack } from "./effectsShared";
 import "ag-grid-community/styles/ag-theme-alpine.css"; // Default theme as fallback
 import { themeQuartz, colorSchemeDark } from "ag-grid-community";
 
+
 // Import the required module
 import { AllCommunityModule } from "ag-grid-community";
 
@@ -31,6 +32,11 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 
 const App = () => {
   const { rows: rowData, setRows: setRowData } = useAppContext();
+  const { activeLayers, layerOptions } = useAppContext();
+  const displayRows = useMemo(
+    () => rowData.filter((r) => rowInLayers(r, activeLayers)),
+    [rowData, activeLayers]
+  );
   // const [miniMapData, setMiniMapData] = useState([]); // Mini-map children data
   // const [lastSelectedRow, setLastSelectedRow] = useState(null); // Last selected row
   const [isLoadModalOpen, setLoadModalOpen] = useState(false); // State for load modal
@@ -105,7 +111,7 @@ const App = () => {
 
   };
 
-  const handleAddRow = createNewRow(setRowData, activeGroup); // Function to create a new row
+  const handleAddRow = createNewRow(setRowData, activeGroup, activeLayers); // Function to create a new row
 
   // Handle row selection and fetch children dynamically
   // const onRowSelected = async (event) => {
@@ -313,7 +319,7 @@ const App = () => {
         <AgGridReact
           rowSelection="multiple"
           theme={myTheme}
-          rowData={rowData}
+          rowData={displayRows}
           columnDefs={columnDefs}
           gridOptions={gridOptions}
           onGridReady={onGridReady}
@@ -328,6 +334,8 @@ const App = () => {
         gridApiRef={gridApiRef}
         setRowData={setRowData}
         handleAddRow={handleAddRow}
+        activeLayers={activeLayers}
+        layerOptions={layerOptions}
       />
 
       <LoadModal
