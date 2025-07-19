@@ -115,7 +115,7 @@ const App = () => {
         </section>
 
         <section id="sub">
-          <AppFlow/>
+          <AppFlow keepLayout={keepLayout} setKeepLayout={setKeepLayout} />
         </section>
 
         <section id="mermaid" className="mb-28">
