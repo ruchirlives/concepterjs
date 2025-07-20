@@ -254,6 +254,7 @@ export const useOnEdgeChange = (setEdges) => {
 };
 
 export const useOnEdgeDoubleClick = (setEdges) => {
+    const { baseUrl } = useAppContext();
     const onEdgeDoubleClick = useCallback(
         (event, edge) => {
             console.log('Edge double-clicked:', edge);
@@ -272,7 +273,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
                     })
                 );
                 // Call your API to set the new position using the new label
-                setPosition(sourceId, targetId, newLabel)
+                setPosition(sourceId, targetId, newLabel, baseUrl)
                     .then((response) => {
                         if (response) {
                             console.log("Position set successfully.");
@@ -287,7 +288,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
             }
 
         },
-        [setEdges]
+        [setEdges, baseUrl] // Add baseUrl to dependencies
     );
 
     return onEdgeDoubleClick;
