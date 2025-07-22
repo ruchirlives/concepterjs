@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { manyChildren, setPosition } from "./api";
 import { useAppContext } from "./AppContext";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and useEdgeMenu
+import toast from "react-hot-toast";
 
 const AppMatrix = () => {
   const { rows: rowData } = useAppContext();
@@ -183,6 +184,38 @@ const AppMatrix = () => {
     [handleCellSubmit]
   );
 
+  const handleExportExcel = useCallback(() => {
+    const headers = ["", ...filteredTargets.map((c) => c.Name)];
+    const rows = filteredSources.map((source) => {
+      const values = [source.Name];
+      filteredTargets.forEach((target) => {
+        const key = `${source.id}-${target.id}`;
+        values.push(relationships[key] || "");
+      });
+      return values.join("\t");
+    });
+    const tsv = [headers.join("\t"), ...rows].join("\n");
+
+    toast((t) => (
+      <div className="max-w-[300px]">
+        <div className="font-semibold mb-1">Matrix TSV</div>
+        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">
+          {tsv}
+        </div>
+        <button
+          className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
+          onClick={() => {
+            navigator.clipboard.writeText(tsv);
+            toast.success("Copied!");
+            toast.dismiss(t.id);
+          }}
+        >
+          Copy to Clipboard
+        </button>
+      </div>
+    ));
+  }, [filteredSources, filteredTargets, relationships]);
+
   // Focus input when editing starts
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -291,6 +324,14 @@ const AppMatrix = () => {
             title={hideEmpty ? "Show all containers" : "Hide empty rows/columns"}
           >
             {hideEmpty ? "Show All" : "Hide Empty"}
+          </button>
+
+          <button
+            className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
+            onClick={handleExportExcel}
+            title="Export current view"
+          >
+            Export Excel
           </button>
         </div>
 
