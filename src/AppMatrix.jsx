@@ -6,6 +6,7 @@ import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and u
 const AppMatrix = () => {
   const { rows: rowData } = useAppContext();
   const [relationships, setRelationships] = useState({});
+  const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [collapsed, setCollapsed] = useState(true);
@@ -54,6 +55,7 @@ const AppMatrix = () => {
 
       // Build relationships map from parent-child data
       const newRelationships = {};
+      const newForwardMap = {};
 
       // Process the parent-child map (same logic as flowFetchAndCreateEdges.js)
       parentChildMap.forEach(({ container_id, children }) => {
@@ -74,6 +76,7 @@ const AppMatrix = () => {
           }
 
           newRelationships[key] = relationship;
+          newForwardMap[key] = true;
         });
       });
 
@@ -94,6 +97,7 @@ const AppMatrix = () => {
       }
 
       setRelationships(newRelationships);
+      setForwardExists(newForwardMap);
     } catch (error) {
       console.error("Error loading relationships:", error);
       // Initialize empty relationships on error
@@ -109,6 +113,7 @@ const AppMatrix = () => {
         }
       }
       setRelationships(newRelationships);
+      setForwardExists({});
     }
 
     setLoading(false);
@@ -146,6 +151,10 @@ const AppMatrix = () => {
         setRelationships((prev) => ({
           ...prev,
           [key]: value,
+        }));
+        setForwardExists((prev) => ({
+          ...prev,
+          [key]: true,
         }));
       } catch (error) {
         console.error("Error saving relationship:", error);
@@ -188,31 +197,24 @@ const AppMatrix = () => {
       return rowData;
     }
 
-    // Find containers that have at least one non-empty relationship (as source or target)
-    const containersWithRelationships = new Set();
+    // Find containers that participate in a forward relationship
+    const containersWithForward = new Set();
 
     rowData.forEach((sourceContainer) => {
       rowData.forEach((targetContainer) => {
         if (sourceContainer.id !== targetContainer.id) {
           const key = `${sourceContainer.id}-${targetContainer.id}`;
-          const reverseKey = `${targetContainer.id}-${sourceContainer.id}`;
 
-          // Safe check for non-empty relationships
-          const hasForwardRelationship = relationships[key] && typeof relationships[key] === "string" && relationships[key].trim() !== "";
-
-          const hasReverseRelationship =
-            relationships[reverseKey] && typeof relationships[reverseKey] === "string" && relationships[reverseKey].trim() !== "";
-
-          if (hasForwardRelationship || hasReverseRelationship) {
-            containersWithRelationships.add(sourceContainer.id);
-            containersWithRelationships.add(targetContainer.id);
+          if (forwardExists[key]) {
+            containersWithForward.add(sourceContainer.id);
+            containersWithForward.add(targetContainer.id);
           }
         }
       });
     });
 
-    return rowData.filter((container) => containersWithRelationships.has(container.id));
-  }, [rowData, relationships, hideEmpty]);
+    return rowData.filter((container) => containersWithForward.has(container.id));
+  }, [rowData, forwardExists, hideEmpty]);
 
   // Fix the EmptyState component
   const EmptyState = useMemo(
