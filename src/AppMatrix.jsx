@@ -184,6 +184,33 @@ const AppMatrix = () => {
     [handleCellSubmit]
   );
 
+  // Memoize filtered data based on hideEmpty setting
+  const { filteredSources, filteredTargets } = useMemo(() => {
+    if (!hideEmpty || rowData.length === 0) {
+      return { filteredSources: rowData, filteredTargets: rowData };
+    }
+
+    const sources = new Set();
+    const targets = new Set();
+
+    rowData.forEach((source) => {
+      rowData.forEach((target) => {
+        if (source.id !== target.id) {
+          const key = `${source.id}-${target.id}`;
+          if (forwardExists[key]) {
+            sources.add(source.id);
+            targets.add(target.id);
+          }
+        }
+      });
+    });
+
+    return {
+      filteredSources: rowData.filter((c) => sources.has(c.id)),
+      filteredTargets: rowData.filter((c) => targets.has(c.id)),
+    };
+  }, [rowData, forwardExists, hideEmpty]);
+
   const handleExportExcel = useCallback(() => {
     const headers = ["", ...filteredTargets.map((c) => c.Name)];
     const rows = filteredSources.map((source) => {
@@ -223,33 +250,6 @@ const AppMatrix = () => {
       inputRef.current.select();
     }
   }, [editingCell]);
-
-  // Memoize filtered data based on hideEmpty setting
-  const { filteredSources, filteredTargets } = useMemo(() => {
-    if (!hideEmpty || rowData.length === 0) {
-      return { filteredSources: rowData, filteredTargets: rowData };
-    }
-
-    const sources = new Set();
-    const targets = new Set();
-
-    rowData.forEach((source) => {
-      rowData.forEach((target) => {
-        if (source.id !== target.id) {
-          const key = `${source.id}-${target.id}`;
-          if (forwardExists[key]) {
-            sources.add(source.id);
-            targets.add(target.id);
-          }
-        }
-      });
-    });
-
-    return {
-      filteredSources: rowData.filter((c) => sources.has(c.id)),
-      filteredTargets: rowData.filter((c) => targets.has(c.id)),
-    };
-  }, [rowData, forwardExists, hideEmpty]);
 
   // Fix the EmptyState component
   const EmptyState = useMemo(
