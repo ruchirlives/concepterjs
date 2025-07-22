@@ -192,28 +192,30 @@ const AppMatrix = () => {
   }, [editingCell]);
 
   // Memoize filtered data based on hideEmpty setting
-  const filteredRowData = useMemo(() => {
+  const { filteredSources, filteredTargets } = useMemo(() => {
     if (!hideEmpty || rowData.length === 0) {
-      return rowData;
+      return { filteredSources: rowData, filteredTargets: rowData };
     }
 
-    // Find containers that participate in a forward relationship
-    const containersWithForward = new Set();
+    const sources = new Set();
+    const targets = new Set();
 
-    rowData.forEach((sourceContainer) => {
-      rowData.forEach((targetContainer) => {
-        if (sourceContainer.id !== targetContainer.id) {
-          const key = `${sourceContainer.id}-${targetContainer.id}`;
-
+    rowData.forEach((source) => {
+      rowData.forEach((target) => {
+        if (source.id !== target.id) {
+          const key = `${source.id}-${target.id}`;
           if (forwardExists[key]) {
-            containersWithForward.add(sourceContainer.id);
-            containersWithForward.add(targetContainer.id);
+            sources.add(source.id);
+            targets.add(target.id);
           }
         }
       });
     });
 
-    return rowData.filter((container) => containersWithForward.has(container.id));
+    return {
+      filteredSources: rowData.filter((c) => sources.has(c.id)),
+      filteredTargets: rowData.filter((c) => targets.has(c.id)),
+    };
   }, [rowData, forwardExists, hideEmpty]);
 
   // Fix the EmptyState component
@@ -277,7 +279,7 @@ const AppMatrix = () => {
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <div className="flex items-center gap-4">
           <span className="font-semibold">
-            Relationship Matrix ({filteredRowData.length} of {rowData.length} containers)
+            Relationship Matrix ({filteredSources.length} of {rowData.length} containers)
           </span>
 
           {/* Hide Empty Toggle Button */}
@@ -319,7 +321,7 @@ const AppMatrix = () => {
                           </div>
                         </th>
                         {/* Column headers - only show filtered containers */}
-                        {filteredRowData.map((container) => (
+                        {filteredTargets.map((container) => (
                           <th
                             key={container.id}
                             className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[100px] max-w-[100px] truncate whitespace-nowrap"
@@ -331,14 +333,14 @@ const AppMatrix = () => {
                     </thead>
                     <tbody>
                       {/* Only show filtered containers as rows */}
-                      {filteredRowData.map((sourceContainer) => (
+                      {filteredSources.map((sourceContainer) => (
                         <tr key={sourceContainer.id}>
                           {/* Row header */}
                           <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px] truncate whitespace-nowrap">
                             <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
                           </th>
                           {/* Data cells - only show filtered containers as columns */}
-                          {filteredRowData.map((targetContainer) => {
+                          {filteredTargets.map((targetContainer) => {
                             const key = `${sourceContainer.id}-${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
                             const value = relationships[key] || "";
@@ -360,7 +362,7 @@ const AppMatrix = () => {
                                 key={key}
                                 className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
                                 onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
-                                onContextMenu={(e) => handleEdgeMenu(e, edge)} // <-- Add right-click handler
+                                onContextMenu={(e) => handleEdgeMenu(e, edge)}
                                 onMouseEnter={(e) => {
                                   if (value) {
                                     const rect = e.target.getBoundingClientRect();
@@ -402,8 +404,8 @@ const AppMatrix = () => {
                     onMenuItemClick={onMenuItemClick}
                     rowData={rowData}
                     setRowData={() => {}}
-                    edges={filteredRowData.map((source) =>
-                      filteredRowData.map((target) => ({
+                    edges={filteredSources.map((source) =>
+                      filteredTargets.map((target) => ({
                         id: `${source.id}-${target.id}`,
                         source: source.id,
                         target: target.id,
