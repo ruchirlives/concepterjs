@@ -401,7 +401,7 @@ const AppMatrix = () => {
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[100px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
+                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[200px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
                                 onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
                                 onContextMenu={(e) => handleEdgeMenu(e, edge)}
                                 onMouseEnter={(e) => {
@@ -426,8 +426,8 @@ const AppMatrix = () => {
                                     onBlur={handleBlur}
                                   />
                                 ) : (
-                                  <span className="text-xs block truncate">
-                                    {value.length > 20 ? value.slice(0, 20) + "..." : value || "—"}
+                                  <span className="text-xs block whitespace-pre-line break-words">
+                                    {value || "—"}
                                   </span>
                                 )}
                               </td>
