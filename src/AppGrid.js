@@ -15,7 +15,7 @@ import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } fr
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
   useSaveButtonEffect, useDropDownEffect, useLoadDataEffect, useFilteredRowContext,
-  useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestReloadChannel, useRekeyButtonEffect, useAddTagsChannel, useRemoveTagsChannel
+  useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestReloadChannel, useRekeyButtonEffect, useDedupButtonEffect, useAddTagsChannel, useRemoveTagsChannel
 } from "./gridEffects";
 import { handleWriteBack } from "./effectsShared";
 
@@ -275,6 +275,7 @@ const App = () => {
   useAddChildChannel(gridApiRef, setRowData);
   useRequestReloadChannel(setRowData);
   useRekeyButtonEffect()
+  useDedupButtonEffect()
   useAddTagsChannel(gridApiRef, setRowData);
   useRemoveTagsChannel(gridApiRef, setRowData);
 

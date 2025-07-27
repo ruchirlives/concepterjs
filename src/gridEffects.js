@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey } from "./api";
+import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey, requestDedup } from "./api";
 import { setApiUrl } from "./apiConfig";
 import { formatDateFields, handleWriteBack } from "./effectsShared";
 import API_URLS from "./globalconfig";
@@ -295,6 +295,19 @@ export const useRekeyButtonEffect = () => {
     useButtonEffect("requestRekeyButton", handleRekeyClick, [handleRekeyClick]);
 };
 
+// Deduplication button effect
+export const useDedupButtonEffect = (setRowData) => {
+    const handleDedupClick = useCallback(async () => {
+        console.log("Deduplication button clicked");
+        const resp = await requestDedup();
+        console.log("Deduplication response:", resp.message);
+        // Reload
+        const channel = new BroadcastChannel('requestReloadChannel');
+        channel.postMessage({ type: "reload" });
+    }, []);
+
+    useButtonEffect("requestDedupButton", handleDedupClick, [handleDedupClick]);
+};
 
 /**
  * Reusable hook for attaching button event listeners

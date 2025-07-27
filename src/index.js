@@ -25,6 +25,8 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
     { id: "clearButton", text: "Clear" },
     { id: "refreshButton", text: "Refresh" },
     { id: "requestRekeyButton", text: "Request Rekey" },
+    // Request dedup
+    { id: "requestDedupButton", text: "Request Deduplication" },
   ]);
 
   return (

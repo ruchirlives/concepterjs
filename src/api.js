@@ -27,6 +27,7 @@ export const fetchContainers = async () => {
     try {
         const response = await apiClient.get(`${getApiUrl()}/get_containers`);
         let containers = response.data.containers;
+        console.log("Fetched containers:", containers);
 
         // Duplicate check (warn)
         if (Array.isArray(containers)) {
@@ -489,6 +490,19 @@ export const requestRekey = async () => {
         return null;
     }
 };
+
+// Request dedup
+export const requestDedup = async () => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/request_dedup`);
+        console.log("Request dedup response:", response);
+        return response.data;
+    } catch (error) {
+        console.error("Error requesting deduplication:", error);
+        return null;
+    }
+};
+
 
 // Save containers
 export const saveContainers = async (name) => {
