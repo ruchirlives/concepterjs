@@ -124,7 +124,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const pid = p.id.toString();
             return allNodes.some(m => m.id === pid && m.type === 'group');
         });
-        
+
         if (activeGroup) {
             // Hide the activeGroup node itself when we're inside it
             if (n.id === activeGroup) {
@@ -134,12 +134,12 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const hasActiveGroupAsParent = parents.some(p => p.id === activeGroup);
             return hasActiveGroupAsParent || !hasVisibleGroupParent;
         }
-        
+
         // For nodes outside activeGroup, check if they should be visible
         const isDirectChild = !hasVisibleGroupParent;
-        const isSuccessorWithVisibleChain = childRelationshipLabels[n.id]?.has('successor') && 
+        const isSuccessorWithVisibleChain = childRelationshipLabels[n.id]?.has('successor') &&
             hasVisibleSuccessorChain(n.id, successorChildToParent, allNodes, new Set());
-        
+
         return isDirectChild || isSuccessorWithVisibleChain;
     });
 
@@ -148,23 +148,23 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         // Prevent infinite loops
         if (visited.has(nodeId)) return false;
         visited.add(nodeId);
-        
+
         const successorParents = successorChildToParent[nodeId] || [];
-        
+
         for (const parentId of successorParents) {
             const parentNode = allNodes.find(n => n.id === parentId);
             if (!parentNode) continue;
-            
+
             // Check if this parent is directly visible (not a child of a group)
             const parentIsDirectlyVisible = !parentNode.data.parents?.some(p => {
                 const pid = p.id.toString();
                 return allNodes.some(m => m.id === pid && m.type === 'group');
             });
-            
+
             if (parentIsDirectlyVisible) {
                 return true; // Found a visible node in the chain
             }
-            
+
             // If parent is also a successor, recursively check its chain
             if (childRelationshipLabels[parentId]?.has('successor')) {
                 if (hasVisibleSuccessorChain(parentId, successorChildToParent, allNodes, visited)) {
@@ -172,7 +172,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 }
             }
         }
-        
+
         return false; // No visible node found in any chain
     }
 

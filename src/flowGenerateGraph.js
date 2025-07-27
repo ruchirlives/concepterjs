@@ -29,7 +29,6 @@ export function generateNodesAndEdges(params) {
         };
     });
 
-
     fetchAndCreateEdges(computedNodes, params);
     // Fit the view to the nodes and edges
     fitViewToFlow();

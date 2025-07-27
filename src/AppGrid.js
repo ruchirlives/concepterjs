@@ -235,38 +235,29 @@ const App = () => {
     channel.onmessage = (event) => {
       const { activeGroup } = event.data;
       console.log("Received active group:", activeGroup);
-      setActiveGroup(activeGroup); // Update the active group state
+      setActiveGroup(activeGroup);
 
-      // If activeGroup is null, fetch all containers
       if (activeGroup === null) {
-        console.log("Active group is null, fetching all containers");
-        // reset color of all rows to default
         setRowData((prevData) =>
           prevData.map((row) => ({ ...row, hidden: false }))
         );
         return;
-      }
-      else {
-        console.log("Active group is not null, fetching active group data");
-
+      } else {
         fetchChildren(activeGroup).then((children) => {
-          const childIds = new Set(children.map(child => child.id)); // Use Set for faster lookup
-
+          const childIds = new Set(children.map(child => child.id));
           setRowData(prevData =>
             prevData.map(row => ({
               ...row,
-              hidden: !childIds.has(row.id), // hide if not in childIds
+              hidden: !childIds.has(row.id),
             }))
           );
         });
       }
-
-
     };
     return () => {
-      channel.close(); // Close the channel when the component unmounts
+      channel.close();
     }
-  }, [rowData, setRowData]); // Add rowData and setRowData to dependencies
+  }); // <-- Only run once on mount
 
   // Use custom hooks for effects
   useFetchData(setRowData, fetchContainers);

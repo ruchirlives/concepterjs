@@ -213,6 +213,7 @@ export function buildVisibleEdges(params) {
 
     // ✅ NEW: for each group, pull its direct kids from childMap
     visibleNodes.forEach(node => {
+        // console.log('Processing', node);
         if (node.type !== 'group') return;        // only for group-nodes
         node.data.children = node.data.children || [];  // ensure the array
 
@@ -231,6 +232,12 @@ export function buildVisibleEdges(params) {
             }
         });
     });
+
+    // const ids = visibleNodes.map(n => n.id);
+    // const dupes = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+    // if (dupes.length > 0) {
+    //   console.warn('Duplicate node IDs in visibleNodes:', [...new Set(dupes)]);
+    // }
 
     return newEdges;
 }

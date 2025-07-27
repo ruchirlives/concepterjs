@@ -5,7 +5,7 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [rows, setRows] = useState([]);
-  
+
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
     type: "doc",

@@ -26,7 +26,29 @@ export const fetchContainerById = async (id) => {
 export const fetchContainers = async () => {
     try {
         const response = await apiClient.get(`${getApiUrl()}/get_containers`);
-        return response.data.containers;
+        let containers = response.data.containers;
+
+        // Duplicate check (warn)
+        if (Array.isArray(containers)) {
+            const idCounts = containers.reduce((acc, c) => {
+                acc[c.id] = (acc[c.id] || 0) + 1;
+                return acc;
+            }, {});
+            const dupes = Object.entries(idCounts).filter(([id, count]) => count > 1);
+            if (dupes.length > 0) {
+                console.warn("Duplicate container IDs found in fetchContainers:", dupes.map(([id, count]) => `${id} (x${count})`));
+            }
+
+            // Deduplicate by id
+            const seen = new Set();
+            containers = containers.filter(c => {
+                if (seen.has(c.id)) return false;
+                seen.add(c.id);
+                return true;
+            });
+        }
+
+        return containers;
     } catch (error) {
         console.error("Error fetching containers:", error);
     }
