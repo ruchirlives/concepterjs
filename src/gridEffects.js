@@ -233,7 +233,10 @@ export const useAddTagsChannel = (gridApiRef, setRowData) => {
             const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
             addTagToNodes(selectedNodes, tags, gridApiRef.current);
             setRowData((prev) => {
-                const updated = [...prev, ...selectedNodes.map(node => node.data)];
+                const updated = prev.map(row => {
+                    const node = selectedNodes.find(n => n.data.id === row.id);
+                    return node ? { ...row, ...node.data } : row;
+                });
                 writeBackData(updated);
                 return updated;
             });
@@ -255,7 +258,10 @@ export const useRemoveTagsChannel = (gridApiRef, setRowData) => {
             const selectedNodes = selectedIds.map(id => gridApiRef.current.getRowNode(id));
             removeTagFromNodes(selectedNodes, tags, gridApiRef.current);
             setRowData((prev) => {
-                const updated = [...prev, ...selectedNodes.map(node => node.data)];
+                const updated = prev.map(row => {
+                    const node = selectedNodes.find(n => n.data.id === row.id);
+                    return node ? { ...row, ...node.data } : row;
+                });
                 writeBackData(updated);
                 return updated;
             });
