@@ -132,12 +132,15 @@ export function buildVisibleEdges(params) {
             ancNode.data.children = ancNode.data.children || [];
             if (!ancNode.data.children.some(ch => ch.id === childId)) {
                 const buried = nodeById[childId];
-                console.log('Adding buried child to ancestor:', buried);
+                // Ensure tags is an array and includes 'input' or 'output'
+                let tags = buried.data.Tags;
+                if (typeof tags === 'string') tags = tags.split(',').map(t => t.trim()).filter(Boolean);
+                if (!tags.includes('input') && !tags.includes('output')) tags.push('input'); // or 'output' as needed
                 ancNode.data.children.push({
                     id: childId,
                     name: buried.data.Name,
                     position: buried.position,
-                    tags: buried.data.Tags,
+                    tags,
                 });
             }
 
@@ -182,11 +185,14 @@ export function buildVisibleEdges(params) {
             ancNode.data.children = ancNode.data.children || [];
             if (!ancNode.data.children.some(ch => ch.id === parentId)) {
                 const buried = nodeById[parentId];
+                let tags = buried.data.Tags;
+                if (typeof tags === 'string') tags = tags.split(',').map(t => t.trim()).filter(Boolean);
+                if (!tags.includes('input') && !tags.includes('output')) tags.push('output'); // or 'input' as needed
                 ancNode.data.children.push({
                     id: parentId,
                     name: buried.data.Name,
                     position: buried.position,
-                    tags: buried.data.Tags,
+                    tags,
                 });
             }
 

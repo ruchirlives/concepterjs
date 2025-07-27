@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "./AppContext";
 
 const AppLayers = () => {
@@ -8,9 +8,31 @@ const AppLayers = () => {
     removeLayer,
     activeLayers,
     toggleLayer,
+    rows
   } = useAppContext();
   const [collapsed, setCollapsed] = useState(true);
   const [newLayer, setNewLayer] = useState("");
+
+  // Extract tags from rows and add as layers, but only when not collapsed
+  useEffect(() => {
+    if (collapsed || !rows) return;
+    const tagSet = new Set();
+    rows.forEach(row => {
+      if (row.Tags) {
+        row.Tags
+          .split(",")
+          .map(tag => tag.trim())
+          .filter(Boolean)
+          .forEach(tag => tagSet.add(tag));
+      }
+    });
+    tagSet.forEach(tag => {
+      if (!layerOptions.includes(tag)) {
+        addLayer(tag);
+      }
+    });
+    // eslint-disable-next-line
+  }, [rows, collapsed]);
 
   const handleAdd = () => {
     const name = newLayer.trim();
