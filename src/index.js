@@ -108,9 +108,9 @@ const App = () => {
           <AppMatrix />
         </section>
 
-        {/* <section id="prioritiser">
+        <section id="prioritiser">
           <AppPrioritiser />
-        </section> */}
+        </section>
 
         <section id="layers">
           <AppLayers />
