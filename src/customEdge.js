@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { getBezierPath, BaseEdge } from '@xyflow/react';
+import { useFlowMenu } from './FlowMenuContext';
 import ReactDOM from 'react-dom';
 
 const Tooltip = ({ x, y, children }) =>
@@ -49,6 +50,7 @@ const CustomEdge = ({
     markerEnd,
     data,
 }) => {
+    const { handleEdgeMenu } = useFlowMenu();
     // compute our stroke colour
     const hue = getHueFromString(source);
     const strokeColor = `hsl(${hue}, 70%, 50%)`;
@@ -155,6 +157,34 @@ const CustomEdge = ({
                     </div>
                 </foreignObject>
             )}
+
+            <foreignObject
+                width={20}
+                height={20}
+                x={labelX + 10}
+                y={labelY - 10}
+                requiredExtensions="http://www.w3.org/1999/xhtml"
+                style={{ pointerEvents: 'auto' }}
+            >
+                <button
+                    xmlns="http://www.w3.org/1999/xhtml"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdgeMenu(e, { id });
+                    }}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        background: '#e5e7eb',
+                        fontSize: 12,
+                        lineHeight: '18px',
+                        textAlign: 'center',
+                    }}
+                >
+                    ⋮
+                </button>
+            </foreignObject>
 
             {hovered && data?.description && (
                 <Tooltip x={tooltipPos.x} y={tooltipPos.y}>

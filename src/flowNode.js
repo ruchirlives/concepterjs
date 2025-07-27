@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNodeId, Handle } from '@xyflow/react';
+import { useFlowMenu } from './FlowMenuContext';
 
 const FlowNode = ({ data, style, selected }) => {
   const [isHovered, setIsHovered] = useState(false);
   const nodeId = useNodeId();
+  const { handleNodeMenu } = useFlowMenu();
 
   const handleDoubleClick = () => {
     console.log('Node id:', nodeId);
@@ -76,6 +78,16 @@ const FlowNode = ({ data, style, selected }) => {
         position="right"
         className="bg-gray-600 w-2.5 h-2.5"
       />
+
+      <button
+        className="absolute top-0 right-0 text-xs bg-gray-200 rounded px-1"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleNodeMenu(e, { data: { id: data.id } });
+        }}
+      >
+        ⋮
+      </button>
 
       <div>{data.Name}</div>
 

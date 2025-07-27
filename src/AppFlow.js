@@ -11,6 +11,7 @@ import GroupNode from './flowGroupNodes';
 import ContextMenu from "./ContextMenu";
 import { useContextMenu, menuItems } from "./flowContextMenu";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
+import { FlowMenuProvider } from './FlowMenuContext';
 import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './customEdge';
 import { Toaster } from 'react-hot-toast';
@@ -167,6 +168,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
             </div>
           )}
 
+          <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
           <ReactFlow
             fitView
             nodes={nodes}
@@ -215,6 +217,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           />
           <EdgeMenu ref={edgeMenuRef} onMenuItemClick={onEdgeMenuItemClick} rowData={rowData} setRowData={setRowData} edges={edges} setEdges={setEdges} />
           <Toaster position="top-right" />
+          </FlowMenuProvider>
         </div>
       </div>
     </div>
