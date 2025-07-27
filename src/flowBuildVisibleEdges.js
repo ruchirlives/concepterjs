@@ -221,7 +221,7 @@ export function buildVisibleEdges(params) {
         directKids.forEach(k => {
             const cid = k.id.toString();
             // guard against duplicates
-            if (!node.data.children.some(ch => ch.id === cid)) {
+            if (!node.data.children.some(ch => ch.id === cid && JSON.stringify(ch.tags) === JSON.stringify(k.tags))) {
                 node.data.children.push({
                     id: cid,
                     name: k.name,          // or k.data.Name if you have that
