@@ -81,6 +81,7 @@ export function displayContextMenu(menuRef, event, node, wrapperRef) {
     menu.style.setProperty("display", "block", "important");
 
     menu.dataset.nodeId = node.data.id;
+    menu.dataset.selected = node.data.selected ? "true" : "false";
 }
 export function requestRefreshChannel() {
     console.log('Request to refresh channel:');

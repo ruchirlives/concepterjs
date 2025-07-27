@@ -83,7 +83,7 @@ const FlowNode = ({ data, style, selected }) => {
         className="absolute top-0 right-0 text-xs bg-gray-200 rounded px-1"
         onClick={(e) => {
           e.stopPropagation();
-          handleNodeMenu(e, { data: { id: data.id } });
+          handleNodeMenu(e, { data: { id: data.id, selected: true } });
         }}
       >
         ⋮

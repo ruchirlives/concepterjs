@@ -385,7 +385,24 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
     const onMenuItemClick = async (action) => {
         const m = menuRef.current;
         const nodeId = m?.dataset.nodeId;
-        const selectedNodes = nodes.filter(n => n.selected);
+        const selected = m?.dataset.selected;
+
+        let selectedNodes = [];
+
+        // If selected, then use nodeId, otherwise check for selected nodes
+        if (!selected) {
+            const selectedNodes = nodes.filter(n => n.selected);
+            if (selectedNodes.length === 0) {
+                console.warn("No nodes selected for action:", action);
+                return;
+            }
+        }
+        else {
+            // If selected, we can use the nodeId directly
+            console.log("Node ID from menu:", nodeId);
+            selectedNodes = nodes.filter(n => n.data.id === nodeId);
+        }
+
         const selectedIds = selectedNodes.map(n => n.data.id);
 
         // If no nodes are selected selectedIds will be all nodes in the graph
