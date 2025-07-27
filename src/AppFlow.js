@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useAppContext } from './AppContext';
 import {
   ReactFlow, ReactFlowProvider // This is the provider component linked to Zustand store
   , MiniMap, Controls, Background, useNodesState, useEdgesState, useReactFlow, addEdge, ControlButton
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useOnEdgeDoubleClick, useSelectNode } from './flowEffects';
+import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useSelectNode } from './flowEffects';
 import FlowNode from './flowNode';
 import GroupNode from './flowGroupNodes';
 import ContextMenu from "./ContextMenu";
@@ -28,6 +28,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [layoutPositions, setLayoutPositions] = useState({});
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useEdgesState();
+
+  // Memoize edgeTypes so it's not recreated on every render
+  const edgeTypes = useMemo(() => ({
+    customEdge: (edgeProps) => (
+      <CustomEdge {...edgeProps} setEdges={setEdges} />
+    ),
+  }), [setEdges]);
 
   // Step 3: Viewport transformation ---
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
@@ -90,7 +97,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const onEdgesChange = useOnEdgeChange(setEdges);
   const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
   const onConnectEnd = useOnConnectEnd({ setEdges, setNodes, screenToFlowPosition, setRowData, addEdge, activeGroup, setLayoutPositions });
-  const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
+  // const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
 
   // Step 5: Context menu and edge menu logic ---
   useTagsChange(rowData, setRowData, keepLayout);
@@ -118,10 +125,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   } = useEdgeMenu(flowWrapperRef, activeGroup); // Custom edge menu logic
 
   const hideMenu = () => { hideContextMenu(); hideEdgeMenu(); };
-
-  const edgeTypes = {
-    customEdge: CustomEdge,
-  };
 
   return (
     <div className="bg-white rounded shadow">
@@ -175,7 +178,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onEdgeDoubleClick={onEdgeDoubleClick}
             onConnect={onEdgeConnect}
             nodeTypes={{ custom: FlowNode, group: GroupNode }}
             edgeTypes={edgeTypes}

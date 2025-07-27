@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { getBezierPath, BaseEdge } from '@xyflow/react';
 import { useFlowMenu } from './FlowMenuContext';
 import ReactDOM from 'react-dom';
+import { useOnEdgeDoubleClick } from './flowEffects';
 
 const Tooltip = ({ x, y, children }) =>
     ReactDOM.createPortal(
@@ -39,7 +40,8 @@ const getHueFromString = (str) => {
 
 const CustomEdge = ({
     id,
-    source,            // the source node's ID
+    source,
+    target,
     sourceX,
     sourceY,
     targetX,
@@ -49,8 +51,11 @@ const CustomEdge = ({
     style = {},
     markerEnd,
     data,
+    setEdges, // <-- accept as prop
 }) => {
     const { handleEdgeMenu } = useFlowMenu();
+    const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges); // <-- use here
+
     // compute our stroke colour
     const hue = getHueFromString(source);
     const strokeColor = `hsl(${hue}, 70%, 50%)`;
@@ -60,7 +65,7 @@ const CustomEdge = ({
     let adjustedSourceY = sourceY;
     let adjustedTargetX = targetX;
     let adjustedTargetY = targetY;
-    
+
     if (data?.label === 'successor') {
         const sourceGapSize = 20; // pixels to gap from source end
         const targetGapSize = 20; // smaller gap at target end
@@ -99,6 +104,7 @@ const CustomEdge = ({
     const [hovered, setHovered] = useState(false);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
     const labelRef = useRef();
+    const singleTapTimeout = useRef(null);
 
     const handleMouseEnter = () => {
         if (labelRef.current) {
@@ -108,6 +114,32 @@ const CustomEdge = ({
         setHovered(true);
     };
     const handleMouseLeave = () => setHovered(false);
+
+    const handleLabelClick = (e) => {
+        e.stopPropagation();
+        // Always clear any previous timer
+        if (singleTapTimeout.current) {
+            clearTimeout(singleTapTimeout.current);
+            singleTapTimeout.current = null;
+        }
+        // Set a new timer for single tap
+        singleTapTimeout.current = setTimeout(() => {
+            handleEdgeMenu(e, { id });
+            singleTapTimeout.current = null;
+        }, 250);
+    };
+
+    const handleLabelDoubleClick = (e) => {
+        e.stopPropagation();
+        if (singleTapTimeout.current) {
+            clearTimeout(singleTapTimeout.current);
+            singleTapTimeout.current = null;
+        }
+        if (typeof onEdgeDoubleClick === 'function') {
+            // Pass the event and edge object (mimic ReactFlow's signature)
+            onEdgeDoubleClick(e, { id, source, target, label: data?.label });
+        }
+    };
 
     // merge with any incoming style and set stroke color
     const edgeStyle = { ...style, stroke: strokeColor };
@@ -136,6 +168,8 @@ const CustomEdge = ({
                         xmlns="http://www.w3.org/1999/xhtml"
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
+                        onClick={handleLabelClick}
+                        onDoubleClick={handleLabelDoubleClick}
                         style={{
                             pointerEvents: 'auto',
                             background: '#f9fafb',
@@ -157,34 +191,6 @@ const CustomEdge = ({
                     </div>
                 </foreignObject>
             )}
-
-            <foreignObject
-                width={20}
-                height={20}
-                x={labelX + 10}
-                y={labelY - 10}
-                requiredExtensions="http://www.w3.org/1999/xhtml"
-                style={{ pointerEvents: 'auto' }}
-            >
-                <button
-                    xmlns="http://www.w3.org/1999/xhtml"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdgeMenu(e, { id });
-                    }}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        background: '#e5e7eb',
-                        fontSize: 12,
-                        lineHeight: '18px',
-                        textAlign: 'center',
-                    }}
-                >
-                    ⋮
-                </button>
-            </foreignObject>
 
             {hovered && data?.description && (
                 <Tooltip x={tooltipPos.x} y={tooltipPos.y}>
