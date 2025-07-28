@@ -1,5 +1,6 @@
 // apiConfig.js
-let apiUrl = ""; // Holds the current API URL
+import API_URLS from './globalconfig';
+let apiUrl = API_URLS.cloudhost; // Holds the current API URL
 
 export const getApiUrl = () => apiUrl; // Function to retrieve the current API URL
 
