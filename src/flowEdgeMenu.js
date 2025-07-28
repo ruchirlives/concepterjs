@@ -7,23 +7,25 @@ import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
-export const useEdgeMenu = (flowWrapperRef, activeGroup, setEdges) => {
+export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent, setTiptapContent, activeLayers } = useAppContext();
+    const { tiptapContent, setTiptapContent, activeLayers, edges, setEdges } = useAppContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
+        console.log("Edge Data:", edge);
         event.preventDefault(); // Prevent default context menu
         menuRef.current.edgeId = edge.id; // Store the edge ID in the menuRef for later use
 
         displayContextMenu(menuRef, event, { data: { id: "edge" } }, flowWrapperRef); // Call the function to display the context menu
     };
 
-    const onMenuItemClick = async (action, rowData, setRowData, edges, setEdges) => {
+    const onMenuItemClick = async (action, setRowData) => {
         // Get source and target nodes from the edge
         const edgeId = menuRef.current.edgeId;
         const edge = edges.find((e) => e.id === edgeId);
+        console.log("Selected Edge:", edge);
         const sourceNodeId = edge.source;
         const targetNodeId = edge.target;
         console.log("Source Node ID:", sourceNodeId);

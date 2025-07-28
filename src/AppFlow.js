@@ -122,7 +122,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   ); // Custom onConnect and onDisconnect hooks
 
   const { menuRef: edgeMenuRef, handleEdgeMenu, onMenuItemClick: onEdgeMenuItemClick, hideMenu: hideEdgeMenu,
-  } = useEdgeMenu(flowWrapperRef, activeGroup, setEdges); // Custom edge menu logic
+  } = useEdgeMenu(flowWrapperRef, activeGroup); // Custom edge menu logic
 
   const hideMenu = () => { hideContextMenu(); hideEdgeMenu(); };
 

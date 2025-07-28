@@ -5,7 +5,7 @@ import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and u
 import toast from "react-hot-toast";
 
 const AppMatrix = () => {
-  const { rows: rowData, setEdges } = useAppContext();
+  const { rows: rowData, edges } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ const AppMatrix = () => {
   // Setup EdgeMenu hook
   const flowWrapperRef = useRef(null);
   
-  const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null, setEdges);
+  const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
 
   // Hide menu when clicking outside
   useEffect(() => {
@@ -368,7 +368,7 @@ const AppMatrix = () => {
             <>
               <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
                 <div className="overflow-auto w-full h-full" style={{ maxHeight: "600px" }}>
-                  <table className="border-collapse w-full">
+                  <table className="table-fixed border-collapse w-full">
                     <thead className="sticky top-0 z-20">
                       <tr>
                         {/* Top-left corner cell */}
@@ -382,7 +382,7 @@ const AppMatrix = () => {
                         {filteredTargets.map((container) => (
                           <th
                             key={container.id}
-                            className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[100px] max-w-[100px] truncate whitespace-nowrap"
+                            className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center  truncate whitespace-nowrap"
                           >
                             <div title={container.Name}>{container.Name}</div>
                           </th>
@@ -394,7 +394,7 @@ const AppMatrix = () => {
                       {filteredSources.map((sourceContainer) => (
                         <tr key={sourceContainer.id}>
                           {/* Row header */}
-                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px] truncate whitespace-nowrap">
+                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center truncate whitespace-nowrap">
                             <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
                           </th>
                           {/* Data cells - only show filtered containers as columns */}
@@ -409,21 +409,23 @@ const AppMatrix = () => {
 
                             if (isDiagonal) {
                               return (
-                                <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-center min-w-[100px] max-w-[100px]">
+                                <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-center">
                                   —
                                 </td>
                               );
                             }
 
-                            // Construct a minimal edge object for useEdgeMenu
-                            const edge = flipped
-                              ? { id: key, source: targetContainer.id, target: sourceContainer.id }
-                              : { id: key, source: sourceContainer.id, target: targetContainer.id };
+                            // Find the actual edge from the edges array
+                            const edge = edges.find(
+                              (e) =>
+                              e.source === (flipped ? targetContainer.id : sourceContainer.id) &&
+                              e.target === (flipped ? sourceContainer.id : targetContainer.id)
+                            );
 
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[200px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
+                                className={`p-1 border border-gray-300 text-center cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
                                 onClick={() =>
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
