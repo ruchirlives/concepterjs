@@ -74,11 +74,11 @@ async function copyToClipboard({ selectedNodes }) {
         toast.error("No nodes selected to copy.");
         return;
     }
-    // Copy the selected nodes' data as JSON to clipboard
     try {
-        const text = JSON.stringify(selectedNodes.map(n => n.data), null, 2);
+        // Copy only the Name text of each selected node
+        const text = selectedNodes.map(n => n.data.Name).join('\n');
         await navigator.clipboard.writeText(text);
-        toast.success("Copied selected node(s) to clipboard!");
+        toast.success("Copied node Name(s) to clipboard!");
     } catch (err) {
         toast.error("Failed to copy to clipboard.");
         console.error("Clipboard error:", err);

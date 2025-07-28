@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import { createNewRow } from './ModalNewContainer';
-import { addChildren, getPosition, setNarrative, suggestRelationship } from "./api";
+import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "./api";
 import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
@@ -40,6 +40,32 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup, setEdges) => {
         else if (action === "edit edge") {
             // Handle edit edge action here
             console.log("Edit edge action triggered");
+        }
+        else if (action === "flip edge") {
+            // Handle flip edge action here
+            console.log("Flip edge action triggered");
+            // 1. Get metadata from the old edge
+            const position = await getPosition(sourceNodeId, targetNodeId);
+
+            // 2. Remove the old edge
+            removeEdgeById(edgeId);
+
+            // 3. Create a new edge in the reverse direction
+            //    Use addChildren to create an edge from target to source
+            const response = await addChildren(targetNodeId, [sourceNodeId]);
+            console.log("Response from addChildren (flip):", response);
+
+            // 4. Copy metadata to the new edge
+            if (position) {
+                if (position.label) {
+                    await setPosition(targetNodeId, sourceNodeId, position.label);
+                }
+                if (position.narrative) {
+                    await setNarrative(targetNodeId, sourceNodeId, position.narrative);
+                }
+            }
+
+            requestReloadChannel();
         }
         else if (action === "rename") {
             // Handle rename action here useOnEdgeDoubleClick
@@ -133,7 +159,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "rename", "insert node", "edit edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
+            {["delete edge", "rename", "insert node", "edit edge", "flip edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}

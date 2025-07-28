@@ -13,7 +13,7 @@ const AppMatrix = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
-  const [flipped, setFlipped] = useState(false); // Add this line
+  const [flipped, setFlipped] = useState(true); // Start with flipped
   const inputRef = useRef(null);
 
   // Setup EdgeMenu hook
