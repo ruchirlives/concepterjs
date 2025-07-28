@@ -5,7 +5,7 @@ import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and u
 import toast from "react-hot-toast";
 
 const AppMatrix = () => {
-  const { rows: rowData } = useAppContext();
+  const { rows: rowData, setEdges } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,8 @@ const AppMatrix = () => {
 
   // Setup EdgeMenu hook
   const flowWrapperRef = useRef(null);
-  const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
+  
+  const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null, setEdges);
 
   // Hide menu when clicking outside
   useEffect(() => {

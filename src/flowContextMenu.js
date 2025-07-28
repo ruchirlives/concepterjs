@@ -29,6 +29,8 @@ import {
 
 export const menuItems = [
     { handler: "view", label: "View Details" },
+    // rename Name label
+    { handler: "rename", label: "Rename" },
     // copy to clipboard
     { handler: "copyToClipboard", label: "Copy to Clipboard" },
     { handler: "deleteAction", label: "Delete" },
@@ -57,6 +59,27 @@ export const menuItems = [
     { handler: "unmakeGroupNode", label: "Unmake Group Node" },
 ];
 /* eslint-disable no-unused-vars */
+
+// rename
+async function rename({ selectedNodes, selectedIds }) {
+    if (selectedNodes.length === 0) {
+        toast.error("No nodes selected to rename.");
+        return;
+    }
+    const name = prompt("Enter new name for the selected node(s):");
+    if (!name) return; // User cancelled
+
+    for (const id of selectedIds) {
+        const res = await renameContainer(id, name);
+        if (!res) {
+            toast.error(`Failed to rename node with ID ${id}.`);
+            return;
+        }
+    }
+    toast.success("Node(s) renamed successfully!");
+}
+
+
 async function view({ nodeId, selectedNodes }) {
     console.log(`View details for Node ID: ${nodeId}`);
     console.log("Active node's data:", selectedNodes[0]);

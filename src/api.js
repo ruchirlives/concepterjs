@@ -240,6 +240,7 @@ export const setPosition = async (sourceId, targetId, label) => {
         return response.data;
     } catch (error) {
         console.error("Error setting positions:", error);
+        console.log(sourceId, targetId, label);
         return null;
     }
 };

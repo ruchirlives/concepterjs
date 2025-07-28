@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState } from 'react';
 import { requestReloadChannel } from './effectsShared';
-
+import {useNodesState, useEdgesState} from '@xyflow/react'; // Import Zustand hooks for nodes and edges
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [rows, setRows] = useState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges] = useEdgesState();
 
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
@@ -16,6 +18,7 @@ export const AppProvider = ({ children }) => {
   const [layerOptions, setLayerOptions] = useState([]); // available layers
   const [activeLayers, setActiveLayers] = useState([]); // currently selected
 
+  
   const addLayer = (layer) => {
     setLayerOptions((prev) =>
       prev.includes(layer) ? prev : [...prev, layer]
@@ -49,6 +52,11 @@ export const AppProvider = ({ children }) => {
     activeLayers,
     setActiveLayers,
     toggleLayer,
+    nodes,
+    setNodes,
+    edges,
+    setEdges,
+    onNodesChange,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

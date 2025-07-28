@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useAppContext } from './AppContext';
 import {
   ReactFlow, ReactFlowProvider // This is the provider component linked to Zustand store
-  , MiniMap, Controls, Background, useNodesState, useEdgesState, useReactFlow, addEdge, ControlButton
+  , MiniMap, Controls, Background, useReactFlow, addEdge, ControlButton
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useSelectNode, useOnEdgeDoubleClick } from './flowEffects';
@@ -24,10 +24,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Step 2: Zustand store for nodes and edges ---
   const flowWrapperRef = React.useRef(null);
-  const { rows: rowData, setRows: setRowData } = useAppContext();
+  const { rows: rowData, setRows: setRowData, nodes, setNodes, edges, setEdges, onNodesChange } = useAppContext();
   const [layoutPositions, setLayoutPositions] = useState({});
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges] = useEdgesState();
+  // const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  // const [edges, setEdges] = useEdgesState();
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
