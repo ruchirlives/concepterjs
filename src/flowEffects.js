@@ -286,7 +286,6 @@ export const useOnEdgeDoubleClick = (setEdges) => {
                         alert("Failed to set position.");
                     });
             }
-
         },
         [setEdges, baseUrl] // Add baseUrl to dependencies
     );

@@ -14,7 +14,7 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
             setStack([...stack, item.children]);
         } else {
             onMenuItemClick(item.handler);
-            setStack([menuItems]);
+            // Do not reset stack here; let parent hide the menu if needed
         }
     };
 
@@ -35,11 +35,17 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
                 padding: "8px 0",
                 maxHeight: "300px",
                 overflowY: "auto",
+                minWidth: "320px"
             }}
         >
             {stack.length > 1 && (
                 <div
-                    style={{ padding: "6px 12px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    style={{
+                        gridColumn: "span 4",
+                        padding: "6px 12px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                    }}
                     onClick={goBack}
                     onMouseEnter={e => (e.currentTarget.style.background = "#f5f5f5")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -47,18 +53,31 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
                     ◀ Back
                 </div>
             )}
-            {current.map((item) => (
-                <div
-                    key={item.handler}
-                    className="context-menu__item"
-                    style={{ padding: "6px 12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                    onClick={() => handleClick(item)}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#f5f5f5")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                    {item.label}
-                </div>
-            ))}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, 1fr)",
+                    gap: "2px"
+                }}
+            >
+                {current.map((item) => (
+                    <div
+                        key={item.handler}
+                        className="context-menu__item"
+                        style={{
+                            padding: "6px 12px",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            borderRadius: "2px"
+                        }}
+                        onClick={() => handleClick(item)}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#f5f5f5")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                        {item.label}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 });

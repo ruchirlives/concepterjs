@@ -5,10 +5,12 @@ import { addChildren, getPosition, setNarrative, suggestRelationship } from "./a
 import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
+import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
-export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
+export const useEdgeMenu = (flowWrapperRef, activeGroup, setEdges) => {
     const menuRef = useRef(null);
     const { tiptapContent, setTiptapContent, activeLayers } = useAppContext();
+    const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
@@ -38,6 +40,13 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         else if (action === "edit edge") {
             // Handle edit edge action here
             console.log("Edit edge action triggered");
+        }
+        else if (action === "rename") {
+            // Handle rename action here useOnEdgeDoubleClick
+            console.log("Rename action triggered");
+            onEdgeDoubleClick(null, edge);
+
+
         }
         else if (action === "insert node") {
             // Handle insert node action here
@@ -124,7 +133,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "insert node", "edit edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
+            {["delete edge", "rename", "insert node", "edit edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}

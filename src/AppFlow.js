@@ -5,7 +5,7 @@ import {
   , MiniMap, Controls, Background, useNodesState, useEdgesState, useReactFlow, addEdge, ControlButton
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useSelectNode } from './flowEffects';
+import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useSelectNode, useOnEdgeDoubleClick } from './flowEffects';
 import FlowNode from './flowNode';
 import GroupNode from './flowGroupNodes';
 import ContextMenu from "./ContextMenu";
@@ -97,7 +97,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const onEdgesChange = useOnEdgeChange(setEdges);
   const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
   const onConnectEnd = useOnConnectEnd({ setEdges, setNodes, screenToFlowPosition, setRowData, addEdge, activeGroup, setLayoutPositions });
-  // const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
+  const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
 
   // Step 5: Context menu and edge menu logic ---
   useTagsChange(rowData, setRowData, keepLayout);
@@ -122,7 +122,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   ); // Custom onConnect and onDisconnect hooks
 
   const { menuRef: edgeMenuRef, handleEdgeMenu, onMenuItemClick: onEdgeMenuItemClick, hideMenu: hideEdgeMenu,
-  } = useEdgeMenu(flowWrapperRef, activeGroup); // Custom edge menu logic
+  } = useEdgeMenu(flowWrapperRef, activeGroup, setEdges); // Custom edge menu logic
 
   const hideMenu = () => { hideContextMenu(); hideEdgeMenu(); };
 
@@ -178,6 +178,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onEdgeDoubleClick={onEdgeDoubleClick}
             onConnect={onEdgeConnect}
             nodeTypes={{ custom: FlowNode, group: GroupNode }}
             edgeTypes={edgeTypes}
