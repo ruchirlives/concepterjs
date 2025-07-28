@@ -13,6 +13,7 @@ const AppMatrix = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
+  const [flipped, setFlipped] = useState(false); // Add this line
   const inputRef = useRef(null);
 
   // Setup EdgeMenu hook
@@ -184,10 +185,12 @@ const AppMatrix = () => {
     [handleCellSubmit]
   );
 
-  // Memoize filtered data based on hideEmpty setting
+  // Memoize filtered data based on hideEmpty setting and flipped state
   const { filteredSources, filteredTargets } = useMemo(() => {
     if (!hideEmpty || rowData.length === 0) {
-      return { filteredSources: rowData, filteredTargets: rowData };
+      return flipped
+        ? { filteredSources: rowData, filteredTargets: rowData }
+        : { filteredSources: rowData, filteredTargets: rowData };
     }
 
     const sources = new Set();
@@ -205,11 +208,15 @@ const AppMatrix = () => {
       });
     });
 
-    return {
+    const base = {
       filteredSources: rowData.filter((c) => sources.has(c.id)),
       filteredTargets: rowData.filter((c) => targets.has(c.id)),
     };
-  }, [rowData, forwardExists, hideEmpty]);
+
+    return flipped
+      ? { filteredSources: base.filteredTargets, filteredTargets: base.filteredSources }
+      : base;
+  }, [rowData, forwardExists, hideEmpty, flipped]);
 
   const handleExportExcel = useCallback(() => {
     const headers = ["", ...filteredTargets.map((c) => c.Name)];
@@ -326,6 +333,15 @@ const AppMatrix = () => {
             {hideEmpty ? "Show All" : "Hide Empty"}
           </button>
 
+          {/* Flip Axis Button */}
+          <button
+            className="px-3 py-1 text-xs rounded bg-purple-500 text-white hover:bg-purple-600"
+            onClick={() => setFlipped((f) => !f)}
+            title="Flip rows and columns"
+          >
+            Flip Axis
+          </button>
+
           <button
             className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
             onClick={handleExportExcel}
@@ -357,8 +373,8 @@ const AppMatrix = () => {
                         {/* Top-left corner cell */}
                         <th className="sticky left-0 z-30 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px]">
                           <div className="w-0 h-0 border-l-[50px] border-l-transparent border-b-[30px] border-b-gray-400 relative">
-                            <span className="absolute -bottom-6 -left-12 text-xs">From</span>
-                            <span className="absolute -bottom-2 left-2 text-xs">To</span>
+                            <span className="absolute -bottom-6 -left-12 text-xs">{flipped ? "To" : "From"}</span>
+                            <span className="absolute -bottom-2 left-2 text-xs">{flipped ? "From" : "To"}</span>
                           </div>
                         </th>
                         {/* Column headers - only show filtered containers */}
@@ -382,7 +398,10 @@ const AppMatrix = () => {
                           </th>
                           {/* Data cells - only show filtered containers as columns */}
                           {filteredTargets.map((targetContainer) => {
-                            const key = `${sourceContainer.id}-${targetContainer.id}`;
+                            // Flip the key if flipped
+                            const key = flipped
+                              ? `${targetContainer.id}-${sourceContainer.id}`
+                              : `${sourceContainer.id}-${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
                             const value = relationships[key] || "";
                             const isDiagonal = sourceContainer.id === targetContainer.id;
@@ -396,13 +415,19 @@ const AppMatrix = () => {
                             }
 
                             // Construct a minimal edge object for useEdgeMenu
-                            const edge = { id: key, source: sourceContainer.id, target: targetContainer.id };
+                            const edge = flipped
+                              ? { id: key, source: targetContainer.id, target: sourceContainer.id }
+                              : { id: key, source: sourceContainer.id, target: targetContainer.id };
 
                             return (
                               <td
                                 key={key}
                                 className={`p-1 border border-gray-300 text-center min-w-[100px] max-w-[200px] cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
-                                onClick={() => handleCellClick(sourceContainer.id, targetContainer.id)}
+                                onClick={() =>
+                                  flipped
+                                    ? handleCellClick(targetContainer.id, sourceContainer.id)
+                                    : handleCellClick(sourceContainer.id, targetContainer.id)
+                                }
                                 onContextMenu={(e) => handleEdgeMenu(e, edge)}
                                 onMouseEnter={(e) => {
                                   if (value) {

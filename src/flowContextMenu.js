@@ -29,6 +29,8 @@ import {
 
 export const menuItems = [
     { handler: "view", label: "View Details" },
+    // copy to clipboard
+    { handler: "copyToClipboard", label: "Copy to Clipboard" },
     { handler: "deleteAction", label: "Delete" },
     { handler: "hideUnselected", label: "Hide Unselected" },
     { handler: "hideChildren", label: "Hide Children" },
@@ -64,6 +66,23 @@ async function deleteAction({ selectedIds }) {
     const ok = await deleteContainers(selectedIds);
     if (ok) requestReloadChannel();
     else alert("Failed to delete containers.");
+}
+
+
+async function copyToClipboard({ selectedNodes }) {
+    if (!selectedNodes || selectedNodes.length === 0) {
+        toast.error("No nodes selected to copy.");
+        return;
+    }
+    // Copy the selected nodes' data as JSON to clipboard
+    try {
+        const text = JSON.stringify(selectedNodes.map(n => n.data), null, 2);
+        await navigator.clipboard.writeText(text);
+        toast.success("Copied selected node(s) to clipboard!");
+    } catch (err) {
+        toast.error("Failed to copy to clipboard.");
+        console.error("Clipboard error:", err);
+    }
 }
 
 async function hideUnselected({ selectedIds, activeGroup }) {
