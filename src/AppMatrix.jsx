@@ -372,7 +372,7 @@ const AppMatrix = () => {
                     <thead className="sticky top-0 z-20">
                       <tr>
                         {/* Top-left corner cell */}
-                        <th className="sticky left-0 z-30 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center min-w-[120px] max-w-[120px]">
+                        <th className="sticky left-0 z-30 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-left min-w-[120px] max-w-[120px] w-[120px]">
                           <div className="w-0 h-0 border-l-[50px] border-l-transparent border-b-[30px] border-b-gray-400 relative">
                             <span className="absolute -bottom-6 -left-12 text-xs">{flipped ? "To" : "From"}</span>
                             <span className="absolute -bottom-2 left-2 text-xs">{flipped ? "From" : "To"}</span>
@@ -382,7 +382,7 @@ const AppMatrix = () => {
                         {filteredTargets.map((container) => (
                           <th
                             key={container.id}
-                            className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center  truncate whitespace-nowrap"
+                            className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-[120px] max-w-[120px] w-[120px]"
                           >
                             <div title={container.Name}>{container.Name}</div>
                           </th>
@@ -394,7 +394,7 @@ const AppMatrix = () => {
                       {filteredSources.map((sourceContainer) => (
                         <tr key={sourceContainer.id}>
                           {/* Row header */}
-                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-center truncate whitespace-nowrap">
+                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-[120px] max-w-[120px] w-[120px]">
                             <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
                           </th>
                           {/* Data cells - only show filtered containers as columns */}
@@ -409,7 +409,7 @@ const AppMatrix = () => {
 
                             if (isDiagonal) {
                               return (
-                                <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-center">
+                                <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-left">
                                   —
                                 </td>
                               );
@@ -425,7 +425,7 @@ const AppMatrix = () => {
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-center cursor-pointer hover:bg-gray-50 ${getRelationshipColor(value)}`}
+                                className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-[120px] max-w-[120px] w-[120px] ${getRelationshipColor(value)}`}
                                 onClick={() =>
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
