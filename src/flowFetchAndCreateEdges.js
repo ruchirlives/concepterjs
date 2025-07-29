@@ -119,6 +119,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     }
 
     computedNodes = computedNodes.filter(n => {
+        if (n.type === 'group') return true; // <-- Always show group nodes
+
         const parents = n.data.parents || [];
         const hasVisibleGroupParent = parents.some(p => {
             const pid = p.id.toString();
