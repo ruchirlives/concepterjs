@@ -222,6 +222,11 @@ async function mergeSelected({ selectedIds, activeGroup }) {
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
     await addChildren(activeGroup, [ok.id]);
     // brief delay to allow the request to complete
+
+    // add ids to the active layers
+    const ch = new BroadcastChannel("addTagsChannel");
+    ch.postMessage({ selectedIds: [ok.id], tags: "active" });
+
     requestRefreshChannel();
 }
 
