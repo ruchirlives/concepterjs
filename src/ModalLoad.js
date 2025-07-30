@@ -22,7 +22,7 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
             await loadContainers(item);
         }
 
-        const channel = new BroadcastChannel('requestReloadChannel');
+        const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });
         channel.close();
     };

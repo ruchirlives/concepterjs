@@ -314,7 +314,7 @@ export const useCreateNodesAndEdges = (params) => {
 
 
 export const useTagsChange = (rowData, setRowData, keepLayout) => {
-    const { rows: tagFilter, activeLayers } = useAppContext();
+    const { rowData: tagFilter, activeLayers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     // Keep ref updated

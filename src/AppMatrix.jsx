@@ -5,7 +5,7 @@ import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and u
 import toast from "react-hot-toast";
 
 const AppMatrix = () => {
-  const { rows: rowData, edges } = useAppContext();
+  const { rowData, edges } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);

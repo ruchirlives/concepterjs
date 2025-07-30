@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import { createNewRow } from './ModalNewContainer';
 import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "./api";
-import { requestReloadChannel } from "./effectsShared"; // Import the function to handle edge removal
+import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
@@ -67,7 +67,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
                 }
             }
 
-            requestReloadChannel();
+            requestRefreshChannel();
         }
         else if (action === "rename") {
             // Handle rename action here useOnEdgeDoubleClick
@@ -99,7 +99,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
                 console.log("Response from addChildren:", response2);
             }
 
-            requestReloadChannel(); // Call the function to reload the channel with the new node ID
+            requestRefreshChannel(); // Call the function to reload the channel with the new node ID
         }
         else if (action === "suggest relationship") {
             // Handle suggest relationship action here
@@ -107,7 +107,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             const suggestedRelationship = await suggestRelationship(sourceNodeId, targetNodeId);
             console.log("Suggested Relationship:", suggestedRelationship);
             // reload the channel to reflect the suggested relationship
-            requestReloadChannel();
+            requestRefreshChannel();
         }
         else if (action === "edit narrative") {
             // Handle edit narrative action here

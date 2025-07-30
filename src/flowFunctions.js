@@ -83,13 +83,6 @@ export function displayContextMenu(menuRef, event, node, wrapperRef) {
     menu.dataset.nodeId = node.data.id;
     menu.dataset.selected = node.data.selected ? "true" : "false";
 }
-export function requestRefreshChannel() {
-    console.log('Request to refresh channel:');
-    // Instead of calling API, notify grid
-    const channel = new BroadcastChannel('requestRefreshChannel');
-    channel.postMessage({});
-    channel.close(); // Optional: or keep open if used elsewhere
-}
 export function handleEdgeConnection(params) {
     const { connectionParams, setEdges, addEdge } = params;
     // Add the edge with animated property

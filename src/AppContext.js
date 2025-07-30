@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState } from 'react';
-import { requestReloadChannel } from './effectsShared';
+import { requestRefreshChannel } from './effectsShared';
 import {useNodesState, useEdgesState} from '@xyflow/react'; // Import Zustand hooks for nodes and edges
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const [rows, setRows] = useState([]);
+  const [rowData, setRowData] = useState([]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useEdgesState();
 
@@ -28,7 +28,7 @@ export const AppProvider = ({ children }) => {
   const removeLayer = (layer) => {
     setLayerOptions((prev) => prev.filter((l) => l !== layer));
     setActiveLayers((prev) => prev.filter((l) => l !== layer));
-    requestReloadChannel();
+    requestRefreshChannel();
   };
 
   const toggleLayer = (layer) => {
@@ -37,12 +37,12 @@ export const AppProvider = ({ children }) => {
         ? prev.filter((l) => l !== layer)
         : [...prev, layer]
     );
-    requestReloadChannel();
+    requestRefreshChannel();
   };
 
   const value = {
-    rows,
-    setRows,
+    rowData,
+    setRowData,
     // Add Tiptap content to context
     tiptapContent,
     setTiptapContent,
@@ -65,9 +65,9 @@ export const AppProvider = ({ children }) => {
 export const useAppContext = () => useContext(AppContext);
 
 // Utility to check if a row belongs to any active layer
-export const rowInLayers = (row, layers = []) => {
+export const rowInLayers = (rowData, layers = []) => {
   if (!layers.length) return true;
-  const tagList = (row.Tags || '')
+  const tagList = (rowData.Tags || '')
     .split(',')
     .map((t) => t.trim().toLowerCase())
     .filter(Boolean);

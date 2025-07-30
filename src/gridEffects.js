@@ -273,12 +273,12 @@ export const useRemoveTagsChannel = (gridApiRef, setRowData) => {
     useBroadcastChannel('removeTagsChannel', handleRemoveTags, [handleRemoveTags]);
 };
 
-export const useRequestReloadChannel = (setRowData) => {
+export const useRequestRefreshChannel = (setRowData) => {
     useEffect(() => {
-        const channel = new BroadcastChannel('requestReloadChannel');
+        const channel = new BroadcastChannel('requestRefreshChannel');
 
         channel.onmessage = async (event) => {
-            console.log("Received requestReload message:", event.data);
+            console.log("Received requestRefresh message:", event.data);
             asyncDataLoaderWithDateFormatting(fetchContainers, setRowData)();
         };
 
@@ -294,7 +294,7 @@ export const useRekeyButtonEffect = () => {
         const resp = await requestRekey();
         console.log("Rekey response:", resp.message);
         // Reload
-        const channel = new BroadcastChannel('requestReloadChannel');
+        const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });
     }, []);
 
@@ -308,7 +308,7 @@ export const useDedupButtonEffect = (setRowData) => {
         const resp = await requestDedup();
         console.log("Deduplication response:", resp.message);
         // Reload
-        const channel = new BroadcastChannel('requestReloadChannel');
+        const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });
     }, []);
 

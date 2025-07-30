@@ -15,7 +15,7 @@ import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } fr
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
   useSaveButtonEffect, useDropDownEffect, useLoadDataEffect, useFilteredRowContext,
-  useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestReloadChannel, useRekeyButtonEffect, useDedupButtonEffect, useAddTagsChannel, useRemoveTagsChannel
+  useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestRefreshChannel, useRekeyButtonEffect, useDedupButtonEffect, useAddTagsChannel, useRemoveTagsChannel
 } from "./gridEffects";
 import { handleWriteBack } from "./effectsShared";
 
@@ -31,8 +31,7 @@ import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const App = () => {
-  const { rows: rowData, setRows: setRowData } = useAppContext();
-  const { activeLayers, layerOptions } = useAppContext();
+  const { rowData, setRowData, activeLayers, layerOptions } = useAppContext();
   const displayRows = useMemo(
     () => rowData.filter((r) => rowInLayers(r, activeLayers)),
     [rowData, activeLayers]
@@ -172,9 +171,11 @@ const App = () => {
   const { menuRef, handleContextMenu, onMenuItemClick, hideMenu } = useContextMenu();
 
   const sendFilteredRows = () => {
-    // get currently filtered rows
+    if (!gridApiRef.current) {
+      console.warn("Grid API not initialized yet.");
+      return;
+    }
     const filteredRowData = [];
-
     const displayedRowCount = gridApiRef.current.getDisplayedRowCount();
 
     for (let i = 0; i < displayedRowCount; i++) {
@@ -184,7 +185,6 @@ const App = () => {
       }
     }
 
-    // Update context with filtered rows
     setRowData(filteredRowData);
   }
 
@@ -273,7 +273,7 @@ const App = () => {
   // useModalButtonEffect(setModalOpen); // Pass modal state updater to the hook
   useRowSelectMessage(rowData, setRowData, gridApiRef);
   useAddChildChannel(gridApiRef, setRowData);
-  useRequestReloadChannel(setRowData);
+  useRequestRefreshChannel(setRowData);
   useRekeyButtonEffect()
   useDedupButtonEffect()
   useAddTagsChannel(gridApiRef, setRowData);

@@ -19,11 +19,10 @@ import {
     add_similar,
     api_build_chain_beam,
 } from "./api";
-import { requestReloadChannel, sendMermaidCodeToChannel } from "./effectsShared";
+import { requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
     displayContextMenu,
     requestAddChild,
-    requestRefreshChannel,
 } from "./flowFunctions";
 
 
@@ -87,7 +86,7 @@ async function view({ nodeId, selectedNodes }) {
 
 async function deleteAction({ selectedIds }) {
     const ok = await deleteContainers(selectedIds);
-    if (ok) requestReloadChannel();
+    if (ok) requestRefreshChannel();
     else alert("Failed to delete containers.");
 }
 
@@ -171,14 +170,14 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
     alert(ok ? "Containers categorized successfully." : "Failed to categorize containers.");
     console.log(ok.new_category_ids);
     if (!activeGroup) {
-        requestReloadChannel();
+        requestRefreshChannel();
         return;
     }
     ids = ok.new_category_ids;
     // add ids as children to the active group
     await addChildren(activeGroup, ids);
     // brief delay to allow the request to complete
-    requestReloadChannel();
+    requestRefreshChannel();
 }
 
 async function buildRelationships({ nodes, selectedNodes }) {
@@ -223,7 +222,7 @@ async function mergeSelected({ selectedIds, activeGroup }) {
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
     await addChildren(activeGroup, [ok.id]);
     // brief delay to allow the request to complete
-    requestReloadChannel();
+    requestRefreshChannel();
 }
 
 async function joinSelected({ selectedIds, activeGroup }) {
@@ -237,7 +236,7 @@ async function joinSelected({ selectedIds, activeGroup }) {
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
     await addChildren(activeGroup, [ok.id]);
     // brief delay to allow the request to complete
-    requestReloadChannel();
+    requestRefreshChannel();
 }
 
 async function addSelected({ nodeId, selectedIds }) {
@@ -319,7 +318,7 @@ async function removeFromActiveGroup({ activeGroup, selectedIds, history }) {
     }
     const prev = history[history.length - 1] || null;
     ok = await addChildren(prev, selectedIds);
-    if (ok) requestReloadChannel();
+    if (ok) requestRefreshChannel();
 }
 
 async function makeGroupNode({ selectedIds }) {

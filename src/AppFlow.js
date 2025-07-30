@@ -24,7 +24,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Step 2: Zustand store for nodes and edges ---
   const flowWrapperRef = React.useRef(null);
-  const { rows: rowData, setRows: setRowData, nodes, setNodes, edges, setEdges, onNodesChange } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange } = useAppContext();
   const [layoutPositions, setLayoutPositions] = useState({});
   // const [nodes, setNodes, onNodesChange] = useNodesState([]);
   // const [edges, setEdges] = useEdgesState();

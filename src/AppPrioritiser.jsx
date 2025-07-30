@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAppContext } from "./AppContext";
 
 const AppPrioritiser = () => {
-  const { rows: rowData, setRows: setRowData } = useAppContext();
+  const { rowData, setRowData } = useAppContext();
   const [positions, setPositions] = useState({});
   const [collapsed, setCollapsed] = useState(true);
   const containerRef = useRef(null);

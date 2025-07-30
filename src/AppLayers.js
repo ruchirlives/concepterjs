@@ -8,16 +8,16 @@ const AppLayers = () => {
     removeLayer,
     activeLayers,
     toggleLayer,
-    rows
+    rowData,
   } = useAppContext();
   const [collapsed, setCollapsed] = useState(true);
   const [newLayer, setNewLayer] = useState("");
 
-  // Extract tags from rows and add as layers, but only when not collapsed
+  // Extract tags from rowData and add as layers, but only when not collapsed
   useEffect(() => {
-    if (collapsed || !rows) return;
+    if (collapsed || !rowData) return;
     const tagSet = new Set();
-    rows.forEach(row => {
+    rowData.forEach(row => {
       if (row.Tags) {
         row.Tags
           .split(",")
@@ -32,7 +32,7 @@ const AppLayers = () => {
       }
     });
     // eslint-disable-next-line
-  }, [rows, collapsed]);
+  }, [rowData, collapsed]);
 
   const handleAdd = () => {
     const name = newLayer.trim();
