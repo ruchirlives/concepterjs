@@ -399,15 +399,28 @@ const getRowNodeSafely = (gridApi, nodeId) => {
 };
 
 // ==================== GRID UTILITIES ====================
-export function addTagToNodes(selectedNodes, tag, gridApi) {
+export function addTagToNodes(selectedNodes, tags, gridApi) {
+    // Normalize tags to an array
+    const tagsArray = Array.isArray(tags) ? tags : [tags];
+
     selectedNodes.forEach((node) => {
         const existingTags = node.data.Tags;
-        // Append the new tag to existing comma separated tags
-        node.data.Tags = existingTags ? `${existingTags}, ${tag}` : tag;
-        // Update the row using applyTransaction
-        gridApi.applyTransaction({ update: [node.data] });
+        let nodeTags = existingTags ? existingTags.split(',').map(t => t.trim()) : [];
+
+        tagsArray.forEach(tag => {
+            if (tag && !nodeTags.includes(tag)) {
+                nodeTags.push(tag);
+            }
+        });
+
+        node.data.Tags = nodeTags.join(', ');
+        // If we have gridApi, update the row
+        if (gridApi) {
+            gridApi.applyTransaction({ update: [node.data] });
+        }
     });
 }
+
 
 export function removeTagFromNodes(selectedNodes, tag, gridApi) {
     selectedNodes.forEach((node) => {

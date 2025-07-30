@@ -211,7 +211,7 @@ async function exportSelected({ selectedIds }) {
     exportSelectedContainers(selectedIds);
 }
 
-async function mergeSelected({ selectedIds, activeGroup }) {
+async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, setRowData }) {
     const ok = await mergeContainers(selectedIds);
     if (ok) {
         alert("Containers merged successfully.");
@@ -220,13 +220,9 @@ async function mergeSelected({ selectedIds, activeGroup }) {
     }
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
-    await addChildren(activeGroup, [ok.id]);
-    // brief delay to allow the request to complete
-
-    // add ids to the active layers
-    const ch = new BroadcastChannel("addTagsChannel");
-    ch.postMessage({ selectedIds: [ok.id], tags: "active" });
-
+    if (activeGroup) {
+        await addChildren(activeGroup, [ok.id]);
+    }
     requestRefreshChannel();
 }
 
@@ -428,6 +424,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
         );
     };
 
+    const { activeLayers } = useAppContext();
     const onMenuItemClick = async (action) => {
         const m = menuRef.current;
         const nodeId = m?.dataset.nodeId;
@@ -439,7 +436,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers };
         const handler = handlersByName[action] || getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
