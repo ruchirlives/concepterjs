@@ -1,8 +1,8 @@
 import React, { useRef, useState } from "react";
 import { fetchParentContainers, addChildren, removeChildren, deleteContainers, get_docx, mergeContainers, fetchContainerById, fetchChildren } from "./api"; // Import API function
-import { sendGanttToChannel, sendMermaidToChannel, writeBackUpdatedData } from "./effectsShared";
+import { sendGanttToChannel, sendMermaidToChannel, writeBackUpdatedData, handleWriteBack } from "./effectsShared";
 import { addTagToNodes, removeTagFromNodes } from "./gridEffects";
-
+import { useAppContext } from "./AppContext"; // Assuming you have an AppContext for global state management
 // Context menu rendering
 const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData, handleAddRow, activeLayers = [], layerOptions = [] }, ref) => {
     const [showAddMenu, setShowAddMenu] = useState(false);
@@ -168,6 +168,7 @@ const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData,
 export const useContextMenu = () => {
     const menuRef = useRef(null);
     const prevID = useRef(null); // Store the previous mermaid code
+    const { activeLayers } = useAppContext()
 
     const handleContextMenu = (params) => {
         params.event.preventDefault();
@@ -350,6 +351,7 @@ export const useContextMenu = () => {
             // Merge selected rows
             // Perform merge operation here
             console.log("Merging rows with IDs:", selectedIds);
+
             const response = await mergeContainers(selectedIds);
             if (response) {
                 const mergedRowId = response.id; // Assuming the API returns the merged row data
@@ -358,8 +360,14 @@ export const useContextMenu = () => {
                 const mergedRowData = await fetchContainerById(mergedRowId); // Fetch the merged row data which returns an array with one object
                 console.log(mergedRowData[0]);
                 const mergedRow = mergedRowData[0]; // Get the first object from the array
-                // Update the rowData state with the new merged row
 
+                // Add merged row to the active layers
+                if (activeLayers.length > 0) {
+                    const tags = activeLayers.join(', ');
+                    mergedRow.Tags = tags; // Set the Tags field to the active layers
+                    console.log("Merged row with active layers:", mergedRow);
+                }
+                // Update the rowData state with the new merged row
                 setRowData((prevData) => {
                     const updatedData = prevData.filter((row) => !selectedIds.includes(row.id));
                     return [...updatedData, mergedRow]; // Add the new merged row
