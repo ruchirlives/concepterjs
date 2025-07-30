@@ -19,7 +19,7 @@ import {
     add_similar,
     api_build_chain_beam,
 } from "./api";
-import { requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
+import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
     displayContextMenu,
     requestAddChild,
@@ -60,21 +60,28 @@ export const menuItems = [
 /* eslint-disable no-unused-vars */
 
 // rename
-async function rename({ selectedNodes, selectedIds }) {
+async function rename({ selectedNodes, selectedIds, rowData, setRowData }) {
     if (selectedNodes.length === 0) {
         toast.error("No nodes selected to rename.");
         return;
     }
     const name = prompt("Enter new name for the selected node(s):");
-    if (!name) return; // User cancelled
+    if (!name) return;
 
-    for (const id of selectedIds) {
-        const res = await renameContainer(id, name);
-        if (!res) {
-            toast.error(`Failed to rename node with ID ${id}.`);
-            return;
+    // Update the nodes in rowData
+    const updatedRowData = rowData.map(row =>
+        selectedIds.includes(row.id) ? { ...row, Name: name } : row
+    );
+    setRowData(updatedRowData);
+
+    // Optionally update selectedNodes too
+    selectedNodes.forEach(node => {
+        if (selectedIds.includes(node.data.id)) {
+            node.data.Name = name;
         }
-    }
+    });
+
+    handleWriteBack(updatedRowData);
     toast.success("Node(s) renamed successfully!");
 }
 
