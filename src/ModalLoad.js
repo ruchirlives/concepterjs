@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import Modal from "react-modal";
 import { getloadContainers, loadContainers, importContainers, deleteProject } from "./api";
+import { useAppContext } from "./AppContext";
 
 Modal.setAppElement("#app");
 
 const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContainer, merge }) => {
     const [list, setList] = useState([]);
+
+    const { setLastLoadedFile } = useAppContext();
 
     const closeModal = () => {
         setIsOpen(false);
@@ -21,6 +24,7 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
         } else {
             await loadContainers(item);
         }
+        setLastLoadedFile(item);
 
         const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });

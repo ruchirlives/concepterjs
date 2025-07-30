@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback } from "react";
-import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey, requestDedup } from "./api";
+import { addChildren, clearContainers, fetchContainers, writeBackData, requestRekey, requestDedup, loadContainers } from "./api";
 import { setApiUrl } from "./apiConfig";
 import { formatDateFields, handleWriteBack } from "./effectsShared";
 import API_URLS from "./globalconfig";
-
+import { useAppContext } from "AppContext";
 // ==================== UTILITIES ====================
 
 export const flashAndScrollToRow = (rowId, gridApiRef) => {
@@ -153,11 +153,23 @@ export const useDropDownEffect = () => {
 };
 
 // Effect to load data from the server and attach listener to loadDataButton
-export const useLoadDataEffect = (setRowData, fetchContainers, sendFilteredRows) => {
+export const useReloadEffect = () => {
+    const { lastLoadedFile } = useAppContext();
     useEffect(() => {
+        console.log("Using ReLoad loadDataButton effect...");
         const loadDataButton = document.getElementById("loadDataButton");
 
-        const handleLoadData = asyncDataLoaderWithDateFormatting(fetchContainers, setRowData);
+        const handleLoadData = () => {
+            console.log("Load data button clicked");
+            loadContainers(lastLoadedFile).then((data) => {
+                console.log("Loaded data:", data);
+            });
+            // Broadcast a message to requestRefreshChannel
+            setTimeout(() => {
+                const channel = new BroadcastChannel('requestRefreshChannel');
+                channel.postMessage({ type: 'refresh' });
+            }, 200);
+        };
 
         if (loadDataButton) {
             loadDataButton.addEventListener("click", handleLoadData);
@@ -168,15 +180,22 @@ export const useLoadDataEffect = (setRowData, fetchContainers, sendFilteredRows)
                 loadDataButton.removeEventListener("click", handleLoadData);
             }
         };
-    }, [setRowData, fetchContainers, sendFilteredRows]);
+    }, [lastLoadedFile]);
 };
 
-export const useFilteredRowContext = (rowData, sendFilteredRows) => {
+export const useRefreshEffect = (rowData, setRowData, fetchContainers, sendFilteredRows) => {
     const prevCountRef = useRef(rowData.length);
 
     useEffect(() => {
         const refreshButton = document.getElementById("refreshButton");
-        const handleRefreshClick = () => sendFilteredRows();
+        const handleRefreshClick = async () => {
+            await fetchContainers().then((data) => {
+                console.log("Data refreshed:", data);
+                formatDateFields(data);
+                setRowData(data);
+                // Remove sendFilteredRows() from here
+            });
+        };
 
         if (refreshButton) {
             refreshButton.addEventListener("click", handleRefreshClick);
@@ -193,7 +212,7 @@ export const useFilteredRowContext = (rowData, sendFilteredRows) => {
                 refreshButton.removeEventListener("click", handleRefreshClick);
             }
         };
-    }, [rowData.length, sendFilteredRows]);
+    }, [rowData.length, setRowData, fetchContainers, sendFilteredRows]);
 };
 
 export const useAddChildChannel = (gridApiRef, setRowData) => {

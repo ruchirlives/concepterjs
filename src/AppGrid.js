@@ -14,7 +14,7 @@ import columnDefs from "./gridColumnDefs";
 import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } from "./api";
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
-  useSaveButtonEffect, useDropDownEffect, useLoadDataEffect, useFilteredRowContext,
+  useSaveButtonEffect, useDropDownEffect, useReloadEffect, useRefreshEffect,
   useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestRefreshChannel, useRekeyButtonEffect, useDedupButtonEffect, useAddTagsChannel, useRemoveTagsChannel
 } from "./gridEffects";
 import { handleWriteBack } from "./effectsShared";
@@ -262,8 +262,8 @@ const App = () => {
   // Use custom hooks for effects
   useFetchData(setRowData, fetchContainers);
   useWriteBackButton(rowData);
-  useLoadDataEffect(setRowData, fetchContainers, sendFilteredRows);
-  useFilteredRowContext(rowData, sendFilteredRows);
+  useReloadEffect();
+  useRefreshEffect(rowData, setRowData, fetchContainers, sendFilteredRows);
   useAddRowButton(handleAddRow);
   useLoadButtonEffect(setLoadModalOpen, setMerge);
   useImportButtonEffect(setLoadModalOpen, setMerge);
