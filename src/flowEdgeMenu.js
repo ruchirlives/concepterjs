@@ -21,7 +21,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         displayContextMenu(menuRef, event, { data: { id: "edge" } }, flowWrapperRef); // Call the function to display the context menu
     };
 
-    const onMenuItemClick = async (action, setRowData) => {
+    const onMenuItemClick = async (action, rowData, setRowData) => {
         // Get source and target nodes from the edge
         const edgeId = menuRef.current.edgeId;
         const edge = edges.find((e) => e.id === edgeId);
