@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiUrl } from "./apiConfig";
+import { requestRefreshChannel } from "effectsShared";
 
 const apiClient = axios.create({
     baseURL: getApiUrl(), // Set the base URL for all requests
@@ -542,3 +543,56 @@ export const createContainersFromContent = async (prompt, content) => {
         throw error; // Re-throw to let the modal handle the error display
     }
 };
+
+// Switch to a new state
+export const switchState = async (newState) => {
+    try {
+        console.log("Switching to state:", newState);
+        const response = await apiClient.get(`${getApiUrl()}/switch_state/${newState}`);
+        // broadcast refresh request
+        requestRefreshChannel();
+        return response.data;
+    } catch (error) {
+        console.error("Error switching state:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// Remove a state by name
+export const removeState = async (stateName) => {
+    try {
+        console.log("Removing state:", stateName);
+        const response = await apiClient.get(`${getApiUrl()}/remove_state/${stateName}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error removing state:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// Clear all stored states
+export const clearStates = async () => {
+    try {
+        console.log("Clearing all stored states");
+        const response = await apiClient.get(`${getApiUrl()}/clear_states`);
+        requestRefreshChannel();
+        return response.data;
+    } catch (error) {
+        console.error("Error clearing states:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// List all stored states
+export const listStates = async () => {
+    try {
+        console.log("Fetching list of states...");
+        const response = await apiClient.get(`${getApiUrl()}/list_states`);
+        return response.data.states || [];
+    } catch (error) {
+        console.error("Error listing states:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+
