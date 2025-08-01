@@ -5,7 +5,7 @@ import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and u
 import toast from "react-hot-toast";
 
 const AppMatrix = () => {
-  const { rowData, edges } = useAppContext();
+  const { rowData, edges, layerOptions } = useAppContext(); // Removed activeLayers
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -14,6 +14,8 @@ const AppMatrix = () => {
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
   const [flipped, setFlipped] = useState(true); // Start with flipped
+  const [selectedFromLayer, setSelectedFromLayer] = useState(""); // Layer filter for "from" (sources)
+  const [selectedToLayer, setSelectedToLayer] = useState(""); // Layer filter for "to" (targets)
   const inputRef = useRef(null);
 
   // Setup EdgeMenu hook
@@ -36,16 +38,45 @@ const AppMatrix = () => {
     };
   }, [menuRef, hideMenu]);
 
+  // Filter rowData by selected layers for "from" and "to" - only using dropdown filters
+  const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
+    const filterByLayer = (data, layer) => {
+      if (!layer) return data;
+      return data.filter(container => {
+        if (!container.Tags) return false;
+        const containerTags = container.Tags
+          .split(",")
+          .map(tag => tag.trim())
+          .filter(Boolean);
+        return containerTags.includes(layer);
+      });
+    };
+
+    return {
+      fromLayerFilteredData: filterByLayer(rowData, selectedFromLayer),
+      toLayerFilteredData: filterByLayer(rowData, selectedToLayer)
+    };
+  }, [rowData, selectedFromLayer, selectedToLayer]);
+
+  // Combine both filtered datasets for relationship loading
+  const combinedFilteredData = useMemo(() => {
+    const combinedIds = new Set([
+      ...fromLayerFilteredData.map(c => c.id),
+      ...toLayerFilteredData.map(c => c.id)
+    ]);
+    return rowData.filter(c => combinedIds.has(c.id));
+  }, [rowData, fromLayerFilteredData, toLayerFilteredData]);
+
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
     // Don't fetch if no data OR if collapsed
-    if (rowData.length === 0 || collapsed) return;
+    if (combinedFilteredData.length === 0 || collapsed) return;
 
     setLoading(true);
 
     try {
-      // Extract container IDs (same as flowFetchAndCreateEdges.js)
-      const containerIds = rowData.map((container) => container.id);
+      // Extract container IDs from combined filtered data
+      const containerIds = combinedFilteredData.map((container) => container.id);
 
       // Use existing manyChildren API
       const parentChildMap = await manyChildren(containerIds);
@@ -84,17 +115,15 @@ const AppMatrix = () => {
       });
 
       // Initialize empty relationships for pairs that don't exist
-      for (let i = 0; i < rowData.length; i++) {
-        for (let j = 0; j < rowData.length; j++) {
-          if (i !== j) {
-            const sourceId = rowData[i].id;
-            const targetId = rowData[j].id;
-            const key = `${sourceId}-${targetId}`;
+      for (let i = 0; i < fromLayerFilteredData.length; i++) {
+        for (let j = 0; j < toLayerFilteredData.length; j++) {
+          const sourceId = fromLayerFilteredData[i].id;
+          const targetId = toLayerFilteredData[j].id;
+          const key = `${sourceId}-${targetId}`;
 
-            // Only set if not already set from parent-child data
-            if (!(key in newRelationships)) {
-              newRelationships[key] = "";
-            }
+          // Only set if not already set from parent-child data
+          if (!(key in newRelationships)) {
+            newRelationships[key] = "";
           }
         }
       }
@@ -105,14 +134,12 @@ const AppMatrix = () => {
       console.error("Error loading relationships:", error);
       // Initialize empty relationships on error
       const newRelationships = {};
-      for (let i = 0; i < rowData.length; i++) {
-        for (let j = 0; j < rowData.length; j++) {
-          if (i !== j) {
-            const sourceId = rowData[i].id;
-            const targetId = rowData[j].id;
-            const key = `${sourceId}-${targetId}`;
-            newRelationships[key] = "";
-          }
+      for (let i = 0; i < fromLayerFilteredData.length; i++) {
+        for (let j = 0; j < toLayerFilteredData.length; j++) {
+          const sourceId = fromLayerFilteredData[i].id;
+          const targetId = toLayerFilteredData[j].id;
+          const key = `${sourceId}-${targetId}`;
+          newRelationships[key] = "";
         }
       }
       setRelationships(newRelationships);
@@ -120,9 +147,9 @@ const AppMatrix = () => {
     }
 
     setLoading(false);
-  }, [rowData, collapsed]); // Add collapsed to dependencies
+  }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed]);
 
-  // Load existing relationships when rowData changes OR when collapsed state changes
+  // Load existing relationships when filtered data changes OR when collapsed state changes
   useEffect(() => {
     loadRelationships();
   }, [loadRelationships]);
@@ -130,10 +157,10 @@ const AppMatrix = () => {
   // Additional effect to trigger fetch when expanding with existing data
   useEffect(() => {
     // Only fetch if we have data, not collapsed, and no relationships loaded yet
-    if (rowData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
+    if (combinedFilteredData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
       loadRelationships();
     }
-  }, [collapsed, rowData.length, relationships, loadRelationships]);
+  }, [collapsed, combinedFilteredData.length, relationships, loadRelationships]);
 
   // Memoize event handlers
   const handleCellClick = useCallback((sourceId, targetId) => {
@@ -188,17 +215,22 @@ const AppMatrix = () => {
 
   // Memoize filtered data based on hideEmpty setting and flipped state
   const { filteredSources, filteredTargets } = useMemo(() => {
-    if (!hideEmpty || rowData.length === 0) {
-      return flipped
-        ? { filteredSources: rowData, filteredTargets: rowData }
-        : { filteredSources: rowData, filteredTargets: rowData };
+    // Apply flipping first to determine which layer filter applies to which axis
+    const baseSourceData = flipped ? toLayerFilteredData : fromLayerFilteredData;
+    const baseTargetData = flipped ? fromLayerFilteredData : toLayerFilteredData;
+
+    if (!hideEmpty || baseSourceData.length === 0 || baseTargetData.length === 0) {
+      return {
+        filteredSources: baseSourceData,
+        filteredTargets: baseTargetData
+      };
     }
 
     const sources = new Set();
     const targets = new Set();
 
-    rowData.forEach((source) => {
-      rowData.forEach((target) => {
+    baseSourceData.forEach((source) => {
+      baseTargetData.forEach((target) => {
         if (source.id !== target.id) {
           const key = `${source.id}-${target.id}`;
           if (forwardExists[key]) {
@@ -209,15 +241,11 @@ const AppMatrix = () => {
       });
     });
 
-    const base = {
-      filteredSources: rowData.filter((c) => sources.has(c.id)),
-      filteredTargets: rowData.filter((c) => targets.has(c.id)),
+    return {
+      filteredSources: baseSourceData.filter((c) => sources.has(c.id)),
+      filteredTargets: baseTargetData.filter((c) => targets.has(c.id))
     };
-
-    return flipped
-      ? { filteredSources: base.filteredTargets, filteredTargets: base.filteredSources }
-      : base;
-  }, [rowData, forwardExists, hideEmpty, flipped]);
+  }, [fromLayerFilteredData, toLayerFilteredData, forwardExists, hideEmpty, flipped]);
 
   const handleExportExcel = useCallback(() => {
     const headers = ["", ...filteredTargets.map((c) => c.Name)];
@@ -274,10 +302,10 @@ const AppMatrix = () => {
         )}
       </div>
     ),
-    [collapsed] // ✅ useMemo uses dependency array correctly
+    [collapsed]
   );
 
-  if (rowData.length === 0) {
+  if (combinedFilteredData.length === 0) {
     return EmptyState;
   }
 
@@ -316,12 +344,52 @@ const AppMatrix = () => {
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
-      {/* Header with collapse button and hide empty toggle */}
+      {/* Header with collapse button and controls */}
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <div className="flex items-center gap-4">
           <span className="font-semibold">
-            Relationship Matrix ({filteredSources.length} of {rowData.length} containers)
+            Relationship Matrix ({filteredSources.length}×{filteredTargets.length} of {rowData.length} containers)
           </span>
+
+          {/* From Layer Filter Dropdown */}
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-600">
+              {flipped ? "To:" : "From:"}
+            </label>
+            <select
+              value={flipped ? selectedToLayer : selectedFromLayer}
+              onChange={(e) => flipped ? setSelectedToLayer(e.target.value) : setSelectedFromLayer(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+              title={`Filter ${flipped ? 'to' : 'from'} layer`}
+            >
+              <option value="">All Layers</option>
+              {layerOptions.map((layer) => (
+                <option key={layer} value={layer}>
+                  {layer}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* To Layer Filter Dropdown */}
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-600">
+              {flipped ? "From:" : "To:"}
+            </label>
+            <select
+              value={flipped ? selectedFromLayer : selectedToLayer}
+              onChange={(e) => flipped ? setSelectedFromLayer(e.target.value) : setSelectedToLayer(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+              title={`Filter ${flipped ? 'from' : 'to'} layer`}
+            >
+              <option value="">All Layers</option>
+              {layerOptions.map((layer) => (
+                <option key={layer} value={layer}>
+                  {layer}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Hide Empty Toggle Button */}
           <button
@@ -491,6 +559,7 @@ const AppMatrix = () => {
                 <p>• Press Enter to save, Escape to cancel</p>
                 <p>• Diagonal cells (same container) are disabled</p>
                 <p>• Headers are frozen for easy navigation</p>
+                <p>• Use separate From/To layer filters to control rows and columns independently</p>
               </div>
             </>
           )}
