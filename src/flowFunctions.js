@@ -68,17 +68,20 @@ export function fitViewToFlow() {
 
 export function displayContextMenu(menuRef, event, node, wrapperRef) {
     const menu = menuRef.current;
-    if (!menu || !wrapperRef.current) return;
+    if (!menu) return;
 
-    // remove hidden class, show menu
-    menu.classList.remove("hidden");
-    menu.classList.add("block");
-
-    const rect = wrapperRef.current.getBoundingClientRect();
-    menu.style.left = `${event.clientX - rect.left}px`;
-    menu.style.top = `${event.clientY - rect.top}px`;
-    // force display:block even in the face of display:none!important
-    menu.style.setProperty("display", "block", "important");
+    // Use the imperative show method for centered positioning
+    if (menu.show) {
+        menu.show();
+    } else {
+        // Fallback to direct style manipulation for centered positioning
+        menu.style.display = "block";
+        menu.style.position = "fixed";
+        menu.style.top = "50%";
+        menu.style.left = "50%";
+        menu.style.transform = "translate(-50%, -50%)";
+        menu.style.zIndex = "1000";
+    }
 
     menu.dataset.nodeId = node.data.id;
     menu.dataset.selected = node.data.selected ? "true" : "false";

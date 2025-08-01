@@ -1,4 +1,3 @@
-
 import { useEffect, useCallback, useRef } from 'react';
 import { useAppContext, rowInLayers } from './AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
@@ -58,15 +57,41 @@ export const useOnConnectEnd = (params) => {
 
                 const targetArray = newNodes.map(node => node.id);
                 console.log("Target array:", targetArray);
-                await requestAddChild(connectionState.fromNode.id, targetArray);
 
-                newNodes.forEach((node) => {
-                    const connectionParams = {
-                        source: connectionState.fromNode.id,
-                        target: node.id,
-                    };
+                await Promise.all(newNodes.map(async (node) => {
+                    // Check if fromNode has a handleId and determine connection direction
+                    let connectionParams;
+                    console.log("Creating connection parameters for node:", node.id, connectionState);
+
+                    if (connectionState.fromHandle) {
+                        // Check if it's an input or output handle
+                        console.log("Reached valid handle:", connectionState.fromHandle);
+                        const isInputHandle = connectionState.fromHandle.type === 'target';
+
+                        if (isInputHandle) {
+                            // Input handle: fromNode becomes target, new node becomes source
+                            connectionParams = {
+                                source: node.id,
+                                target: connectionState.fromNode.id,
+                            };
+
+                        } else {
+                            // Output handle: fromNode becomes source, new node becomes target
+                            connectionParams = {
+                                source: connectionState.fromNode.id,
+                                target: node.id,
+                            };
+
+                        }
+                    } else {
+                        // No handle specified, error
+                        console.error("No handle specified for connection, cannot create edge.");
+                        return;
+
+                    }
+                    await requestAddChild(connectionParams.source, [connectionParams.target]);
                     handleEdgeConnection({ connectionParams, setEdges, addEdge });
-                });
+                }));
 
                 // position the new nodes in the flow at the drop position
                 const dropPosition = screenToFlowPosition({
@@ -124,7 +149,6 @@ function findDescendants(nodeId, edges, depth = 3) {
 
     return Array.from(descendants);
 }
-
 
 // effect to listen to selectNodeChannel event and select and scroll to the node in the flow
 export const useSelectNode = (nodes, edges, setNodes, rowData, handleTransform, centerNode) => {
