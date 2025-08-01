@@ -15,6 +15,7 @@ const AppMatrix = () => {
   const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
   const [childrenMap, setChildrenMap] = useState({}); // Map of parent id -> child ids
   const [hoveredFrom, setHoveredFrom] = useState(null); // Hovered row header
+  const [hoveredRowId, setHoveredRowId] = useState(null); // New state for highlighting row header
   const [flipped, setFlipped] = useState(true); // Start with flipped
   const [selectedFromLayer, setSelectedFromLayer] = useState(""); // Layer filter for "from" (sources)
   const [selectedToLayer, setSelectedToLayer] = useState(""); // Layer filter for "to" (targets)
@@ -326,7 +327,7 @@ const AppMatrix = () => {
 
   // Color coding for different relationship types
   const getRelationshipColor = (value) => {
-    if (!value) return "bg-white";
+    if (!value) return "bg-yellow-50"; // Default for empty relationships
     if (value.includes("parent")) return "bg-blue-50";
     if (value.includes("child")) return "bg-green-50";
     return "bg-yellow-50";
@@ -479,17 +480,25 @@ const AppMatrix = () => {
                           {/* Row header */}
                           <th
                             className={`sticky left-0 z-10 p-2 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30 bg-gray-100 ${
-                              hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
+                              (hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString()))
                                 ? 'bg-yellow-100'
+                                : hoveredRowId === sourceContainer.id.toString()
+                                ? 'bg-yellow-200'
                                 : ''
                             }`}
-                            onMouseEnter={() => setHoveredFrom(sourceContainer.id.toString())}
-                            onMouseLeave={() => setHoveredFrom(null)}
+                            onMouseEnter={() => {
+                              setHoveredFrom(sourceContainer.id.toString());
+                              setHoveredRowId(sourceContainer.id.toString()); // Also highlight when hovering row header itself
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredFrom(null);
+                              setHoveredRowId(null); // Remove highlight when leaving row header
+                            }}
                           >
-                            <div title={sourceContainer.Name} className="whitespace-normal">
+                            <div title={sourceContainer.Name} className="whitespace-normal text-xs">
                               {sourceContainer.Name}
                               {childrenMap[sourceContainer.id.toString()]?.length > 0 && (
-                                <div className="text-[10px] mt-1 break-words">
+                                <div className="text-gray-400 text-xs mt-1 break-words">
                                   (
                                   {childrenMap[sourceContainer.id.toString()]
                                     .map((cid) => nameById[cid] || cid)
@@ -527,7 +536,9 @@ const AppMatrix = () => {
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${getRelationshipColor(value)}`}
+                                className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${
+                                  forwardExists[key] ? getRelationshipColor(value) : 'bg-white'
+                                }`}
                                 onClick={() =>
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
@@ -535,16 +546,20 @@ const AppMatrix = () => {
                                 }
                                 onContextMenu={(e) => handleEdgeMenu(e, edge)}
                                 onMouseEnter={(e) => {
-                                  if (value) {
+                                  setHoveredRowId(sourceContainer.id.toString()); // Highlight the row header
+                                  if (value || forwardExists[key]) {
                                     const rect = e.target.getBoundingClientRect();
                                     setHoveredCell({
                                       key,
-                                      text: value,
+                                      text: value || "Add label",
                                       position: { x: rect.left, y: rect.top },
                                     });
                                   }
                                 }}
-                                onMouseLeave={() => setHoveredCell(null)}
+                                onMouseLeave={() => {
+                                  setHoveredRowId(null); // Remove row header highlight
+                                  setHoveredCell(null);
+                                }}
                               >
                                 {isEditing ? (
                                   <input
