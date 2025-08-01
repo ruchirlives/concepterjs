@@ -23,7 +23,7 @@ const AppMatrix = () => {
 
   // Setup EdgeMenu hook
   const flowWrapperRef = useRef(null);
-  
+
   const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
 
   // Hide menu when clicking outside
@@ -45,11 +45,10 @@ const AppMatrix = () => {
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
     const filterByLayer = (data, layer) => {
       if (!layer) return data;
-      return data.filter(container => {
+      return data.filter((container) => {
         if (!container.Tags) return false;
-        const containerTags = container.Tags
-          .split(",")
-          .map(tag => tag.trim())
+        const containerTags = container.Tags.split(",")
+          .map((tag) => tag.trim())
           .filter(Boolean);
         return containerTags.includes(layer);
       });
@@ -57,17 +56,14 @@ const AppMatrix = () => {
 
     return {
       fromLayerFilteredData: filterByLayer(rowData, selectedFromLayer),
-      toLayerFilteredData: filterByLayer(rowData, selectedToLayer)
+      toLayerFilteredData: filterByLayer(rowData, selectedToLayer),
     };
   }, [rowData, selectedFromLayer, selectedToLayer]);
 
   // Combine both filtered datasets for relationship loading
   const combinedFilteredData = useMemo(() => {
-    const combinedIds = new Set([
-      ...fromLayerFilteredData.map(c => c.id),
-      ...toLayerFilteredData.map(c => c.id)
-    ]);
-    return rowData.filter(c => combinedIds.has(c.id));
+    const combinedIds = new Set([...fromLayerFilteredData.map((c) => c.id), ...toLayerFilteredData.map((c) => c.id)]);
+    return rowData.filter((c) => combinedIds.has(c.id));
   }, [rowData, fromLayerFilteredData, toLayerFilteredData]);
 
   // Map container id to name for quick lookup
@@ -238,7 +234,7 @@ const AppMatrix = () => {
     if (!hideEmpty || baseSourceData.length === 0 || baseTargetData.length === 0) {
       return {
         filteredSources: baseSourceData,
-        filteredTargets: baseTargetData
+        filteredTargets: baseTargetData,
       };
     }
 
@@ -259,7 +255,7 @@ const AppMatrix = () => {
 
     return {
       filteredSources: baseSourceData.filter((c) => sources.has(c.id)),
-      filteredTargets: baseTargetData.filter((c) => targets.has(c.id))
+      filteredTargets: baseTargetData.filter((c) => targets.has(c.id)),
     };
   }, [fromLayerFilteredData, toLayerFilteredData, forwardExists, hideEmpty, flipped]);
 
@@ -278,9 +274,7 @@ const AppMatrix = () => {
     toast((t) => (
       <div className="max-w-[300px]">
         <div className="font-semibold mb-1">Matrix TSV</div>
-        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">
-          {tsv}
-        </div>
+        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">{tsv}</div>
         <button
           className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
           onClick={() => {
@@ -309,9 +303,7 @@ const AppMatrix = () => {
       <div className="bg-white rounded shadow p-4">
         <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between items-center mb-4">
           <span className="font-semibold">Relationship Matrix</span>
-          <button className="text-lg font-bold">
-            {collapsed ? "▼" : "▲"}
-          </button>
+          <button className="text-lg font-bold">{collapsed ? "▼" : "▲"}</button>
         </div>
         {!collapsed && (
           <div className="text-gray-500 text-center py-8">No data available. Filter containers in the grid above to populate the matrix.</div>
@@ -369,14 +361,12 @@ const AppMatrix = () => {
 
           {/* From Layer Filter Dropdown */}
           <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">
-              {flipped ? "To:" : "From:"}
-            </label>
+            <label className="text-xs text-gray-600">{flipped ? "To:" : "From:"}</label>
             <select
               value={flipped ? selectedToLayer : selectedFromLayer}
-              onChange={(e) => flipped ? setSelectedToLayer(e.target.value) : setSelectedFromLayer(e.target.value)}
+              onChange={(e) => (flipped ? setSelectedToLayer(e.target.value) : setSelectedFromLayer(e.target.value))}
               className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title={`Filter ${flipped ? 'to' : 'from'} layer`}
+              title={`Filter ${flipped ? "to" : "from"} layer`}
             >
               <option value="">All Layers</option>
               {layerOptions.map((layer) => (
@@ -389,14 +379,12 @@ const AppMatrix = () => {
 
           {/* To Layer Filter Dropdown */}
           <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">
-              {flipped ? "From:" : "To:"}
-            </label>
+            <label className="text-xs text-gray-600">{flipped ? "From:" : "To:"}</label>
             <select
               value={flipped ? selectedFromLayer : selectedToLayer}
-              onChange={(e) => flipped ? setSelectedFromLayer(e.target.value) : setSelectedToLayer(e.target.value)}
+              onChange={(e) => (flipped ? setSelectedFromLayer(e.target.value) : setSelectedToLayer(e.target.value))}
               className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title={`Filter ${flipped ? 'from' : 'to'} layer`}
+              title={`Filter ${flipped ? "from" : "to"} layer`}
             >
               <option value="">All Layers</option>
               {layerOptions.map((layer) => (
@@ -480,11 +468,11 @@ const AppMatrix = () => {
                           {/* Row header */}
                           <th
                             className={`sticky left-0 z-10 p-2 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30 bg-gray-100 ${
-                              (hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString()))
-                                ? 'bg-yellow-100'
+                              hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
+                                ? "bg-yellow-100"
                                 : hoveredRowId === sourceContainer.id.toString()
-                                ? 'bg-yellow-200'
-                                : ''
+                                ? "bg-yellow-200"
+                                : ""
                             }`}
                             onMouseEnter={() => {
                               setHoveredFrom(sourceContainer.id.toString());
@@ -499,11 +487,7 @@ const AppMatrix = () => {
                               {sourceContainer.Name}
                               {childrenMap[sourceContainer.id.toString()]?.length > 0 && (
                                 <div className="text-gray-400 text-xs mt-1 break-words">
-                                  (
-                                  {childrenMap[sourceContainer.id.toString()]
-                                    .map((cid) => nameById[cid] || cid)
-                                    .join(', ')}
-                                  )
+                                  ({childrenMap[sourceContainer.id.toString()].map((cid) => nameById[cid] || cid).join(", ")})
                                 </div>
                               )}
                             </div>
@@ -511,9 +495,7 @@ const AppMatrix = () => {
                           {/* Data cells - only show filtered containers as columns */}
                           {filteredTargets.map((targetContainer) => {
                             // Flip the key if flipped
-                            const key = flipped
-                              ? `${targetContainer.id}-${sourceContainer.id}`
-                              : `${sourceContainer.id}-${targetContainer.id}`;
+                            const key = flipped ? `${targetContainer.id}-${sourceContainer.id}` : `${sourceContainer.id}-${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
                             const value = relationships[key] || "";
                             const isDiagonal = sourceContainer.id === targetContainer.id;
@@ -529,22 +511,27 @@ const AppMatrix = () => {
                             // Find the actual edge from the edges array
                             const edge = edges.find(
                               (e) =>
-                              e.source === (flipped ? targetContainer.id : sourceContainer.id) &&
-                              e.target === (flipped ? sourceContainer.id : targetContainer.id)
+                                e.source === (flipped ? targetContainer.id : sourceContainer.id) &&
+                                e.target === (flipped ? sourceContainer.id : targetContainer.id)
                             );
 
                             return (
                               <td
                                 key={key}
                                 className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${
-                                  forwardExists[key] ? getRelationshipColor(value) : 'bg-white'
+                                  forwardExists[key] ? getRelationshipColor(value) : "bg-white"
                                 }`}
                                 onClick={() =>
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
                                     : handleCellClick(sourceContainer.id, targetContainer.id)
                                 }
-                                onContextMenu={(e) => handleEdgeMenu(e, edge)}
+                                onContextMenu={(event) => {
+                                  event.preventDefault();
+                                  if (edge) {
+                                    handleEdgeMenu(event, edge);
+                                  }
+                                }}
                                 onMouseEnter={(e) => {
                                   setHoveredRowId(sourceContainer.id.toString()); // Highlight the row header
                                   if (value || forwardExists[key]) {
@@ -571,9 +558,7 @@ const AppMatrix = () => {
                                     onBlur={handleBlur}
                                   />
                                 ) : (
-                                  <span className="text-xs block whitespace-pre-line break-words">
-                                    {value || "—"}
-                                  </span>
+                                  <span className="text-xs block whitespace-pre-line break-words">{value || "—"}</span>
                                 )}
                               </td>
                             );
@@ -590,13 +575,15 @@ const AppMatrix = () => {
                     onMenuItemClick={onMenuItemClick}
                     rowData={rowData}
                     setRowData={() => {}}
-                    edges={filteredSources.map((source) =>
-                      filteredTargets.map((target) => ({
-                        id: `${source.id}-${target.id}`,
-                        source: source.id,
-                        target: target.id,
-                      }))
-                    ).flat()}
+                    edges={filteredSources
+                      .map((source) =>
+                        filteredTargets.map((target) => ({
+                          id: `${source.id}-${target.id}`,
+                          source: source.id,
+                          target: target.id,
+                        }))
+                      )
+                      .flat()}
                     setEdges={() => {}}
                   />
                 </div>
