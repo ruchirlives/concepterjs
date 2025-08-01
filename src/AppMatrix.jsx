@@ -1,30 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { manyChildren, setPosition } from "./api";
 import { useAppContext } from "./AppContext";
-import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu"; // Import EdgeMenu and useEdgeMenu
+import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
 import toast from "react-hot-toast";
+import StateDropdown from "./StateDropdown";
 
 const AppMatrix = () => {
-  const { rowData, edges, layerOptions } = useAppContext(); // Removed activeLayers
+  const { rowData, edges, layerOptions } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [collapsed, setCollapsed] = useState(true);
-  const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
-  const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
-  const [childrenMap, setChildrenMap] = useState({}); // Map of parent id -> child ids
-  const [hoveredFrom, setHoveredFrom] = useState(null); // Hovered row header
-  const [hoveredRowId, setHoveredRowId] = useState(null); // New state for highlighting row header
-  const [flipped, setFlipped] = useState(true); // Start with flipped
-  const [selectedFromLayer, setSelectedFromLayer] = useState(""); // Layer filter for "from" (sources)
-  const [selectedToLayer, setSelectedToLayer] = useState(""); // Layer filter for "to" (targets)
+  const [hideEmpty, setHideEmpty] = useState(true);
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const [childrenMap, setChildrenMap] = useState({});
+  const [hoveredFrom, setHoveredFrom] = useState(null);
+  const [hoveredRowId, setHoveredRowId] = useState(null);
+  const [flipped, setFlipped] = useState(true);
+  const [selectedFromLayer, setSelectedFromLayer] = useState("");
+  const [selectedToLayer, setSelectedToLayer] = useState("");
+
   const inputRef = useRef(null);
 
   // Setup EdgeMenu hook
   const flowWrapperRef = useRef(null);
 
   const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
+
+  // Handle state change callback
+  const handleStateChange = useCallback((newState) => {
+    console.log(`Matrix state changed to: ${newState}`);
+  }, []);
 
   // Hide menu when clicking outside
   useEffect(() => {
@@ -358,6 +365,9 @@ const AppMatrix = () => {
           <span className="font-semibold">
             Relationship Matrix ({filteredSources.length}×{filteredTargets.length} of {rowData.length} containers)
           </span>
+
+          {/* State Management Dropdown - simplified props */}
+          <StateDropdown onStateChange={handleStateChange} />
 
           {/* From Layer Filter Dropdown */}
           <div className="flex items-center gap-1">
