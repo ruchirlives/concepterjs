@@ -13,6 +13,8 @@ const AppMatrix = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [hideEmpty, setHideEmpty] = useState(true); // New state for hiding empty rows/columns
   const [hoveredCell, setHoveredCell] = useState(null); // Track hovered cell
+  const [childrenMap, setChildrenMap] = useState({}); // Map of parent id -> child ids
+  const [hoveredFrom, setHoveredFrom] = useState(null); // Hovered row header
   const [flipped, setFlipped] = useState(true); // Start with flipped
   const [selectedFromLayer, setSelectedFromLayer] = useState(""); // Layer filter for "from" (sources)
   const [selectedToLayer, setSelectedToLayer] = useState(""); // Layer filter for "to" (targets)
@@ -67,6 +69,15 @@ const AppMatrix = () => {
     return rowData.filter(c => combinedIds.has(c.id));
   }, [rowData, fromLayerFilteredData, toLayerFilteredData]);
 
+  // Map container id to name for quick lookup
+  const nameById = useMemo(() => {
+    const map = {};
+    rowData.forEach((c) => {
+      map[c.id] = c.Name;
+    });
+    return map;
+  }, [rowData]);
+
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
     // Don't fetch if no data OR if collapsed
@@ -90,10 +101,12 @@ const AppMatrix = () => {
       // Build relationships map from parent-child data
       const newRelationships = {};
       const newForwardMap = {};
+      const newChildrenMap = {};
 
       // Process the parent-child map (same logic as flowFetchAndCreateEdges.js)
       parentChildMap.forEach(({ container_id, children }) => {
         const parentId = container_id.toString();
+        newChildrenMap[parentId] = children.map((c) => c.id.toString());
 
         children.forEach((child) => {
           const childId = child.id.toString();
@@ -130,6 +143,7 @@ const AppMatrix = () => {
 
       setRelationships(newRelationships);
       setForwardExists(newForwardMap);
+      setChildrenMap(newChildrenMap);
     } catch (error) {
       console.error("Error loading relationships:", error);
       // Initialize empty relationships on error
@@ -144,6 +158,7 @@ const AppMatrix = () => {
       }
       setRelationships(newRelationships);
       setForwardExists({});
+      setChildrenMap({});
     }
 
     setLoading(false);
@@ -462,8 +477,27 @@ const AppMatrix = () => {
                       {filteredSources.map((sourceContainer) => (
                         <tr key={sourceContainer.id}>
                           {/* Row header */}
-                          <th className="sticky left-0 z-10 p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30">
-                            <div title={sourceContainer.Name}>{sourceContainer.Name}</div>
+                          <th
+                            className={`sticky left-0 z-10 p-2 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30 bg-gray-100 ${
+                              hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
+                                ? 'bg-yellow-100'
+                                : ''
+                            }`}
+                            onMouseEnter={() => setHoveredFrom(sourceContainer.id.toString())}
+                            onMouseLeave={() => setHoveredFrom(null)}
+                          >
+                            <div title={sourceContainer.Name} className="whitespace-normal">
+                              {sourceContainer.Name}
+                              {childrenMap[sourceContainer.id.toString()]?.length > 0 && (
+                                <div className="text-[10px] mt-1 break-words">
+                                  (
+                                  {childrenMap[sourceContainer.id.toString()]
+                                    .map((cid) => nameById[cid] || cid)
+                                    .join(', ')}
+                                  )
+                                </div>
+                              )}
+                            </div>
                           </th>
                           {/* Data cells - only show filtered containers as columns */}
                           {filteredTargets.map((targetContainer) => {
