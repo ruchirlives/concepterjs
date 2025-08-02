@@ -232,7 +232,6 @@ const AppMatrix = () => {
   useEffect(() => {
     if (filteredSources.length === 0 || collapsed) return;
     // Extract fetchDifferences as a pure standalone function
-    console.log("TRIGGERED");
     const fetchDifferences = async () => {
       setLoadingDifferences(true);
       setDifferences({});
@@ -250,11 +249,11 @@ const AppMatrix = () => {
             const diff = containerDiffs[targetId];
             const targetName = nameById[targetId] || targetId;
             if (diff.status === "added") {
-              changes.push(`Added relationship to ${targetName}: ${diff.relationship}`);
+              changes.push(`Added ${targetName}: ${diff.relationship}`);
             } else if (diff.status === "changed") {
-              changes.push(`Changed relationship to ${targetName}: ${diff.relationship}`);
+              changes.push(`Changed ${targetName}: ${diff.relationship}`);
             } else if (diff.status === "removed") {
-              changes.push(`Removed relationship to ${targetName}: ${diff.relationship}`);
+              changes.push(`Removed ${targetName}: ${diff.relationship}`);
             }
           });
 
