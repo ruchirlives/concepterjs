@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "./AppContext";
+import { listStates } from "./api";
 
 const StateDropdown = ({ 
   className = "",
@@ -8,6 +9,7 @@ const StateDropdown = ({
   const {
     activeState,
     availableStates,
+    setAvailableStates,
     handleStateSwitch,
     handleRemoveState,
     handleClearStates
@@ -15,6 +17,22 @@ const StateDropdown = ({
 
   const [stateInput, setStateInput] = useState("");
   const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
+
+  // Load available states on StateDropdown opening
+  useEffect(() => {
+    if (!stateDropdownOpen) return;
+    // Fetch states only when dropdown is opened
+    const loadStates = async () => {
+      try {
+        const states = await listStates();
+        setAvailableStates(states);
+      } catch (error) {
+        console.error("Failed to load states:", error);
+      }
+    };
+    loadStates();
+  }, [setAvailableStates, stateDropdownOpen]);
+
 
   // Notify parent component when state changes
   useEffect(() => {

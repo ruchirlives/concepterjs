@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { requestRefreshChannel } from './effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates } from './api';
@@ -26,18 +26,6 @@ export const AppProvider = ({ children }) => {
   const [layerOptions, setLayerOptions] = useState([]);
   const [activeLayers, setActiveLayers] = useState([]);
 
-  // Load available states on app mount
-  useEffect(() => {
-    const loadStates = async () => {
-      try {
-        const states = await listStates();
-        setAvailableStates(states);
-      } catch (error) {
-        console.error("Failed to load states:", error);
-      }
-    };
-    loadStates();
-  }, []);
 
   // State management functions
   const handleStateSwitch = async (stateName) => {
@@ -48,11 +36,11 @@ export const AppProvider = ({ children }) => {
       setActiveState(stateName);
 
       // Refresh available states
-      const states = await listStates();
-      setAvailableStates(states);
+      // const states = await listStates();
+      // setAvailableStates(states);
 
       // Request refresh for components that depend on state changes
-      requestRefreshChannel();
+      // requestRefreshChannel();
 
       toast.success(`Switched to state: ${stateName}`);
     } catch (error) {
@@ -73,7 +61,7 @@ export const AppProvider = ({ children }) => {
       // If we deleted the current active state, switch to base
       if (stateName === activeState) {
         setActiveState("base");
-        requestRefreshChannel();
+        // requestRefreshChannel();
       }
 
       // Refresh available states
@@ -92,7 +80,7 @@ export const AppProvider = ({ children }) => {
       await clearStates();
       setActiveState("base");
       setAvailableStates([]);
-      requestRefreshChannel();
+      // requestRefreshChannel();
       toast.success("Cleared all states");
     } catch (error) {
       console.error("Failed to clear states:", error);
@@ -142,6 +130,7 @@ export const AppProvider = ({ children }) => {
     // State management
     activeState,
     availableStates,
+    setAvailableStates,
     handleStateSwitch,
     handleRemoveState,
     handleClearStates,

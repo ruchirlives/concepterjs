@@ -227,6 +227,50 @@ const AppMatrix = () => {
     setEditingCell({ sourceId, targetId, key });
   }, []);
 
+  // useEffect handles the conditions and state dependencies
+  useEffect(() => {
+    if (filteredSources.length === 0 || collapsed) return;
+    // Extract fetchDifferences as a pure standalone function
+    const fetchDifferences = async () => {
+      setLoadingDifferences(true);
+      setDifferences({});
+      try {
+        const containerIds = filteredSources.map((container) => container.id);
+        const differenceResults = await compareStates(comparatorState, containerIds);
+
+        const differencesMap = {};
+
+        Object.keys(differenceResults).forEach((containerId) => {
+          const containerDiffs = differenceResults[containerId];
+
+          const changes = [];
+          Object.keys(containerDiffs).forEach((targetId) => {
+            const diff = containerDiffs[targetId];
+            const targetName = nameById[targetId] || targetId;
+            if (diff.status === "added") {
+              changes.push(`Added relationship to ${targetName}: ${diff.relationship}`);
+            } else if (diff.status === "changed") {
+              changes.push(`Changed relationship to ${targetName}: ${diff.relationship}`);
+            } else if (diff.status === "removed") {
+              changes.push(`Removed relationship to ${targetName}: ${diff.relationship}`);
+            }
+          });
+
+          differencesMap[containerId] = changes.length > 0 ? changes.join("\n") : "No difference";
+        });
+
+        setDifferences(differencesMap);
+      } catch (error) {
+        console.error("Error fetching differences:", error);
+        setDifferences({});
+      } finally {
+        setLoadingDifferences(false);
+      }
+    }; // Only comparatorState is needed since it's used inside the function
+
+    fetchDifferences();
+  }, [filteredSources, collapsed, nameById, comparatorState]);
+
   const handleCellSubmit = useCallback(
     async (value) => {
       if (!editingCell) return;
@@ -242,11 +286,14 @@ const AppMatrix = () => {
           ...prev,
           [key]: true,
         }));
+
+        setEditingCell(null);
+
+        console.log(`DONE`);
       } catch (error) {
         console.error("Error saving relationship:", error);
+        setEditingCell(null);
       }
-
-      setEditingCell(null);
     },
     [editingCell]
   );
@@ -304,53 +351,6 @@ const AppMatrix = () => {
       inputRef.current.select();
     }
   }, [editingCell]);
-
-  // Fetch differences when filteredSources changes OR when state changes
-  useEffect(() => {
-    const fetchDifferences = async () => {
-      if (filteredSources.length === 0 || collapsed) return;
-
-      setLoadingDifferences(true);
-      setDifferences({});
-      try {
-        const containerIds = filteredSources.map((container) => container.id);
-        const differenceResults = await compareStates(comparatorState, containerIds);
-        console.log("Difference results:", differenceResults);
-
-        const differencesMap = {};
-
-        // Handle the nested object structure from the API response
-        Object.keys(differenceResults).forEach((containerId) => {
-          const containerDiffs = differenceResults[containerId];
-
-          // Build a summary of all changes for this container
-          const changes = [];
-          Object.keys(containerDiffs).forEach((targetId) => {
-            const diff = containerDiffs[targetId];
-            const targetName = nameById[targetId] || targetId;
-            if (diff.status === "added") {
-              changes.push(`Added relationship to ${targetName}`);
-            } else if (diff.status === "changed") {
-              changes.push(`Changed relationship to ${targetName}. Previously: ${diff.relationship}`);
-            } else if (diff.status === "removed") {
-              changes.push(`Removed relationship to ${targetName}. Previously: ${diff.relationship}`);
-            }
-          });
-
-          differencesMap[containerId] = changes.length > 0 ? changes.join("\n") : "No difference";
-        });
-
-        setDifferences(differencesMap);
-      } catch (error) {
-        console.error("Error fetching differences:", error);
-        setDifferences({});
-      } finally {
-        setLoadingDifferences(false);
-      }
-    };
-
-    fetchDifferences();
-  }, [filteredSources, collapsed, nameById, comparatorState]);
 
   // Color coding and tooltip functions (non-hooks can stay here)
   const getRelationshipColor = (value) => {
