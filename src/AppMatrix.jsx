@@ -23,6 +23,7 @@ const AppMatrix = () => {
   const [differences, setDifferences] = useState({});
   const [loadingDifferences, setLoadingDifferences] = useState(false);
   const [comparatorState, setComparatorState] = useState("base");
+  const [differencesTrigger, setDifferencesTrigger] = useState(0); // Add this with your other state variables
 
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
@@ -231,6 +232,7 @@ const AppMatrix = () => {
   useEffect(() => {
     if (filteredSources.length === 0 || collapsed) return;
     // Extract fetchDifferences as a pure standalone function
+    console.log("TRIGGERED");
     const fetchDifferences = async () => {
       setLoadingDifferences(true);
       setDifferences({});
@@ -269,7 +271,7 @@ const AppMatrix = () => {
     }; // Only comparatorState is needed since it's used inside the function
 
     fetchDifferences();
-  }, [filteredSources, collapsed, nameById, comparatorState]);
+  }, [filteredSources, collapsed, nameById, comparatorState, differencesTrigger]);
 
   const handleCellSubmit = useCallback(
     async (value) => {
@@ -289,13 +291,15 @@ const AppMatrix = () => {
 
         setEditingCell(null);
 
-        console.log(`DONE`);
+        // Trigger differences refresh
+        setDifferencesTrigger((prev) => prev + 1);
+
       } catch (error) {
         console.error("Error saving relationship:", error);
         setEditingCell(null);
       }
     },
-    [editingCell]
+    [editingCell, setRelationships, setForwardExists, setDifferencesTrigger]
   );
 
   const handleKeyDown = useCallback(

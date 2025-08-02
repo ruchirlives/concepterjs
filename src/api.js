@@ -597,6 +597,7 @@ export const listStates = async () => {
 
 // Compare states for given containers
 export const compareStates = async (baseState, containerIds) => {
+    console.log("Comparing states");
     try {
         // console.log("Comparing states:", { baseState, containerIds });
         const response = await apiClient.post(`${getApiUrl()}/compare_states`, {
