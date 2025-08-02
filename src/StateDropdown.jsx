@@ -1,93 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { listStates, switchState, removeState, clearStates } from "./api";
-import toast from "react-hot-toast";
+import { useAppContext } from "./AppContext";
 
 const StateDropdown = ({ 
   className = "",
-  onStateChange = () => {},
-  initialState = "base"
+  onStateChange = () => {}
 }) => {
-  const [activeState, setActiveState] = useState(initialState);
-  const [availableStates, setAvailableStates] = useState([]);
+  const {
+    activeState,
+    availableStates,
+    handleStateSwitch,
+    handleRemoveState,
+    handleClearStates
+  } = useAppContext();
+
   const [stateInput, setStateInput] = useState("");
   const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
 
-  // Load available states on component mount
+  // Notify parent component when state changes
   useEffect(() => {
-    const loadStates = async () => {
-      try {
-        const states = await listStates();
-        setAvailableStates(states);
-      } catch (error) {
-        console.error("Failed to load states:", error);
-      }
-    };
-    loadStates();
-  }, []);
+    onStateChange(activeState);
+  }, [activeState, onStateChange]);
 
-  // Handle state switching
-  const handleStateSwitch = async (stateName) => {
-    if (!stateName.trim()) return;
-
-    try {
-      await switchState(stateName);
-      setActiveState(stateName);
-      setStateInput("");
-      setStateDropdownOpen(false);
-
-      // Refresh available states
-      const states = await listStates();
-      setAvailableStates(states);
-
-      // Notify parent component of state change
-      onStateChange(stateName);
-
-      toast.success(`Switched to state: ${stateName}`);
-    } catch (error) {
-      console.error("Failed to switch state:", error);
-      toast.error("Failed to switch state");
-    }
-  };
-
-  // Handle state removal
-  const handleRemoveState = async (stateName = activeState) => {
-    if (stateName === "base") {
-      toast.error("Cannot remove base state");
-      return;
-    }
-
-    try {
-      await removeState(stateName);
-
-      // If we deleted the current active state, switch to base
-      if (stateName === activeState) {
-        setActiveState("base");
-        onStateChange("base");
-      }
-
-      // Refresh available states
-      const states = await listStates();
-      setAvailableStates(states);
-
-      toast.success(`Removed state: ${stateName}`);
-    } catch (error) {
-      console.error("Failed to remove state:", error);
-      toast.error("Failed to remove state");
-    }
-  };
-
-  // Handle clearing all states
-  const handleClearStates = async () => {
-    try {
-      await clearStates();
-      setActiveState("base");
-      setAvailableStates([]);
-      onStateChange("base");
-      toast.success("Cleared all states");
-    } catch (error) {
-      console.error("Failed to clear states:", error);
-      toast.error("Failed to clear states");
-    }
+  // Handle local state switching with input clear
+  const handleLocalStateSwitch = async (stateName) => {
+    await handleStateSwitch(stateName);
+    setStateInput("");
+    setStateDropdownOpen(false);
   };
 
   // Close dropdown when clicking outside
@@ -132,7 +70,7 @@ const StateDropdown = ({
               onChange={(e) => setStateInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleStateSwitch(stateInput);
+                  handleLocalStateSwitch(stateInput);
                 }
               }}
               placeholder="Type new state name or select existing..."
@@ -142,7 +80,7 @@ const StateDropdown = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleStateSwitch(stateInput);
+                handleLocalStateSwitch(stateInput);
               }}
               disabled={!stateInput.trim()}
               className="w-full mt-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300"
@@ -161,7 +99,7 @@ const StateDropdown = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleStateSwitch(state);
+                      handleLocalStateSwitch(state);
                     }}
                     className={`flex-1 text-left p-2 text-sm ${state === activeState ? "text-blue-700 font-medium" : ""}`}
                   >
@@ -182,7 +120,6 @@ const StateDropdown = ({
                 </div>
               ))
             )}
-
           </div>
 
           {/* Action buttons */}

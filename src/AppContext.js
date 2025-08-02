@@ -1,15 +1,20 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { requestRefreshChannel } from './effectsShared';
-import { useNodesState, useEdgesState } from '@xyflow/react'; // Import Zustand hooks for nodes and edges
+import { useNodesState, useEdgesState } from '@xyflow/react';
+import { listStates, switchState, removeState, clearStates } from './api';
+import toast from "react-hot-toast";
+
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [rowData, setRowData] = useState([]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useEdgesState();
-  // last loaded file item
   const [lastLoadedFile, setLastLoadedFile] = useState(null);
 
+  // State management
+  const [activeState, setActiveState] = useState("base");
+  const [availableStates, setAvailableStates] = useState([]);
 
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
@@ -18,9 +23,82 @@ export const AppProvider = ({ children }) => {
   });
 
   // Layers state
-  const [layerOptions, setLayerOptions] = useState([]); // available layers
-  const [activeLayers, setActiveLayers] = useState([]); // currently selected
+  const [layerOptions, setLayerOptions] = useState([]);
+  const [activeLayers, setActiveLayers] = useState([]);
 
+  // Load available states on app mount
+  useEffect(() => {
+    const loadStates = async () => {
+      try {
+        const states = await listStates();
+        setAvailableStates(states);
+      } catch (error) {
+        console.error("Failed to load states:", error);
+      }
+    };
+    loadStates();
+  }, []);
+
+  // State management functions
+  const handleStateSwitch = async (stateName) => {
+    if (!stateName.trim()) return;
+
+    try {
+      await switchState(stateName);
+      setActiveState(stateName);
+
+      // Refresh available states
+      const states = await listStates();
+      setAvailableStates(states);
+
+      // Request refresh for components that depend on state changes
+      requestRefreshChannel();
+
+      toast.success(`Switched to state: ${stateName}`);
+    } catch (error) {
+      console.error("Failed to switch state:", error);
+      toast.error("Failed to switch state");
+    }
+  };
+
+  const handleRemoveState = async (stateName = activeState) => {
+    if (stateName === "base") {
+      toast.error("Cannot remove base state");
+      return;
+    }
+
+    try {
+      await removeState(stateName);
+
+      // If we deleted the current active state, switch to base
+      if (stateName === activeState) {
+        setActiveState("base");
+        requestRefreshChannel();
+      }
+
+      // Refresh available states
+      const states = await listStates();
+      setAvailableStates(states);
+
+      toast.success(`Removed state: ${stateName}`);
+    } catch (error) {
+      console.error("Failed to remove state:", error);
+      toast.error("Failed to remove state");
+    }
+  };
+
+  const handleClearStates = async () => {
+    try {
+      await clearStates();
+      setActiveState("base");
+      setAvailableStates([]);
+      requestRefreshChannel();
+      toast.success("Cleared all states");
+    } catch (error) {
+      console.error("Failed to clear states:", error);
+      toast.error("Failed to clear states");
+    }
+  };
 
   const addLayer = (layer) => {
     setLayerOptions((prev) =>
@@ -46,7 +124,6 @@ export const AppProvider = ({ children }) => {
   const value = {
     rowData,
     setRowData,
-    // Add Tiptap content to context
     tiptapContent,
     setTiptapContent,
     layerOptions,
@@ -62,6 +139,12 @@ export const AppProvider = ({ children }) => {
     onNodesChange,
     lastLoadedFile,
     setLastLoadedFile,
+    // State management
+    activeState,
+    availableStates,
+    handleStateSwitch,
+    handleRemoveState,
+    handleClearStates,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
