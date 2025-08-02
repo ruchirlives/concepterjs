@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import StateDropdown from "./StateDropdown";
 
 const AppMatrix = () => {
-  const { rowData, edges, layerOptions } = useAppContext();
+  const { rowData, edges, layerOptions, availableStates } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,7 @@ const AppMatrix = () => {
   const [selectedToLayer, setSelectedToLayer] = useState("");
   const [differences, setDifferences] = useState({});
   const [loadingDifferences, setLoadingDifferences] = useState(false);
+  const [comparatorState, setComparatorState] = useState("base");
 
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
@@ -31,6 +32,13 @@ const AppMatrix = () => {
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
     console.log(`Matrix state changed to: ${newState}`);
+    setDifferences({});
+    setLoadingDifferences(true);
+  }, []);
+
+  // Handle comparator state change
+  const handleComparatorChange = useCallback((state) => {
+    setComparatorState(state);
     setDifferences({});
     setLoadingDifferences(true);
   }, []);
@@ -183,7 +191,7 @@ const AppMatrix = () => {
   }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed]);
 
   const handleExportExcel = useCallback(() => {
-    const headers = ["", ...filteredTargets.map((c) => c.Name), "Difference to base"];
+    const headers = ["", ...filteredTargets.map((c) => c.Name), `Difference to ${comparatorState}`];
     const rows = filteredSources.map((source) => {
       const values = [source.Name];
       filteredTargets.forEach((target) => {
@@ -211,7 +219,7 @@ const AppMatrix = () => {
         </button>
       </div>
     ));
-  }, [filteredSources, filteredTargets, relationships, differences]);
+  }, [filteredSources, filteredTargets, relationships, differences, comparatorState]);
 
   const handleCellClick = useCallback((sourceId, targetId) => {
     if (sourceId === targetId) return;
@@ -303,9 +311,10 @@ const AppMatrix = () => {
       if (filteredSources.length === 0 || collapsed) return;
 
       setLoadingDifferences(true);
+      setDifferences({});
       try {
         const containerIds = filteredSources.map((container) => container.id);
-        const differenceResults = await compareStates("base", containerIds);
+        const differenceResults = await compareStates(comparatorState, containerIds);
         console.log("Difference results:", differenceResults);
 
         const differencesMap = {};
@@ -341,7 +350,7 @@ const AppMatrix = () => {
     };
 
     fetchDifferences();
-  }, [filteredSources, collapsed, nameById]);
+  }, [filteredSources, collapsed, nameById, comparatorState]);
 
   // Color coding and tooltip functions (non-hooks can stay here)
   const getRelationshipColor = (value) => {
@@ -386,6 +395,23 @@ const AppMatrix = () => {
 
           {/* State Management Dropdown - simplified props */}
           <StateDropdown onStateChange={handleStateChange} />
+
+          {/* Comparator State Dropdown */}
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-600">Compare:</label>
+            <select
+              value={comparatorState}
+              onChange={(e) => handleComparatorChange(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+              title="Select comparator state"
+            >
+              {availableStates.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* From Layer Filter Dropdown */}
           <div className="flex items-center gap-1">
@@ -495,10 +521,10 @@ const AppMatrix = () => {
                             <div title={container.Name}>{container.Name}</div>
                           </th>
                         ))}
-                        {/* Difference to base column header */}
+                        {/* Difference to comparator state column header */}
                         <th className="p-2 bg-blue-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-40 max-w-40 w-40">
-                          <div title="Differences compared to base state">
-                            Difference to base
+                          <div title={`Differences compared to ${comparatorState} state`}>
+                            Difference to {comparatorState}
                             {loadingDifferences && <span className="ml-1">⏳</span>}
                           </div>
                         </th>
@@ -606,7 +632,7 @@ const AppMatrix = () => {
                               </td>
                             );
                           })}
-                          {/* Difference to base column */}
+                          {/* Difference to comparator state column */}
                           <td className="p-2 bg-blue-50 border border-gray-300 text-left min-w-40 max-w-40 w-40">
                             <div className="text-xs whitespace-pre-line break-words">
                               {loadingDifferences ? (
