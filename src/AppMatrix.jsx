@@ -341,7 +341,7 @@ const AppMatrix = () => {
     };
 
     fetchDifferences();
-  }, [filteredSources, collapsed]);
+  }, [filteredSources, collapsed, nameById]);
 
   // Color coding and tooltip functions (non-hooks can stay here)
   const getRelationshipColor = (value) => {
