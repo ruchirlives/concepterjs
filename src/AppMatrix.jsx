@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { manyChildren, setPosition } from "./api";
+import { manyChildren, setPosition, compareStates } from "./api";
 import { useAppContext } from "./AppContext";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
 import toast from "react-hot-toast";
@@ -20,10 +20,10 @@ const AppMatrix = () => {
   const [flipped, setFlipped] = useState(true);
   const [selectedFromLayer, setSelectedFromLayer] = useState("");
   const [selectedToLayer, setSelectedToLayer] = useState("");
+  const [differences, setDifferences] = useState({});
+  const [loadingDifferences, setLoadingDifferences] = useState(false);
 
   const inputRef = useRef(null);
-
-  // Setup EdgeMenu hook
   const flowWrapperRef = useRef(null);
 
   const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
@@ -31,24 +31,13 @@ const AppMatrix = () => {
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
     console.log(`Matrix state changed to: ${newState}`);
+    setDifferences({});
+    setLoadingDifferences(true);
   }, []);
 
-  // Hide menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      // If menuRef exists and click is outside the menu, hide it
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        hideMenu();
-      }
-    }
+  // FIRST: Define all the memoized values that other hooks depend on
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [menuRef, hideMenu]);
-
-  // Filter rowData by selected layers for "from" and "to" - only using dropdown filters
+  // Filter rowData by selected layers for "from" and "to"
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
     const filterByLayer = (data, layer) => {
       if (!layer) return data;
@@ -82,18 +71,49 @@ const AppMatrix = () => {
     return map;
   }, [rowData]);
 
+  // Memoize filtered data based on hideEmpty setting and flipped state
+  const { filteredSources, filteredTargets } = useMemo(() => {
+    const baseSourceData = flipped ? toLayerFilteredData : fromLayerFilteredData;
+    const baseTargetData = flipped ? fromLayerFilteredData : toLayerFilteredData;
+
+    if (!hideEmpty || baseSourceData.length === 0 || baseTargetData.length === 0) {
+      return {
+        filteredSources: baseSourceData,
+        filteredTargets: baseTargetData,
+      };
+    }
+
+    const sources = new Set();
+    const targets = new Set();
+
+    baseSourceData.forEach((source) => {
+      baseTargetData.forEach((target) => {
+        if (source.id !== target.id) {
+          const key = `${source.id}-${target.id}`;
+          if (forwardExists[key]) {
+            sources.add(source.id);
+            targets.add(target.id);
+          }
+        }
+      });
+    });
+
+    return {
+      filteredSources: baseSourceData.filter((c) => sources.has(c.id)),
+      filteredTargets: baseTargetData.filter((c) => targets.has(c.id)),
+    };
+  }, [fromLayerFilteredData, toLayerFilteredData, forwardExists, hideEmpty, flipped]);
+
+  // THEN: Define callbacks that depend on the memoized values
+
   // Use manyChildren to get all relationships efficiently
   const loadRelationships = useCallback(async () => {
-    // Don't fetch if no data OR if collapsed
     if (combinedFilteredData.length === 0 || collapsed) return;
 
     setLoading(true);
 
     try {
-      // Extract container IDs from combined filtered data
       const containerIds = combinedFilteredData.map((container) => container.id);
-
-      // Use existing manyChildren API
       const parentChildMap = await manyChildren(containerIds);
 
       if (!parentChildMap) {
@@ -102,12 +122,10 @@ const AppMatrix = () => {
         return;
       }
 
-      // Build relationships map from parent-child data
       const newRelationships = {};
       const newForwardMap = {};
       const newChildrenMap = {};
 
-      // Process the parent-child map (same logic as flowFetchAndCreateEdges.js)
       parentChildMap.forEach(({ container_id, children }) => {
         const parentId = container_id.toString();
         newChildrenMap[parentId] = children.map((c) => c.id.toString());
@@ -116,7 +134,6 @@ const AppMatrix = () => {
           const childId = child.id.toString();
           const key = `${parentId}-${childId}`;
 
-          // Extract relationship from position (same as flowFetchAndCreateEdges.js)
           let relationship = "";
           if (child.position) {
             if (typeof child.position === "object") {
@@ -131,14 +148,12 @@ const AppMatrix = () => {
         });
       });
 
-      // Initialize empty relationships for pairs that don't exist
       for (let i = 0; i < fromLayerFilteredData.length; i++) {
         for (let j = 0; j < toLayerFilteredData.length; j++) {
           const sourceId = fromLayerFilteredData[i].id;
           const targetId = toLayerFilteredData[j].id;
           const key = `${sourceId}-${targetId}`;
 
-          // Only set if not already set from parent-child data
           if (!(key in newRelationships)) {
             newRelationships[key] = "";
           }
@@ -150,7 +165,6 @@ const AppMatrix = () => {
       setChildrenMap(newChildrenMap);
     } catch (error) {
       console.error("Error loading relationships:", error);
-      // Initialize empty relationships on error
       const newRelationships = {};
       for (let i = 0; i < fromLayerFilteredData.length; i++) {
         for (let j = 0; j < toLayerFilteredData.length; j++) {
@@ -168,23 +182,39 @@ const AppMatrix = () => {
     setLoading(false);
   }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed]);
 
-  // Load existing relationships when filtered data changes OR when collapsed state changes
-  useEffect(() => {
-    loadRelationships();
-  }, [loadRelationships]);
+  const handleExportExcel = useCallback(() => {
+    const headers = ["", ...filteredTargets.map((c) => c.Name), "Difference to base"];
+    const rows = filteredSources.map((source) => {
+      const values = [source.Name];
+      filteredTargets.forEach((target) => {
+        const key = `${source.id}-${target.id}`;
+        values.push(relationships[key] || "");
+      });
+      values.push(differences[source.id] || "No difference");
+      return values.join("\t");
+    });
+    const tsv = [headers.join("\t"), ...rows].join("\n");
 
-  // Additional effect to trigger fetch when expanding with existing data
-  useEffect(() => {
-    // Only fetch if we have data, not collapsed, and no relationships loaded yet
-    if (combinedFilteredData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
-      loadRelationships();
-    }
-  }, [collapsed, combinedFilteredData.length, relationships, loadRelationships]);
+    toast((t) => (
+      <div className="max-w-[300px]">
+        <div className="font-semibold mb-1">Matrix TSV</div>
+        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">{tsv}</div>
+        <button
+          className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
+          onClick={() => {
+            navigator.clipboard.writeText(tsv);
+            toast.success("Copied!");
+            toast.dismiss(t.id);
+          }}
+        >
+          Copy to Clipboard
+        </button>
+      </div>
+    ));
+  }, [filteredSources, filteredTargets, relationships, differences]);
 
-  // Memoize event handlers
   const handleCellClick = useCallback((sourceId, targetId) => {
     if (sourceId === targetId) return;
-
     const key = `${sourceId}-${targetId}`;
     setEditingCell({ sourceId, targetId, key });
   }, []);
@@ -192,7 +222,6 @@ const AppMatrix = () => {
   const handleCellSubmit = useCallback(
     async (value) => {
       if (!editingCell) return;
-
       const { sourceId, targetId, key } = editingCell;
 
       try {
@@ -232,69 +261,33 @@ const AppMatrix = () => {
     [handleCellSubmit]
   );
 
-  // Memoize filtered data based on hideEmpty setting and flipped state
-  const { filteredSources, filteredTargets } = useMemo(() => {
-    // Apply flipping first to determine which layer filter applies to which axis
-    const baseSourceData = flipped ? toLayerFilteredData : fromLayerFilteredData;
-    const baseTargetData = flipped ? fromLayerFilteredData : toLayerFilteredData;
+  // FINALLY: All useEffect hooks that depend on the above
 
-    if (!hideEmpty || baseSourceData.length === 0 || baseTargetData.length === 0) {
-      return {
-        filteredSources: baseSourceData,
-        filteredTargets: baseTargetData,
-      };
+  // Hide menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        hideMenu();
+      }
     }
 
-    const sources = new Set();
-    const targets = new Set();
-
-    baseSourceData.forEach((source) => {
-      baseTargetData.forEach((target) => {
-        if (source.id !== target.id) {
-          const key = `${source.id}-${target.id}`;
-          if (forwardExists[key]) {
-            sources.add(source.id);
-            targets.add(target.id);
-          }
-        }
-      });
-    });
-
-    return {
-      filteredSources: baseSourceData.filter((c) => sources.has(c.id)),
-      filteredTargets: baseTargetData.filter((c) => targets.has(c.id)),
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [fromLayerFilteredData, toLayerFilteredData, forwardExists, hideEmpty, flipped]);
+  }, [menuRef, hideMenu]);
 
-  const handleExportExcel = useCallback(() => {
-    const headers = ["", ...filteredTargets.map((c) => c.Name)];
-    const rows = filteredSources.map((source) => {
-      const values = [source.Name];
-      filteredTargets.forEach((target) => {
-        const key = `${source.id}-${target.id}`;
-        values.push(relationships[key] || "");
-      });
-      return values.join("\t");
-    });
-    const tsv = [headers.join("\t"), ...rows].join("\n");
+  // Load existing relationships when filtered data changes OR when collapsed state changes
+  useEffect(() => {
+    loadRelationships();
+  }, [loadRelationships]);
 
-    toast((t) => (
-      <div className="max-w-[300px]">
-        <div className="font-semibold mb-1">Matrix TSV</div>
-        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">{tsv}</div>
-        <button
-          className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
-          onClick={() => {
-            navigator.clipboard.writeText(tsv);
-            toast.success("Copied!");
-            toast.dismiss(t.id);
-          }}
-        >
-          Copy to Clipboard
-        </button>
-      </div>
-    ));
-  }, [filteredSources, filteredTargets, relationships]);
+  // Additional effect to trigger fetch when expanding with existing data
+  useEffect(() => {
+    if (combinedFilteredData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
+      loadRelationships();
+    }
+  }, [collapsed, combinedFilteredData.length, relationships, loadRelationships]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -304,35 +297,60 @@ const AppMatrix = () => {
     }
   }, [editingCell]);
 
-  // Fix the EmptyState component
-  const EmptyState = useMemo(
-    () => (
-      <div className="bg-white rounded shadow p-4">
-        <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between items-center mb-4">
-          <span className="font-semibold">Relationship Matrix</span>
-          <button className="text-lg font-bold">{collapsed ? "▼" : "▲"}</button>
-        </div>
-        {!collapsed && (
-          <div className="text-gray-500 text-center py-8">No data available. Filter containers in the grid above to populate the matrix.</div>
-        )}
-      </div>
-    ),
-    [collapsed]
-  );
+  // Fetch differences when filteredSources changes OR when state changes
+  useEffect(() => {
+    const fetchDifferences = async () => {
+      if (filteredSources.length === 0 || collapsed) return;
 
-  if (combinedFilteredData.length === 0) {
-    return EmptyState;
-  }
+      setLoadingDifferences(true);
+      try {
+        const containerIds = filteredSources.map((container) => container.id);
+        const differenceResults = await compareStates("base", containerIds);
+        console.log("Difference results:", differenceResults);
 
-  // Color coding for different relationship types
+        const differencesMap = {};
+
+        // Handle the nested object structure from the API response
+        Object.keys(differenceResults).forEach((containerId) => {
+          const containerDiffs = differenceResults[containerId];
+
+          // Build a summary of all changes for this container
+          const changes = [];
+          Object.keys(containerDiffs).forEach((targetId) => {
+            const diff = containerDiffs[targetId];
+            const targetName = nameById[targetId] || targetId;
+            if (diff.status === "added") {
+              changes.push(`Added relationship to ${targetName}`);
+            } else if (diff.status === "changed") {
+              changes.push(`Changed relationship to ${targetName}. Previously: ${diff.relationship}`);
+            } else if (diff.status === "removed") {
+              changes.push(`Removed relationship to ${targetName}. Previously: ${diff.relationship}`);
+            }
+          });
+
+          differencesMap[containerId] = changes.length > 0 ? changes.join("\n") : "No difference";
+        });
+
+        setDifferences(differencesMap);
+      } catch (error) {
+        console.error("Error fetching differences:", error);
+        setDifferences({});
+      } finally {
+        setLoadingDifferences(false);
+      }
+    };
+
+    fetchDifferences();
+  }, [filteredSources, collapsed]);
+
+  // Color coding and tooltip functions (non-hooks can stay here)
   const getRelationshipColor = (value) => {
-    if (!value) return "bg-yellow-50"; // Default for empty relationships
+    if (!value) return "bg-yellow-50";
     if (value.includes("parent")) return "bg-blue-50";
     if (value.includes("child")) return "bg-green-50";
     return "bg-yellow-50";
   };
 
-  // Tooltip component
   const RelationshipTooltip = ({ text, position }) => {
     if (!text) return null;
     return (
@@ -359,7 +377,7 @@ const AppMatrix = () => {
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
-      {/* Header with collapse button and controls */}
+      {/* Header - this always shows useful info even when empty */}
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <div className="flex items-center gap-4">
           <span className="font-semibold">
@@ -446,6 +464,14 @@ const AppMatrix = () => {
             <div className="flex items-center justify-center h-32">
               <div className="text-gray-500">Loading relationships...</div>
             </div>
+          ) : filteredSources.length === 0 || filteredTargets.length === 0 ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-gray-500">
+                {rowData.length === 0
+                  ? "No data available. Load containers to populate the matrix."
+                  : "No containers match the current filters. Adjust layer filters or toggle 'Show All'."}
+              </div>
+            </div>
           ) : (
             <>
               <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
@@ -469,6 +495,13 @@ const AppMatrix = () => {
                             <div title={container.Name}>{container.Name}</div>
                           </th>
                         ))}
+                        {/* Difference to base column header */}
+                        <th className="p-2 bg-blue-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-40 max-w-40 w-40">
+                          <div title="Differences compared to base state">
+                            Difference to base
+                            {loadingDifferences && <span className="ml-1">⏳</span>}
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -486,11 +519,11 @@ const AppMatrix = () => {
                             }`}
                             onMouseEnter={() => {
                               setHoveredFrom(sourceContainer.id.toString());
-                              setHoveredRowId(sourceContainer.id.toString()); // Also highlight when hovering row header itself
+                              setHoveredRowId(sourceContainer.id.toString());
                             }}
                             onMouseLeave={() => {
                               setHoveredFrom(null);
-                              setHoveredRowId(null); // Remove highlight when leaving row header
+                              setHoveredRowId(null);
                             }}
                           >
                             <div title={sourceContainer.Name} className="whitespace-normal text-xs">
@@ -573,6 +606,16 @@ const AppMatrix = () => {
                               </td>
                             );
                           })}
+                          {/* Difference to base column */}
+                          <td className="p-2 bg-blue-50 border border-gray-300 text-left min-w-40 max-w-40 w-40">
+                            <div className="text-xs whitespace-pre-line break-words">
+                              {loadingDifferences ? (
+                                <span className="text-gray-500">Loading...</span>
+                              ) : (
+                                differences[sourceContainer.id] || "No difference"
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -595,4 +595,19 @@ export const listStates = async () => {
     }
 };
 
+// Compare states for given containers
+export const compareStates = async (baseState, containerIds) => {
+    try {
+        console.log("Comparing states:", { baseState, containerIds });
+        const response = await apiClient.post(`${getApiUrl()}/compare_states`, {
+            baseState: baseState,
+            containerIds: containerIds,
+        });
+        return response.data.collected_differences || [];
+    } catch (error) {
+        console.error("Error comparing states:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
 
