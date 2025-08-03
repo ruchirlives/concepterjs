@@ -95,13 +95,13 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 const targetName = nameById[targetId] || targetId;
 
                 if (diff.status === "added") {
-                    changes.push(`${containerName} Added ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [added a relationship with] ${targetName}: ${diff.relationship}`);
                     counts.added++;
                 } else if (diff.status === "changed") {
-                    changes.push(`${containerName} Changed ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [Changed its relationship with] ${targetName}: ${diff.relationship}`);
                     counts.changed++;
                 } else if (diff.status === "removed") {
-                    changes.push(`${containerName} Removed ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [Removed its relationship with] ${targetName}: ${diff.relationship}`);
                     counts.removed++;
                 }
             });
