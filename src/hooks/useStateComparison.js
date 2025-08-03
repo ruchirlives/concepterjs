@@ -15,13 +15,13 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
     // Create edge click handler
     const createEdgeClickHandler = useCallback((diffResults, sourceState, targetState) => {
         return () => {
-            const enriched = enrichDiffWithMetadata(diffResults, sourceState, targetState);
+            const enriched = enrichDiffWithMetadata(diffResults);
             setCurrentDiffResults({
                 results: enriched,
                 sourceState,
                 targetState
             });
-
+            
             // Initialize all diffs as selected
             const initialSelected = {};
             Object.keys(enriched).forEach((containerId) => {

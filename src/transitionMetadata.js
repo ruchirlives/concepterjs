@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'transition_metadata';
 
-const generateKey = (sourceState, targetState, containerId, targetId) =>
-  [sourceState, targetState, containerId, targetId].join('|');
+const generateKey = (containerId, targetId, transitionLabel) =>
+  [containerId, targetId, transitionLabel].join('|');
 
 export const loadTransitionMetadata = () => {
   try {
@@ -21,25 +21,35 @@ export const saveTransitionMetadata = (metadata) => {
   }
 };
 
-export const getMetadataFor = (sourceState, targetState, containerId, targetId) => {
+export const getMetadataFor = (containerId, targetId, transitionLabel) => {
   const metadata = loadTransitionMetadata();
-  return metadata[generateKey(sourceState, targetState, containerId, targetId)] || {};
+  return metadata[generateKey(containerId, targetId, transitionLabel)] || {};
 };
 
-export const updateMetadataFor = (sourceState, targetState, containerId, targetId, data) => {
+export const updateMetadataFor = (
+  containerId,
+  targetId,
+  transitionLabel,
+  data
+) => {
   const metadata = loadTransitionMetadata();
-  const key = generateKey(sourceState, targetState, containerId, targetId);
+  const key = generateKey(containerId, targetId, transitionLabel);
   metadata[key] = { ...metadata[key], ...data };
   saveTransitionMetadata(metadata);
 };
 
-export const enrichDiffWithMetadata = (diff, sourceState, targetState) => {
+export const enrichDiffWithMetadata = (diff) => {
   const enriched = {};
   Object.keys(diff).forEach((cid) => {
     enriched[cid] = {};
     Object.keys(diff[cid]).forEach((tid) => {
       const rel = { ...diff[cid][tid] };
-      const meta = getMetadataFor(sourceState, targetState, cid, tid);
+      const transitionLabel = (() => {
+        const base = rel.base_relationship_dict?.label || 'None';
+        const current = rel.relationship_dict?.label || 'None';
+        return `${base} -> ${current}`;
+      })();
+      const meta = getMetadataFor(cid, tid, transitionLabel);
       if (Object.keys(meta).length) {
         Object.assign(rel, meta);
       }

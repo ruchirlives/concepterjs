@@ -49,7 +49,13 @@ const DiffPopup = ({
                 ...prev,
                 [entry.key]: { ...prev[entry.key], [field]: value }
             };
-            updateMetadataFor(sourceState, targetState, entry.containerId, entry.targetId, updated[entry.key]);
+            const rel = results[entry.containerId]?.[entry.targetId] || {};
+            const transitionLabel = (() => {
+                const base = rel.base_relationship_dict?.label || 'None';
+                const current = rel.relationship_dict?.label || 'None';
+                return `${base} -> ${current}`;
+            })();
+            updateMetadataFor(entry.containerId, entry.targetId, transitionLabel, updated[entry.key]);
             if (results[entry.containerId] && results[entry.containerId][entry.targetId]) {
                 results[entry.containerId][entry.targetId][field] = value;
             }
