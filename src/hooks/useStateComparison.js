@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { listStates, compareStates } from '../api';
 import { getLayoutedElements } from './flowLayouter';
 import toast from 'react-hot-toast';
+import { enrichDiffWithMetadata } from '../transitionMetadata';
 
 export const useStateComparison = (rowData, selectedTargetState, setDiffDict, collapsed) => {
     const [nodes, setNodes] = useState([]);
@@ -14,16 +15,17 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
     // Create edge click handler
     const createEdgeClickHandler = useCallback((diffResults, sourceState, targetState) => {
         return () => {
+            const enriched = enrichDiffWithMetadata(diffResults);
             setCurrentDiffResults({
-                results: diffResults,
+                results: enriched,
                 sourceState,
                 targetState
             });
-
+            
             // Initialize all diffs as selected
             const initialSelected = {};
-            Object.keys(diffResults).forEach((containerId) => {
-                const containerDiffs = diffResults[containerId];
+            Object.keys(enriched).forEach((containerId) => {
+                const containerDiffs = enriched[containerId];
                 Object.keys(containerDiffs).forEach((targetId) => {
                     const key = `${containerId}-${targetId}`;
                     initialSelected[key] = true;
