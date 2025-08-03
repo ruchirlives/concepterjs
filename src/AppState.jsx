@@ -18,13 +18,7 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   });
 
   if (!label || label === "No difference") {
-    return (
-      <BaseEdge 
-        id={id} 
-        path={edgePath} 
-        style={style}
-      />
-    );
+    return <BaseEdge id={id} path={edgePath} style={style} />;
   }
 
   // Improved word wrapping logic
@@ -44,7 +38,7 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
       words.forEach((word) => {
         // Check if adding this word would exceed the line length
         const testLine = currentLine ? `${currentLine} ${word}` : word;
-        
+
         if (testLine.length <= maxLineLength) {
           currentLine = testLine;
         } else {
@@ -79,11 +73,7 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 
   return (
     <>
-      <BaseEdge 
-        id={id} 
-        path={edgePath} 
-        style={style}
-      />
+      <BaseEdge id={id} path={edgePath} style={style} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -106,12 +96,12 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
           className="nodrag nopan"
         >
           {wrappedLines.map((line, index) => (
-            <div 
-              key={index} 
-              style={{ 
+            <div
+              key={index}
+              style={{
                 marginBottom: index < wrappedLines.length - 1 ? "3px" : "0",
                 wordBreak: "break-word",
-                hyphens: "auto"
+                hyphens: "auto",
               }}
             >
               {line}
@@ -126,21 +116,21 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 // Enhanced Custom Node component with handles
 const CustomNode = ({ data, selected }) => {
   const isTarget = data.isTarget;
-  
+
   return (
     <div
       style={{
         padding: "14px 18px",
         borderRadius: "16px",
         border: isTarget ? "3px solid #1976d2" : selected ? "2px solid #64b5f6" : "2px solid #e0e0e0",
-        background: isTarget 
-          ? "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)" 
-          : selected 
+        background: isTarget
+          ? "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)"
+          : selected
           ? "linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)"
           : "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
-        boxShadow: isTarget 
-          ? "0 12px 32px rgba(25, 118, 210, 0.4), 0 4px 8px rgba(25, 118, 210, 0.2)" 
-          : selected 
+        boxShadow: isTarget
+          ? "0 12px 32px rgba(25, 118, 210, 0.4), 0 4px 8px rgba(25, 118, 210, 0.2)"
+          : selected
           ? "0 8px 20px rgba(0,0,0,0.15)"
           : "0 6px 16px rgba(0,0,0,0.08)",
         color: isTarget ? "#1565c0" : "#37474f",
@@ -177,34 +167,36 @@ const CustomNode = ({ data, selected }) => {
       />
 
       {isTarget && (
-        <div style={{ 
-          fontSize: "10px", 
-          color: "#1976d2", 
-          marginBottom: "6px",
-          fontWeight: "600",
-          letterSpacing: "0.5px",
-          textTransform: "uppercase"
-        }}>
+        <div
+          style={{
+            fontSize: "10px",
+            color: "#1976d2",
+            marginBottom: "6px",
+            fontWeight: "600",
+            letterSpacing: "0.5px",
+            textTransform: "uppercase",
+          }}
+        >
           🎯 TARGET
         </div>
       )}
-      <div style={{ fontWeight: isTarget ? "700" : "600" }}>
-        {data.label}
-      </div>
-      
+      <div style={{ fontWeight: isTarget ? "700" : "600" }}>{data.label}</div>
+
       {/* Subtle glow effect for target */}
       {isTarget && (
-        <div style={{
-          position: "absolute",
-          top: "-2px",
-          left: "-2px",
-          right: "-2px",
-          bottom: "-2px",
-          borderRadius: "18px",
-          background: "linear-gradient(135deg, rgba(25, 118, 210, 0.1), rgba(187, 222, 251, 0.1))",
-          zIndex: -1,
-          filter: "blur(8px)"
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            top: "-2px",
+            left: "-2px",
+            right: "-2px",
+            bottom: "-2px",
+            borderRadius: "18px",
+            background: "linear-gradient(135deg, rgba(25, 118, 210, 0.1), rgba(187, 222, 251, 0.1))",
+            zIndex: -1,
+            filter: "blur(8px)",
+          }}
+        />
       )}
     </div>
   );
@@ -245,10 +237,10 @@ const App = () => {
         const initialNodes = states.map((state) => ({
           id: state,
           type: "custom", // Use custom node type
-          data: { 
-            label: state, 
+          data: {
+            label: state,
             Name: state,
-            isTarget: state === selectedTargetState // Mark target state
+            isTarget: state === selectedTargetState, // Mark target state
           },
           position: { x: 0, y: 0 }, // Will be overwritten by layouter
         }));
@@ -272,18 +264,20 @@ const App = () => {
             // Compare sourceState with selectedTargetState
             const diffResults = await compareStates(sourceState, containerIds);
             const changes = [];
-            
+
             Object.keys(diffResults).forEach((containerId) => {
               const containerDiffs = diffResults[containerId];
+              // get containerName
+              const containerName = nameById[containerId] || containerId;
               Object.keys(containerDiffs).forEach((targetId) => {
                 const diff = containerDiffs[targetId];
                 const targetName = nameById[targetId] || targetId;
                 if (diff.status === "added") {
-                  changes.push(`Added ${targetName}: ${diff.relationship}`);
+                  changes.push(`${containerName} Added ${targetName}: ${diff.relationship}`);
                 } else if (diff.status === "changed") {
-                  changes.push(`Changed ${targetName}: ${diff.relationship}`);
+                  changes.push(`${containerName} Changed ${targetName}: ${diff.relationship}`);
                 } else if (diff.status === "removed") {
-                  changes.push(`Removed ${targetName}: ${diff.relationship}`);
+                  changes.push(`${containerName} Removed ${targetName}: ${diff.relationship}`);
                 }
               });
             });
@@ -293,7 +287,7 @@ const App = () => {
               const label = changes.join("\n");
               initialEdges.push({
                 id: `${sourceState}-${selectedTargetState}`,
-                source: sourceState,        // Other states are sources
+                source: sourceState, // Other states are sources
                 target: selectedTargetState, // Selected state is the target
                 label,
                 type: "custom",
@@ -330,20 +324,11 @@ const App = () => {
         <span className="font-semibold mr-4">State Diagram</span>
         <div className="flex items-center gap-2">
           <span className="text-sm">Target State:</span>
-          <StateDropdown 
-            onStateChange={handleTargetStateChange}
-            className="min-w-32"
-          />
+          <StateDropdown onStateChange={handleTargetStateChange} className="min-w-32" />
         </div>
       </div>
       <div style={{ width: "100%", height: 400 }}>
-        <ReactFlow 
-          nodes={nodes} 
-          edges={edges} 
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes} 
-          fitView
-        >
+        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView>
           <Background />
           <Controls />
         </ReactFlow>

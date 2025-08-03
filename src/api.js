@@ -603,7 +603,7 @@ export const compareStates = async (baseState, containerIds) => {
             baseState: baseState,
             containerIds: containerIds,
         });
-        return response.data.collected_differences || [];
+        return response.data.differences_all || [];
     } catch (error) {
         console.error("Error comparing states:", error);
         throw error; // Re-throw to let the caller handle the error display
