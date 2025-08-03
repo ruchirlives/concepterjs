@@ -111,7 +111,7 @@ const FlowNode = ({ data, style, selected }) => {
       <div>
         {data.Name}
         {/* Show score if available */}
-        {data.score && (
+        {data.score !== undefined && (
           <div className="text-xs text-gray-600 mt-1">
             Score: {data.score.toFixed(3)}
             {data.normalizedScore !== undefined && (

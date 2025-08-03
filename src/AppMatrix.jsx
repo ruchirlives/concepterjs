@@ -624,7 +624,7 @@ const AppMatrix = () => {
                             <div title={sourceContainer.Name} className="whitespace-normal text-xs">
                               {sourceContainer.Name}
                               {/* Show score if available */}
-                              {stateScores[sourceContainer.id] && (
+                              {stateScores[sourceContainer.id] !== undefined && (
                                 <div className="text-gray-600 text-xs mt-1">Score: {stateScores[sourceContainer.id].toFixed(3)}</div>
                               )}
                               {childrenMap[sourceContainer.id.toString()]?.length > 0 && (
