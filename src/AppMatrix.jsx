@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { manyChildren, setPosition, compareStates, revertDifferences } from "./api";
 import { useAppContext } from "./AppContext";
-import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
+import EdgeMenu, { useEdgeMenu } from "./hooks/flowEdgeMenu";
 import toast from "react-hot-toast";
-import StateDropdown, { ComparatorDropdown } from "./StateDropdown";
+import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import { useStateScores } from './hooks/useStateScores';
 
 const AppMatrix = () => {

@@ -1,6 +1,6 @@
 // Create a new file: CreateFromContentModal.jsx
 import React, { useState } from "react";
-import { createContainersFromContent } from "./api";
+import { createContainersFromContent } from "../api";
 
 const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
   const [prompt, setPrompt] = useState("");

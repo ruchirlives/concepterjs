@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { requestRefreshChannel } from './effectsShared';
+import { requestRefreshChannel } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates } from './api';
 import toast from "react-hot-toast";

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Modal from "react-modal";
-import { getloadContainers, loadContainers, importContainers, deleteProject } from "./api";
-import { useAppContext } from "./AppContext";
+import { getloadContainers, loadContainers, importContainers, deleteProject } from "../api";
+import { useAppContext } from "../AppContext";
 
 Modal.setAppElement("#app");
 

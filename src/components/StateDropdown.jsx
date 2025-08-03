@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "./AppContext";
-import { listStates } from "./api";
+import { useAppContext } from "../AppContext";
+import { listStates } from "../api";
 
 const StateDropdown = ({ 
   className = "",

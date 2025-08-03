@@ -3,10 +3,10 @@ import { ReactFlow, ReactFlowProvider, Background, Controls } from "@xyflow/reac
 import "@xyflow/react/dist/style.css";
 import { useAppContext } from "./AppContext";
 import { listStates, compareStates } from "./api";
-import { getLayoutedElements } from "./flowLayouter";
-import StateDropdown from "./StateDropdown";
-import { CustomStateNode } from "CustomStateNode";
-import { CustomStateEdge } from "CustomStateEdge";
+import { getLayoutedElements } from "./hooks/flowLayouter";
+import StateDropdown from "./components/StateDropdown";
+import { CustomStateNode } from "components/CustomStateNode";
+import { CustomStateEdge } from "components/CustomStateEdge";
 import toast from "react-hot-toast";
 
 const App = () => {

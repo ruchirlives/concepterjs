@@ -1,10 +1,10 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
-import { createNewRow } from './ModalNewContainer';
-import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "./api";
+import { createNewRow } from '../components/ModalNewContainer';
+import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
-import { useAppContext } from './AppContext'; // Import the AppContext to access tiptapContent
+import { useAppContext } from '../AppContext'; // Import the AppContext to access tiptapContent
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {

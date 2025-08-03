@@ -7,15 +7,15 @@ import '@xyflow/react/dist/style.css';
 import {
   useCreateNodesAndEdges, useOnConnect, useOnEdgeChange,
   useOnConnectEnd, useTagsChange, useSelectNode, useOnEdgeDoubleClick
-} from './flowEffects';
-import FlowNode from './flowNode';
-import GroupNode from './flowGroupNodes';
-import ContextMenu from "./ContextMenu";
-import { useContextMenu, menuItems } from "./flowContextMenu";
-import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
-import { FlowMenuProvider } from './FlowMenuContext';
+} from './hooks/flowEffects';
+import FlowNode from './hooks/flowNode';
+import GroupNode from './hooks/flowGroupNodes';
+import ContextMenu from "./components/ContextMenu";
+import { useContextMenu, menuItems } from "./hooks/flowContextMenu";
+import EdgeMenu, { useEdgeMenu } from "./hooks/flowEdgeMenu";
+import { FlowMenuProvider } from './components/FlowMenuContext';
 import { GearIcon } from '@radix-ui/react-icons'
-import CustomEdge from './customEdge';
+import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import FlowHeader from './components/FlowHeader';
 import FlowNavigation from './components/FlowNavigation';

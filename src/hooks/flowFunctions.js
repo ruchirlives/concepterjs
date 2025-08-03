@@ -1,4 +1,4 @@
-import { removeChildren } from './api';
+import { removeChildren } from '../api';
 
 export function fitViewToFlow() {
     const flow = document.querySelector('.react-flow__viewport');

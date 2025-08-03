@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { fetchParentContainers, addChildren, removeChildren, deleteContainers, get_docx, mergeContainers, fetchContainerById, fetchChildren } from "./api"; // Import API function
+import { fetchParentContainers, addChildren, removeChildren, deleteContainers, get_docx, mergeContainers, fetchContainerById, fetchChildren } from "../api"; // Import API function
 import { sendGanttToChannel, sendMermaidToChannel, writeBackUpdatedData } from "./effectsShared";
 import { addTagToNodes, removeTagFromNodes } from "./gridEffects";
 // Context menu rendering

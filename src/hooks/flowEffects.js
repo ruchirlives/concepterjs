@@ -1,8 +1,8 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { useAppContext, rowInLayers } from './AppContext';
+import { useAppContext, rowInLayers } from '../AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
-import { setPosition } from './api';
-import { createNewRow } from './ModalNewContainer';
+import { setPosition } from '../api';
+import { createNewRow } from '../components/ModalNewContainer';
 import { generateNodesAndEdges } from './flowGenerateGraph';
 import { handleEdgeConnection, handleEdgeRemoval, requestAddChild } from './flowFunctions';
 

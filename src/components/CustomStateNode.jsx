@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { useAppContext } from './AppContext';
-import { applyDifferences, revertDifferences } from './api';
+import { useAppContext } from '../AppContext';
+import { applyDifferences, revertDifferences } from '../api';
 import toast from 'react-hot-toast';
 
 export const CustomStateNode = ({ data }) => {

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { getApiUrl } from "./apiConfig";
-import { requestRefreshChannel } from "effectsShared";
+import { requestRefreshChannel } from "hooks/effectsShared";
 
 const apiClient = axios.create({
     baseURL: getApiUrl(), // Set the base URL for all requests

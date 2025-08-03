@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
-import { useAppContext } from './AppContext';
+import { useAppContext } from '../AppContext';
 import {
     deleteContainers,
     renameContainer,
@@ -18,7 +18,7 @@ import {
     addChildren,
     add_similar,
     api_build_chain_beam,
-} from "./api";
+} from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
     displayContextMenu,

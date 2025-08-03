@@ -1,4 +1,4 @@
-import { get_gantt, get_mermaid, writeBackData } from "./api";
+import { get_gantt, get_mermaid, writeBackData } from "../api";
 
 
 export const handleWriteBack = async (rowData) => {

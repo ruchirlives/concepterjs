@@ -1,5 +1,5 @@
 import React from 'react';
-import StateDropdown from '../StateDropdown';
+import StateDropdown from './StateDropdown';
 
 const FlowHeader = ({
   collapsed,

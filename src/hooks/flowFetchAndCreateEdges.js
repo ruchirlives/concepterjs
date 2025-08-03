@@ -1,4 +1,4 @@
-import { manyChildren } from './api';
+import { manyChildren } from '../api';
 import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 

@@ -1,4 +1,4 @@
-import { addChildren, createContainer, writeBackData } from "./api";
+import { addChildren, createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 
 export function createNewRow(setRowData, activeGroup=null, activeLayers=[]) {

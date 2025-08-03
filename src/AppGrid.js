@@ -3,21 +3,21 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useAppContext, rowInLayers } from "./AppContext";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry } from "ag-grid-community";
-import { createNewRow } from "./ModalNewContainer"; // Import the function to create a new row
-import NamePromptModal from "./ModalNamePrompt";
+import { createNewRow } from "./components/ModalNewContainer"; // Import the function to create a new row
+import NamePromptModal from "./components/ModalNamePrompt";
 
 // My imports
-import ContextMenu, { useContextMenu } from "./gridContextMenu";
-import LoadModal from "./ModalLoad";
+import ContextMenu, { useContextMenu } from "./hooks/gridContextMenu";
+import LoadModal from "./components/ModalLoad";
 // import MiniMap from "./ModalMiniMap"; // Import the MiniMap component
-import columnDefs from "./gridColumnDefs";
+import columnDefs from "./hooks/gridColumnDefs";
 import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } from "./api";
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
   useSaveButtonEffect, useDropDownEffect, useReloadEffect, useRefreshEffect,
   useClearButtonEffect, useRowSelectMessage, flashAndScrollToRow, useAddChildChannel, useRequestRefreshChannel, useRekeyButtonEffect, useDedupButtonEffect, useAddTagsChannel, useRemoveTagsChannel
-} from "./gridEffects";
-import { handleWriteBack } from "./effectsShared";
+} from "./hooks/gridEffects";
+import { handleWriteBack } from "./hooks/effectsShared";
 
 // Import the custom theme
 import "ag-grid-community/styles/ag-theme-alpine.css"; // Default theme as fallback

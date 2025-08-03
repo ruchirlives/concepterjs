@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { getBezierPath, BaseEdge } from '@xyflow/react';
-import { useFlowMenu } from './FlowMenuContext';
+import { useFlowMenu } from '../components/FlowMenuContext';
 import ReactDOM from 'react-dom';
 import { useOnEdgeDoubleClick } from './flowEffects';
 

@@ -9,7 +9,7 @@ import AppMatrix from './AppMatrix';
 import AppPrioritiser from './AppPrioritiser';
 import AppLayers from './AppLayers';
 import AppState from './AppState';
-import CreateFromContentModal from './CreateFromContentModal';
+import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
 

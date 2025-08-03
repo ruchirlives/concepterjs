@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNodeId, Handle } from '@xyflow/react';
-import { useFlowMenu } from './FlowMenuContext';
+import { useFlowMenu } from '../components/FlowMenuContext';
 
 const FlowNode = ({ data, style, selected }) => {
   const [isHovered, setIsHovered] = useState(false);
