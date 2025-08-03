@@ -15,6 +15,7 @@ export const AppProvider = ({ children }) => {
   // State management
   const [activeState, setActiveState] = useState("base");
   const [availableStates, setAvailableStates] = useState([]);
+  const [comparatorState, setComparatorState] = useState("base");
 
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
@@ -131,6 +132,8 @@ export const AppProvider = ({ children }) => {
     activeState,
     availableStates,
     setAvailableStates,
+    comparatorState,
+    setComparatorState,
     handleStateSwitch,
     handleRemoveState,
     handleClearStates,

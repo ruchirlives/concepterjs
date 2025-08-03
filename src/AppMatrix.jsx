@@ -3,10 +3,10 @@ import { manyChildren, setPosition, compareStates } from "./api";
 import { useAppContext } from "./AppContext";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
 import toast from "react-hot-toast";
-import StateDropdown from "./StateDropdown";
+import StateDropdown, { ComparatorDropdown } from "./StateDropdown";
 
 const AppMatrix = () => {
-  const { rowData, edges, layerOptions, availableStates } = useAppContext();
+  const { rowData, edges, layerOptions, comparatorState } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -22,8 +22,7 @@ const AppMatrix = () => {
   const [selectedToLayer, setSelectedToLayer] = useState("");
   const [differences, setDifferences] = useState({});
   const [loadingDifferences, setLoadingDifferences] = useState(false);
-  const [comparatorState, setComparatorState] = useState("base");
-  const [differencesTrigger, setDifferencesTrigger] = useState(0); // Add this with your other state variables
+  const [differencesTrigger, setDifferencesTrigger] = useState(0);
 
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
@@ -33,13 +32,6 @@ const AppMatrix = () => {
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
     console.log(`Matrix state changed to: ${newState}`);
-    setDifferences({});
-    setLoadingDifferences(true);
-  }, []);
-
-  // Handle comparator state change
-  const handleComparatorChange = useCallback((state) => {
-    setComparatorState(state);
     setDifferences({});
     setLoadingDifferences(true);
   }, []);
@@ -396,25 +388,11 @@ const AppMatrix = () => {
             Relationship Matrix ({filteredSources.length}×{filteredTargets.length} of {rowData.length} containers)
           </span>
 
-          {/* State Management Dropdown - simplified props */}
+          {/* State Management Dropdown */}
           <StateDropdown onStateChange={handleStateChange} />
 
-          {/* Comparator State Dropdown */}
-          <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">Compare:</label>
-            <select
-              value={comparatorState}
-              onChange={(e) => handleComparatorChange(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title="Select comparator state"
-            >
-              {availableStates.map((state) => (
-                <option key={state} value={state}>
-                  {state}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Comparator State Dropdown - Using the new component */}
+          <ComparatorDropdown />
 
           {/* From Layer Filter Dropdown */}
           <div className="flex items-center gap-1">
