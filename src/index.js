@@ -8,6 +8,7 @@ import AppMermaid from './AppMermaid';
 import AppMatrix from './AppMatrix';
 import AppPrioritiser from './AppPrioritiser';
 import AppLayers from './AppLayers';
+import AppState from './AppState';
 import CreateFromContentModal from './CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
@@ -114,6 +115,10 @@ const App = () => {
 
         <section id="layers">
           <AppLayers />
+        </section>
+
+        <section id="states">
+          <AppState />
         </section>
 
         <section id="sub">
