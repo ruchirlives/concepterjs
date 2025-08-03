@@ -1,11 +1,13 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { useAppContext } from './AppContext';
+import React, { useEffect, useMemo } from "react";
 import {
-  ReactFlow, ReactFlowProvider,
-  MiniMap, Controls, Background, useReactFlow, addEdge, ControlButton
+  ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
+  addEdge, ControlButton
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCreateNodesAndEdges, useOnConnect, useOnEdgeChange, useOnConnectEnd, useTagsChange, useSelectNode, useOnEdgeDoubleClick } from './flowEffects';
+import {
+  useCreateNodesAndEdges, useOnConnect, useOnEdgeChange,
+  useOnConnectEnd, useTagsChange, useSelectNode, useOnEdgeDoubleClick
+} from './flowEffects';
 import FlowNode from './flowNode';
 import GroupNode from './flowGroupNodes';
 import ContextMenu from "./ContextMenu";
@@ -15,64 +17,37 @@ import { FlowMenuProvider } from './FlowMenuContext';
 import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './customEdge';
 import { Toaster } from 'react-hot-toast';
-import StateDropdown from './StateDropdown';
-import { useStateScores } from './hooks/useStateScores';
+import FlowHeader from './components/FlowHeader';
+import FlowNavigation from './components/FlowNavigation';
+import { useFlowLogic } from './hooks/useFlowLogic';
 
 const App = ({ keepLayout, setKeepLayout }) => {
-  const [collapsed, setCollapsed] = useState(true);
-  // Step 1: Active group state and history ---
-  const [activeGroup, setActiveGroup] = useState(null);
-  const [history, setHistory] = useState([]);
-
-  // New state for layer visibility in Flow
-  const [hiddenLayers, setHiddenLayers] = useState(new Set());
-  const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
-
-  // // State management
-  // const [activeState, setActiveState] = useState("base");
-
-  // Step 2: Zustand store for nodes and edges ---
   const flowWrapperRef = React.useRef(null);
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, layerOptions, comparatorState } = useAppContext();
-  const [layoutPositions, setLayoutPositions] = useState({});
-  // const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  // const [edges, setEdges] = useEdgesState();
 
-  // Filter rowData based on hidden layers for Flow only
-  const flowFilteredRowData = useMemo(() => {
-    if (hiddenLayers.size === 0) return rowData;
-
-    return rowData.filter(container => {
-      if (!container.Tags) return true; // Show containers without tags
-
-      const containerTags = container.Tags
-        .split(",")
-        .map(tag => tag.trim())
-        .filter(Boolean);
-
-      // Hide if any of the container's tags are in hiddenLayers
-      return !containerTags.some(tag => hiddenLayers.has(tag));
-    });
-  }, [rowData, hiddenLayers]);
-
-  // Toggle layer visibility
-  const toggleLayerVisibility = useCallback((layer) => {
-    setHiddenLayers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(layer)) {
-        newSet.delete(layer);
-      } else {
-        newSet.add(layer);
-      }
-      return newSet;
-    });
-  }, []);
-
-  // Handle state change callback
-  const handleStateChange = useCallback((newState) => {
-    // Additional logic when state changes if needed
-    console.log(`State changed to: ${newState}`);
-  }, []);
+  const {
+    collapsed, setCollapsed,
+    activeGroup, setActiveGroup,
+    history, setHistory,
+    hiddenLayers, setHiddenLayers,
+    layerDropdownOpen, setLayerDropdownOpen,
+    layoutPositions, setLayoutPositions,
+    flowFilteredRowData,
+    layerOptions,
+    comparatorState,
+    toggleLayerVisibility,
+    handleStateChange,
+    centerNode,
+    handleTransform,
+    stateScores,
+    handleCalculateStateScores,
+    getHighestScoringContainer,
+    clearStateScores,
+    rowData, setRowData,
+    nodes, setNodes,
+    edges, setEdges,
+    onNodesChange,
+    screenToFlowPosition
+  } = useFlowLogic();
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -81,45 +56,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
     ),
   }), [setEdges]);
 
-  // Step 3: Viewport transformation ---
-  const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
-
-  const centerNode = (node) => {
-    const zoom = getZoom();
-
-    // Use actual bounding box if possible (fallback to estimates)
-    const nodeWidth = node?.width || 200;
-    const nodeHeight = node?.height || 100;
-
-    const nodeCenterX = node.position.x + nodeWidth / 2;
-    const nodeCenterY = node.position.y + nodeHeight / 2;
-
-    const wrapper = document.querySelector('.react-flow__viewport')?.parentElement;
-    const wrapperRect = wrapper.getBoundingClientRect();
-
-    const screenCenter = {
-      x: wrapperRect.left + wrapperRect.width / 2,
-      y: wrapperRect.top + wrapperRect.height / 2,
-    };
-
-    const x = screenCenter.x - nodeCenterX * zoom;
-    const y = screenCenter.y - nodeCenterY * zoom;
-
-    setViewport({ x, y, zoom }, { duration: 800 });
-  };
-
-  const handleTransform = useCallback((x, y) => {
-    console.log('Zooming');
-    const { zoom } = getViewport();
-    setViewport({ x: x, y: y, zoom: zoom }, { duration: 800 });
-  }, [setViewport, getViewport]);
-
   useEffect(() => {
     if (!keepLayout) return;
-    // Build a fresh map of *current* positions
     const storedPositions = {};
     nodes.forEach(node => {
-      // Grab the live position you just dragged
       storedPositions[node.id] = node.position;
     });
     setLayoutPositions(storedPositions);
@@ -135,56 +75,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
   }, [activeGroup]);
 
-  // Add state scores functionality
-  const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
-
-
-  // Step 4: Custom hook to create nodes and edges (use filtered data)
-  useCreateNodesAndEdges({ 
-    nodes, 
-    setNodes, 
-    setEdges, 
-    rowData: flowFilteredRowData, 
-    keepLayout, 
-    activeGroup, 
-    setLayoutPositions, 
-    layoutPositions, 
-    setRowData,
-    stateScores,                    // Add this
-    getHighestScoringContainer      // Add this
-  });
-  const onEdgesChange = useOnEdgeChange(setEdges);
-  const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
-  const onConnectEnd = useOnConnectEnd({ setEdges, setNodes, screenToFlowPosition, setRowData, addEdge, activeGroup, setLayoutPositions });
-  const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
-
-  // Step 5: Context menu and edge menu logic ---
-  useTagsChange(rowData, setRowData, keepLayout);
-  useSelectNode(nodes, edges, setNodes, rowData, handleTransform, centerNode); // Use the custom context menu logic
-
-  const {
-    menuRef: contextMenuRef,
-    menuItems: contextMenuItems,
-    handleContextMenu,
-    onMenuItemClick: onContextMenuItemClick,
-    hideMenu: hideContextMenu,
-    selectionContextMenu,
-    gearContextMenu,
-  } = useContextMenu(
-    flowWrapperRef,
-    activeGroup,
-    menuItems,
-    nodes,
-    rowData,
-    setRowData,
-    history
-  ); // Custom onConnect and onDisconnect hooks
-
-  const { menuRef: edgeMenuRef, handleEdgeMenu, onMenuItemClick: onEdgeMenuItemClick, hideMenu: hideEdgeMenu,
-  } = useEdgeMenu(flowWrapperRef, activeGroup); // Custom edge menu logic
-
-  const hideMenu = () => { hideContextMenu(); hideEdgeMenu(); };
-
   // Close layer dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -197,111 +87,68 @@ const App = ({ keepLayout, setKeepLayout }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [layerDropdownOpen]);
+  }, [layerDropdownOpen, setLayerDropdownOpen]);
 
+  // Flow effects hooks
+  useCreateNodesAndEdges({
+    nodes, setNodes, setEdges, rowData: flowFilteredRowData, keepLayout,
+    activeGroup, setLayoutPositions, layoutPositions, setRowData,
+    stateScores, getHighestScoringContainer
+  });
+
+  const onEdgesChange = useOnEdgeChange(setEdges);
+  const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
+  const onConnectEnd = useOnConnectEnd({
+    setEdges, setNodes, screenToFlowPosition, setRowData, addEdge,
+    activeGroup, setLayoutPositions
+  });
+  const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
+
+  useTagsChange(rowData, setRowData, keepLayout);
+  useSelectNode(nodes, edges, setNodes, rowData, handleTransform, centerNode);
+
+  const {
+    menuRef: contextMenuRef,
+    menuItems: contextMenuItems,
+    handleContextMenu,
+    onMenuItemClick: onContextMenuItemClick,
+    hideMenu: hideContextMenu,
+    selectionContextMenu,
+    gearContextMenu,
+  } = useContextMenu(
+    flowWrapperRef, activeGroup, menuItems, nodes, rowData, setRowData, history
+  );
+
+  const {
+    menuRef: edgeMenuRef,
+    handleEdgeMenu,
+    onMenuItemClick: onEdgeMenuItemClick,
+    hideMenu: hideEdgeMenu,
+  } = useEdgeMenu(flowWrapperRef, activeGroup);
+
+  const hideMenu = () => {
+    hideContextMenu();
+    hideEdgeMenu();
+  };
 
   return (
     <div className="bg-white rounded shadow">
-      {/* Header with collapse button, layer filter, and state management */}
-      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold" onClick={() => setCollapsed((c) => !c)}>
-            Flow Diagram
-          </span>
+      <FlowHeader
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        handleStateChange={handleStateChange}
+        handleCalculateStateScores={handleCalculateStateScores}
+        clearStateScores={clearStateScores}
+        comparatorState={comparatorState}
+        stateScores={stateScores}
+        layerDropdownOpen={layerDropdownOpen}
+        setLayerDropdownOpen={setLayerDropdownOpen}
+        hiddenLayers={hiddenLayers}
+        setHiddenLayers={setHiddenLayers}
+        layerOptions={layerOptions}
+        toggleLayerVisibility={toggleLayerVisibility}
+      />
 
-          {/* State Management Dropdown */}
-          <StateDropdown onStateChange={handleStateChange} />
-
-          {/* Calculate Scores button */}
-          <button
-            className="px-3 py-1 text-xs rounded bg-purple-500 text-white hover:bg-purple-600"
-            onClick={handleCalculateStateScores}
-            title={`Calculate propagated change scores for ${comparatorState} state`}
-            disabled={!comparatorState}
-          >
-            Calculate Scores
-          </button>
-
-          {/* Clear Scores button */}
-          <button
-            className="px-3 py-1 text-xs rounded bg-red-500 text-white hover:bg-red-600"
-            onClick={clearStateScores}
-            title="Clear all state scores and highlighting"
-            disabled={Object.keys(stateScores).length === 0}
-          >
-            Clear Scores
-          </button>
-
-          {/* Layer Filter Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setLayerDropdownOpen(!layerDropdownOpen)}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
-                hiddenLayers.size > 0
-                  ? "bg-orange-500 text-white hover:bg-orange-600"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-              title="Filter layers"
-            >
-              Layers {hiddenLayers.size > 0 && `(${layerOptions.length - hiddenLayers.size}/${layerOptions.length})`}
-            </button>
-
-            {layerDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-48">
-                <div className="p-2 border-b border-gray-200 text-xs font-medium text-gray-600">
-                  Hide Layers in Flow
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  {layerOptions.length === 0 ? (
-                    <div className="p-3 text-xs text-gray-500">No layers available</div>
-                  ) : (
-                    layerOptions.map((layer) => (
-                      <label
-                        key={layer}
-                        className="flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer text-sm"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={hiddenLayers.has(layer)}
-                          onChange={() => toggleLayerVisibility(layer)}
-                          className="rounded border-gray-300"
-                        />
-                        <span className={hiddenLayers.has(layer) ? 'line-through text-gray-500' : ''}>
-                          {layer}
-                        </span>
-                      </label>
-                    ))
-                  )}
-                </div>
-                {hiddenLayers.size > 0 && (
-                  <div className="p-2 border-t border-gray-200">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setHiddenLayers(new Set());
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                    >
-                      Show All Layers
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          className="text-lg font-bold"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand flow diagram" : "Collapse flow diagram"}
-        >
-          {collapsed ? "▼" : "▲"}
-        </button>
-      </div>
-
-      {/* Flow content */}
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
         <div
           ref={flowWrapperRef}
@@ -309,29 +156,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
           style={{ height: 600 }}
           onClick={hideMenu}
         >
-
-          {/* [ADDED] Back button and name of activegroup when in a subgroup */}
-          {activeGroup && (
-            <div
-              className="absolute top-2 left-20 z-50 flex items-center space-x-4 bg-white bg-opacity-80 rounded shadow p-3"
-              style={{ backdropFilter: 'blur(4px)' }}
-            >
-              <button
-                className="bg-gray-200 rounded p-3"
-                onClick={() => {
-                  const prev = history[history.length - 1] || null;
-                  setHistory(h => h.slice(0, -1));
-                  setActiveGroup(prev);
-                }}
-              >
-                ← Back
-              </button>
-
-              <h1 className="text-lg font-bold p-3">
-                {rowData.find(n => n.id === activeGroup)?.Name || activeGroup}
-              </h1>
-            </div>
-          )}
+          <FlowNavigation
+            activeGroup={activeGroup}
+            history={history}
+            setHistory={setHistory}
+            setActiveGroup={setActiveGroup}
+            rowData={rowData}
+          />
 
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
             <ReactFlow
@@ -345,19 +176,17 @@ const App = ({ keepLayout, setKeepLayout }) => {
               nodeTypes={{ custom: FlowNode, group: GroupNode }}
               edgeTypes={edgeTypes}
               defaultMarkerColor="#000000"
-              onConnectEnd={onConnectEnd} onEdgeContextMenu={handleEdgeMenu} onNodeContextMenu={handleContextMenu} onSelectionContextMenu={selectionContextMenu} // Handle right-click for context menu
-              // [ADDED] onNodeDoubleClick drills into group
+              onConnectEnd={onConnectEnd}
+              onEdgeContextMenu={handleEdgeMenu}
+              onNodeContextMenu={handleContextMenu}
+              onSelectionContextMenu={selectionContextMenu}
               onNodeDoubleClick={(e, node) => {
                 if (node.type === 'group') {
-                  // [ADDED] push current activeGroup onto history
                   setHistory(h => [...h, activeGroup]);
                   setActiveGroup(node.id);
-                  // If setKeepLayout exists, set it to false
                   if (typeof setKeepLayout === 'function') {
                     setKeepLayout(false);
                   }
-                  // Refresh the nodes and edges
-
                 }
               }}
             >
@@ -371,8 +200,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
                 variant="dots"
                 gap={12}
                 size={1}
-                color="#e5e7eb" // Tailwind's gray-200
-                style={{ backgroundColor: '#f9fafb' }} // Tailwind's gray-50
+                color="#e5e7eb"
+                style={{ backgroundColor: '#f9fafb' }}
               />
             </ReactFlow>
             <ContextMenu
@@ -380,7 +209,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onMenuItemClick={onContextMenuItemClick}
               menuItems={contextMenuItems}
             />
-            <EdgeMenu ref={edgeMenuRef} onMenuItemClick={onEdgeMenuItemClick} rowData={rowData} setRowData={setRowData} edges={edges} setEdges={setEdges} />
+            <EdgeMenu
+              ref={edgeMenuRef}
+              onMenuItemClick={onEdgeMenuItemClick}
+              rowData={rowData}
+              setRowData={setRowData}
+              edges={edges}
+              setEdges={setEdges}
+            />
             <Toaster position="top-right" />
           </FlowMenuProvider>
         </div>
