@@ -73,12 +73,24 @@ const App = () => {
       </div>
 
       <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 400 }}>
-        <div style={{ width: "100%", height: "100%" }}>
-          <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView>
-            <Background />
-            <Controls />
-          </ReactFlow>
-        </div>
+        {!collapsed && (
+          <div style={{ width: "100%", height: "400px", position: "relative" }}>
+            <ReactFlow 
+              nodes={nodes} 
+              edges={edges} 
+              nodeTypes={nodeTypes} 
+              edgeTypes={edgeTypes} 
+              fitView
+              fitViewOptions={{ padding: 0.1 }}
+              minZoom={0.1}
+              maxZoom={2}
+              attributionPosition="bottom-left"
+            >
+              <Background />
+              <Controls />
+            </ReactFlow>
+          </div>
+        )}
       </div>
 
       {/* Diff Selection Popup */}

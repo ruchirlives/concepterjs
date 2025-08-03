@@ -36,7 +36,7 @@ export const CustomStateNode = ({ data }) => {
       const containerIds = rowData.map((c) => c.id);
       const targetState = activeState; // Use activeState instead of data.label
       await revertDifferences(containerIds, diffDict, targetState);
-      toast.success(`Reverted differences from ${data.label}`);
+      toast.success(`Reverted differences from ${data.label} to ${activeState}`);
     } catch (error) {
       console.error("Failed to revert differences:", error);
       toast.error("Failed to revert differences");

@@ -15,10 +15,21 @@ import AppTiptap from './AppTiptap';
 
 // Suppress ResizeObserver error that doesn't affect functionality
 window.addEventListener('error', e => {
-  if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+  if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+      e.message.includes('ResizeObserver loop limit exceeded')) {
     e.stopImmediatePropagation();
   }
 });
+
+// Also suppress it in the console
+const originalError = console.error;
+console.error = (...args) => {
+  if (args[0]?.includes?.('ResizeObserver loop') || 
+      args[0]?.message?.includes?.('ResizeObserver loop')) {
+    return;
+  }
+  originalError.apply(console, args);
+};
 
 
 const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {

@@ -79,9 +79,10 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
         setSelectedDiffs({});
     }, []);
 
-    // Build changes array from diff results
+    // Build changes array from diff results - now returns counts object
     const buildChangesFromDiff = useCallback((diffResults, nameById) => {
         const changes = [];
+        const counts = { added: 0, changed: 0, removed: 0 };
 
         Object.keys(diffResults).forEach((containerId) => {
             const containerDiffs = diffResults[containerId];
@@ -93,15 +94,18 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
                 if (diff.status === "added") {
                     changes.push(`${containerName} Added ${targetName}: ${diff.relationship}`);
+                    counts.added++;
                 } else if (diff.status === "changed") {
                     changes.push(`${containerName} Changed ${targetName}: ${diff.relationship}`);
+                    counts.changed++;
                 } else if (diff.status === "removed") {
                     changes.push(`${containerName} Removed ${targetName}: ${diff.relationship}`);
+                    counts.removed++;
                 }
             });
         });
 
-        return changes;
+        return { changes, counts };
     }, []);
 
     // Create edges for state comparison
@@ -115,23 +119,35 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
             try {
                 // Compare sourceState with selectedTargetState
                 const diffResults = await compareStates(sourceState, containerIds);
-                const changes = buildChangesFromDiff(diffResults, nameById);
+                const { changes, counts } = buildChangesFromDiff(diffResults, nameById);
 
                 // Only create edge if there are changes
                 if (changes.length > 0) {
-                    const label = changes.join("\n");
+                    const fullChangesText = changes.join("\n");
+                    const totalChanges = counts.added + counts.changed + counts.removed;
+                    
+                    // Create a detailed label showing breakdown
+                    const labelParts = [];
+                    if (counts.added > 0) labelParts.push(`+${counts.added}`);
+                    if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
+                    if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
+                    
+                    const detailedLabel = labelParts.join(' ');
                     const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, selectedTargetState);
 
                     initialEdges.push({
                         id: `${sourceState}-${selectedTargetState}`,
                         source: sourceState,
                         target: selectedTargetState,
-                        label,
+                        label: detailedLabel, // Pass detailed breakdown
                         type: "custom",
                         animated: false,
                         style: { stroke: "#1976d2", strokeWidth: 2 },
                         data: {
                             onClick: handleEdgeClick,
+                            fullChanges: fullChangesText, // Store full text for tooltip
+                            counts: counts, // Store counts for additional use
+                            totalChanges: totalChanges
                         },
                     });
                 }
