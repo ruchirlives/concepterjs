@@ -76,11 +76,11 @@ const DiffPopup = ({
 
             let description = '';
             if (diff.status === "added") {
-                description = `${containerName} Added ${targetName}: ${diff.relationship}`;
+                description = `${containerName} [added a relationship with] ${targetName}: ${diff.relationship}`;
             } else if (diff.status === "changed") {
-                description = `${containerName} Changed ${targetName}: ${diff.relationship}`;
+                description = `${containerName} [changed its relationship with] ${targetName}: ${diff.relationship}`;
             } else if (diff.status === "removed") {
-                description = `${containerName} Removed ${targetName}: ${diff.relationship}`;
+                description = `${containerName} [removed its relationship with] ${targetName}: ${diff.relationship}`;
             }
 
             diffEntries.push({
