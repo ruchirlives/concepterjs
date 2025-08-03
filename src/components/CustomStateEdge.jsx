@@ -80,7 +80,7 @@ export const CustomStateEdge = ({ id, sourceX, sourceY, targetX, targetY, source
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            fontSize: "10px",
+            fontSize: "5px",
             fontWeight: "500",
             color: "#333",
             background: "rgba(255,255,255,0.96)",

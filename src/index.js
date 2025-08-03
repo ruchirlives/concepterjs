@@ -13,6 +13,13 @@ import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
 
+// Suppress ResizeObserver error that doesn't affect functionality
+window.addEventListener('error', e => {
+  if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+    e.stopImmediatePropagation();
+  }
+});
+
 
 const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
