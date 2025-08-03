@@ -1,13 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { updateMetadataFor } from '../transitionMetadata';
 
-const DiffPopup = ({ 
-    show, 
-    diffResults, 
-    selectedDiffs, 
-    onToggleDiff, 
-    onCopy, 
+const DiffPopup = ({
+    show,
+    diffResults,
+    selectedDiffs,
+    onToggleDiff,
+    onCopy,
     onClose,
-    rowData 
+    rowData
 }) => {
     // Create name lookup map
     const nameById = useMemo(() => {
@@ -18,9 +19,43 @@ const DiffPopup = ({
         return map;
     }, [rowData]);
 
+    const { results = {}, sourceState, targetState } = diffResults || {};
+
+    const [metadata, setMetadata] = useState({});
+
+    useEffect(() => {
+        if (!diffResults) return;
+        const initial = {};
+        Object.keys(results).forEach((cid) => {
+            const cDiffs = results[cid];
+            Object.keys(cDiffs).forEach((tid) => {
+                const k = `${cid}-${tid}`;
+                const d = cDiffs[tid];
+                initial[k] = {
+                    weight: d.weight || '',
+                    qual_label: d.qual_label || '',
+                    notes: d.notes || ''
+                };
+            });
+        });
+        setMetadata(initial);
+    }, [diffResults, results]);
+
     if (!show || !diffResults) return null;
 
-    const { results, sourceState, targetState } = diffResults;
+    const handleMetaChange = (entry, field, value) => {
+        setMetadata(prev => {
+            const updated = {
+                ...prev,
+                [entry.key]: { ...prev[entry.key], [field]: value }
+            };
+            updateMetadataFor(sourceState, targetState, entry.containerId, entry.targetId, updated[entry.key]);
+            if (results[entry.containerId] && results[entry.containerId][entry.targetId]) {
+                results[entry.containerId][entry.targetId][field] = value;
+            }
+            return updated;
+        });
+    };
 
     // Build list of diff entries for display
     const diffEntries = [];
@@ -48,7 +83,9 @@ const DiffPopup = ({
                 status: diff.status,
                 containerName,
                 targetName,
-                relationship: diff.relationship
+                relationship: diff.relationship,
+                containerId,
+                targetId
             });
         });
     });
@@ -102,6 +139,29 @@ const DiffPopup = ({
                                             }`}>
                                                 {entry.status}
                                             </span>
+                                        </div>
+                                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                                            <input
+                                                type="number"
+                                                placeholder="Weight"
+                                                value={metadata[entry.key]?.weight || ''}
+                                                onChange={(e) => handleMetaChange(entry, 'weight', e.target.value)}
+                                                className="border border-gray-300 rounded px-1 py-0.5"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Label"
+                                                value={metadata[entry.key]?.qual_label || ''}
+                                                onChange={(e) => handleMetaChange(entry, 'qual_label', e.target.value)}
+                                                className="border border-gray-300 rounded px-1 py-0.5"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Notes"
+                                                value={metadata[entry.key]?.notes || ''}
+                                                onChange={(e) => handleMetaChange(entry, 'notes', e.target.value)}
+                                                className="border border-gray-300 rounded px-1 py-0.5"
+                                            />
                                         </div>
                                     </div>
                                 </label>
