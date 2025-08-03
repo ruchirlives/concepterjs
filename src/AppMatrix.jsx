@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { manyChildren, setPosition, compareStates } from "./api";
+import { manyChildren, setPosition, compareStates, revertDifferences } from "./api";
 import { useAppContext } from "./AppContext";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
 import toast from "react-hot-toast";
 import StateDropdown, { ComparatorDropdown } from "./StateDropdown";
 
 const AppMatrix = () => {
-  const { rowData, edges, layerOptions, comparatorState } = useAppContext();
+  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -23,6 +23,7 @@ const AppMatrix = () => {
   const [differences, setDifferences] = useState({});
   const [loadingDifferences, setLoadingDifferences] = useState(false);
   const [differencesTrigger, setDifferencesTrigger] = useState(0);
+  const [showDropdowns, setShowDropdowns] = useState({}); // Track which dropdowns are open
 
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
@@ -379,6 +380,58 @@ const AppMatrix = () => {
     );
   };
 
+  const handleCopyDiff = async (containerId) => {
+    try {
+      // We need to get the actual diff results for this container
+      const containerIds = [containerId]; // Just this one container
+      const differenceResults = await compareStates(comparatorState, containerIds);
+      
+      if (!differenceResults || !differenceResults[containerId]) {
+        toast.error("No differences found for this container");
+        return;
+      }
+
+      // Set the diffDict with the same format as AppState uses
+      setDiffDict(differenceResults);
+      toast.success(`Copied diff results for container to context`);
+      console.log('Copied diff results:', differenceResults);
+      
+    } catch (error) {
+      console.error('Failed to copy diff:', error);
+      toast.error("Failed to copy diff");
+    }
+    setShowDropdowns(prev => ({ ...prev, [containerId]: false }));
+  };
+
+  const handleRevertDiff = async (containerId) => {
+    try {
+      // Get the current diff results for this container
+      const containerIds = [containerId];
+      const differenceResults = await compareStates(comparatorState, containerIds);
+      
+      if (!differenceResults || !differenceResults[containerId]) {
+        toast.error("No differences found for this container");
+        return;
+      }
+
+      // Revert using the ACTIVE state as target (where we want to revert changes)
+      await revertDifferences(containerIds, differenceResults, activeState);
+      toast.success(`Reverted differences for container in ${activeState} state`);
+      
+      // Trigger differences refresh
+      setDifferencesTrigger((prev) => prev + 1);
+      
+    } catch (error) {
+      console.error('Failed to revert diff:', error);
+      toast.error("Failed to revert diff");
+    }
+    setShowDropdowns(prev => ({ ...prev, [containerId]: false }));
+  };
+
+  const toggleDropdown = (containerId) => {
+    setShowDropdowns(prev => ({ ...prev, [containerId]: !prev[containerId] }));
+  };
+
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header - this always shows useful info even when empty */}
@@ -614,14 +667,44 @@ const AppMatrix = () => {
                             );
                           })}
                           {/* Difference to comparator state column */}
-                          <td className="p-2 bg-blue-50 border border-gray-300 text-left min-w-40 max-w-40 w-40">
-                            <div className="text-xs whitespace-pre-line break-words">
-                              {loadingDifferences ? (
-                                <span className="text-gray-500">Loading...</span>
-                              ) : (
-                                differences[sourceContainer.id] || "No difference"
+                          <td className="p-2 bg-blue-50 border border-gray-300 text-left min-w-40 max-w-40 w-40 relative">
+                            <div className="flex items-start justify-between">
+                              <div className="text-xs whitespace-pre-line break-words flex-1 pr-2">
+                                {loadingDifferences ? (
+                                  <span className="text-gray-500">Loading...</span>
+                                ) : (
+                                  differences[sourceContainer.id] || "No difference"
+                                )}
+                              </div>
+                              
+                              {/* Dropdown button - only show if there are differences */}
+                              {differences[sourceContainer.id] && differences[sourceContainer.id] !== "No difference" && (
+                                <button
+                                  onClick={() => toggleDropdown(sourceContainer.id)}
+                                  className="text-gray-500 hover:text-gray-700 focus:outline-none text-sm"
+                                >
+                                  ⋮
+                                </button>
                               )}
                             </div>
+                            
+                            {/* Dropdown Menu */}
+                            {showDropdowns[sourceContainer.id] && (
+                              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[140px]">
+                                <button
+                                  onClick={() => handleCopyDiff(sourceContainer.id)}
+                                  className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                                >
+                                  Copy Diff to Context
+                                </button>
+                                <button
+                                  onClick={() => handleRevertDiff(sourceContainer.id)}
+                                  className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                  Revert Diff
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -661,6 +744,14 @@ const AppMatrix = () => {
           )}
         </div>
       </div>
+
+      {/* Click outside to close dropdowns - add this near the end of the return statement */}
+      {Object.values(showDropdowns).some(Boolean) && (
+        <div
+          className="fixed inset-0 z-0"
+          onClick={() => setShowDropdowns({})}
+        />
+      )}
     </div>
   );
 };

@@ -610,4 +610,36 @@ export const compareStates = async (baseState, containerIds) => {
     }
 };
 
+// Apply differences to specified containers
+export const applyDifferences = async (containerIds, differences, targetState) => {
+    try {
+        console.log("Applying differences:", { containerIds, differences, targetState });
+        const response = await apiClient.post(`${getApiUrl()}/apply_differences`, {
+            containerIds: containerIds,
+            differences: differences,
+            targetState: targetState,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error applying differences:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// Revert differences from specified containers
+export const revertDifferences = async (containerIds, differences, targetState) => {
+    try {
+        console.log("Reverting differences:", { containerIds, differences, targetState });
+        const response = await apiClient.post(`${getApiUrl()}/revert_differences`, {
+            containerIds: containerIds,
+            differences: differences,
+            targetState: targetState,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error reverting differences:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
 

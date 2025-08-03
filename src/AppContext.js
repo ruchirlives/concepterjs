@@ -16,6 +16,7 @@ export const AppProvider = ({ children }) => {
   const [activeState, setActiveState] = useState("base");
   const [availableStates, setAvailableStates] = useState([]);
   const [comparatorState, setComparatorState] = useState("base");
+  const [diffDict, setDiffDict] = useState({});
 
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
@@ -134,6 +135,8 @@ export const AppProvider = ({ children }) => {
     setAvailableStates,
     comparatorState,
     setComparatorState,
+    diffDict,
+    setDiffDict,
     handleStateSwitch,
     handleRemoveState,
     handleClearStates,
