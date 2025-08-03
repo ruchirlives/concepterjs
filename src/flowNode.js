@@ -46,8 +46,27 @@ const FlowNode = ({ data, style, selected }) => {
 
   };
 
+  // Get yellow shade based on normalized score value (0-1)
+  const getScoreBasedYellowShade = (normalizedScore) => {
+    if (normalizedScore >= 0.8) return 'bg-yellow-500';  // Highest scores - darkest yellow
+    if (normalizedScore >= 0.6) return 'bg-yellow-400';  // High scores
+    if (normalizedScore >= 0.4) return 'bg-yellow-300';  // Medium scores
+    if (normalizedScore >= 0.2) return 'bg-yellow-200';  // Low scores
+    return 'bg-yellow-100';                              // Very low scores - lightest yellow
+  };
+
   // Background colour is purple if tagged input, beige if tagged output, and getbgcolorclassshade otherwise
   const getBgColorClass = () => {
+    // If a score is available and normalization data exists, use yellow shading
+    if (typeof data.score === 'number' && data.normalizedScore !== undefined) {
+      return getScoreBasedYellowShade(data.normalizedScore);
+    }
+    
+    // Fallback to highest scoring highlighting if available
+    if (data.isHighestScoring) {
+      return 'bg-yellow-500';
+    }
+    
     if (data.Tags && data.Tags.toLowerCase().includes('input')) {
       return 'bg-purple-200';
     } else if (data.Tags && data.Tags.toLowerCase().includes('output')) {
@@ -89,7 +108,18 @@ const FlowNode = ({ data, style, selected }) => {
         ⋮
       </button>
 
-      <div>{data.Name}</div>
+      <div>
+        {data.Name}
+        {/* Show score if available */}
+        {data.score && (
+          <div className="text-xs text-gray-600 mt-1">
+            Score: {data.score.toFixed(3)}
+            {data.normalizedScore !== undefined && (
+              <span className="ml-1 text-gray-500">({(data.normalizedScore * 100).toFixed(0)}%)</span>
+            )}
+          </div>
+        )}
+      </div>
 
       {isHovered && data.Description && (
         <div

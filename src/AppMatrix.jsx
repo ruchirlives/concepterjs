@@ -4,6 +4,7 @@ import { useAppContext } from "./AppContext";
 import EdgeMenu, { useEdgeMenu } from "./flowEdgeMenu";
 import toast from "react-hot-toast";
 import StateDropdown, { ComparatorDropdown } from "./StateDropdown";
+import { useStateScores } from './hooks/useStateScores';
 
 const AppMatrix = () => {
   const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState } = useAppContext();
@@ -221,10 +222,15 @@ const AppMatrix = () => {
     setEditingCell({ sourceId, targetId, key });
   }, []);
 
+  // Add this memoized value before the useEffect
+  const containerIdsString = useMemo(() => {
+    return filteredSources.map((c) => c.id).join(",");
+  }, [filteredSources]);
+
   // useEffect handles the conditions and state dependencies
   useEffect(() => {
     if (filteredSources.length === 0 || collapsed) return;
-    // Extract fetchDifferences as a pure standalone function
+
     const fetchDifferences = async () => {
       setLoadingDifferences(true);
       setDifferences({});
@@ -260,10 +266,18 @@ const AppMatrix = () => {
       } finally {
         setLoadingDifferences(false);
       }
-    }; // Only comparatorState is needed since it's used inside the function
+    };
 
     fetchDifferences();
-  }, [filteredSources, collapsed, nameById, comparatorState, differencesTrigger]);
+  }, [
+    // Include all dependencies that are actually used in the effect
+    comparatorState,
+    differencesTrigger,
+    collapsed,
+    filteredSources,
+    nameById,
+    containerIdsString, // Use the memoized string instead of the complex expression
+  ]);
 
   const handleCellSubmit = useCallback(
     async (value) => {
@@ -285,7 +299,6 @@ const AppMatrix = () => {
 
         // Trigger differences refresh
         setDifferencesTrigger((prev) => prev + 1);
-
       } catch (error) {
         console.error("Error saving relationship:", error);
         setEditingCell(null);
@@ -385,7 +398,7 @@ const AppMatrix = () => {
       // We need to get the actual diff results for this container
       const containerIds = [containerId]; // Just this one container
       const differenceResults = await compareStates(comparatorState, containerIds);
-      
+
       if (!differenceResults || !differenceResults[containerId]) {
         toast.error("No differences found for this container");
         return;
@@ -394,13 +407,12 @@ const AppMatrix = () => {
       // Set the diffDict with the same format as AppState uses
       setDiffDict(differenceResults);
       toast.success(`Copied diff results for container to context`);
-      console.log('Copied diff results:', differenceResults);
-      
+      console.log("Copied diff results:", differenceResults);
     } catch (error) {
-      console.error('Failed to copy diff:', error);
+      console.error("Failed to copy diff:", error);
       toast.error("Failed to copy diff");
     }
-    setShowDropdowns(prev => ({ ...prev, [containerId]: false }));
+    setShowDropdowns((prev) => ({ ...prev, [containerId]: false }));
   };
 
   const handleRevertDiff = async (containerId) => {
@@ -408,7 +420,7 @@ const AppMatrix = () => {
       // Get the current diff results for this container
       const containerIds = [containerId];
       const differenceResults = await compareStates(comparatorState, containerIds);
-      
+
       if (!differenceResults || !differenceResults[containerId]) {
         toast.error("No differences found for this container");
         return;
@@ -417,24 +429,26 @@ const AppMatrix = () => {
       // Revert using the ACTIVE state as target (where we want to revert changes)
       await revertDifferences(containerIds, differenceResults, activeState);
       toast.success(`Reverted differences for container in ${activeState} state`);
-      
+
       // Trigger differences refresh
       setDifferencesTrigger((prev) => prev + 1);
-      
     } catch (error) {
-      console.error('Failed to revert diff:', error);
+      console.error("Failed to revert diff:", error);
       toast.error("Failed to revert diff");
     }
-    setShowDropdowns(prev => ({ ...prev, [containerId]: false }));
+    setShowDropdowns((prev) => ({ ...prev, [containerId]: false }));
   };
 
   const toggleDropdown = (containerId) => {
-    setShowDropdowns(prev => ({ ...prev, [containerId]: !prev[containerId] }));
+    setShowDropdowns((prev) => ({ ...prev, [containerId]: !prev[containerId] }));
   };
+
+  // Replace the stateScores state and functions with the hook
+  const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
-      {/* Header - this always shows useful info even when empty */}
+      {/* Header */}
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
         <div className="flex items-center gap-4">
           <span className="font-semibold">
@@ -510,6 +524,24 @@ const AppMatrix = () => {
           >
             Export Excel
           </button>
+
+          <button
+            className="px-3 py-1 text-xs rounded bg-purple-500 text-white hover:bg-purple-600"
+            onClick={handleCalculateStateScores}
+            title={`Calculate propagated change scores for ${comparatorState} state`}
+            disabled={!comparatorState}
+          >
+            Calculate Scores
+          </button>
+
+          <button
+            className="px-3 py-1 text-xs rounded bg-red-500 text-white hover:bg-red-600"
+            onClick={clearStateScores}
+            title="Clear all state scores and highlighting"
+            disabled={Object.keys(stateScores).length === 0}
+          >
+            Clear Scores
+          </button>
         </div>
 
         <button className="text-lg font-bold" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? "Expand matrix" : "Collapse matrix"}>
@@ -570,12 +602,15 @@ const AppMatrix = () => {
                         <tr key={sourceContainer.id}>
                           {/* Row header */}
                           <th
-                            className={`sticky left-0 z-10 p-2 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30 bg-gray-100 ${
-                              hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
+                            className={`sticky left-0 z-10 p-2 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30 ${
+                              // Check if this is the highest scoring container
+                              getHighestScoringContainer() === sourceContainer.id.toString()
+                                ? "bg-yellow-400"
+                                : hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
                                 ? "bg-yellow-100"
                                 : hoveredRowId === sourceContainer.id.toString()
                                 ? "bg-yellow-200"
-                                : ""
+                                : "bg-gray-100"
                             }`}
                             onMouseEnter={() => {
                               setHoveredFrom(sourceContainer.id.toString());
@@ -588,6 +623,10 @@ const AppMatrix = () => {
                           >
                             <div title={sourceContainer.Name} className="whitespace-normal text-xs">
                               {sourceContainer.Name}
+                              {/* Show score if available */}
+                              {stateScores[sourceContainer.id] && (
+                                <div className="text-gray-600 text-xs mt-1">Score: {stateScores[sourceContainer.id].toFixed(3)}</div>
+                              )}
                               {childrenMap[sourceContainer.id.toString()]?.length > 0 && (
                                 <div className="text-gray-400 text-xs mt-1 break-words">
                                   ({childrenMap[sourceContainer.id.toString()].map((cid) => nameById[cid] || cid).join(", ")})
@@ -676,7 +715,7 @@ const AppMatrix = () => {
                                   differences[sourceContainer.id] || "No difference"
                                 )}
                               </div>
-                              
+
                               {/* Dropdown button - only show if there are differences */}
                               {differences[sourceContainer.id] && differences[sourceContainer.id] !== "No difference" && (
                                 <button
@@ -687,7 +726,7 @@ const AppMatrix = () => {
                                 </button>
                               )}
                             </div>
-                            
+
                             {/* Dropdown Menu */}
                             {showDropdowns[sourceContainer.id] && (
                               <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[140px]">
@@ -746,12 +785,7 @@ const AppMatrix = () => {
       </div>
 
       {/* Click outside to close dropdowns - add this near the end of the return statement */}
-      {Object.values(showDropdowns).some(Boolean) && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => setShowDropdowns({})}
-        />
-      )}
+      {Object.values(showDropdowns).some(Boolean) && <div className="fixed inset-0 z-0" onClick={() => setShowDropdowns({})} />}
     </div>
   );
 };

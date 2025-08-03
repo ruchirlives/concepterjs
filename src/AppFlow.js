@@ -16,6 +16,7 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './customEdge';
 import { Toaster } from 'react-hot-toast';
 import StateDropdown from './StateDropdown';
+import { useStateScores } from './hooks/useStateScores';
 
 const App = ({ keepLayout, setKeepLayout }) => {
   const [collapsed, setCollapsed] = useState(true);
@@ -32,7 +33,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Step 2: Zustand store for nodes and edges ---
   const flowWrapperRef = React.useRef(null);
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, layerOptions } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, layerOptions, comparatorState } = useAppContext();
   const [layoutPositions, setLayoutPositions] = useState({});
   // const [nodes, setNodes, onNodesChange] = useNodesState([]);
   // const [edges, setEdges] = useEdgesState();
@@ -134,8 +135,24 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
   }, [activeGroup]);
 
+  // Add state scores functionality
+  const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
+
+
   // Step 4: Custom hook to create nodes and edges (use filtered data)
-  useCreateNodesAndEdges({ nodes, setNodes, setEdges, rowData: flowFilteredRowData, keepLayout, activeGroup, setLayoutPositions, layoutPositions, setRowData });
+  useCreateNodesAndEdges({ 
+    nodes, 
+    setNodes, 
+    setEdges, 
+    rowData: flowFilteredRowData, 
+    keepLayout, 
+    activeGroup, 
+    setLayoutPositions, 
+    layoutPositions, 
+    setRowData,
+    stateScores,                    // Add this
+    getHighestScoringContainer      // Add this
+  });
   const onEdgesChange = useOnEdgeChange(setEdges);
   const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
   const onConnectEnd = useOnConnectEnd({ setEdges, setNodes, screenToFlowPosition, setRowData, addEdge, activeGroup, setLayoutPositions });
@@ -182,6 +199,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     };
   }, [layerDropdownOpen]);
 
+
   return (
     <div className="bg-white rounded shadow">
       {/* Header with collapse button, layer filter, and state management */}
@@ -192,27 +210,40 @@ const App = ({ keepLayout, setKeepLayout }) => {
           </span>
 
           {/* State Management Dropdown */}
-          <StateDropdown 
-            onStateChange={handleStateChange}
-          />
+          <StateDropdown onStateChange={handleStateChange} />
+
+          {/* Calculate Scores button */}
+          <button
+            className="px-3 py-1 text-xs rounded bg-purple-500 text-white hover:bg-purple-600"
+            onClick={handleCalculateStateScores}
+            title={`Calculate propagated change scores for ${comparatorState} state`}
+            disabled={!comparatorState}
+          >
+            Calculate Scores
+          </button>
+
+          {/* Clear Scores button */}
+          <button
+            className="px-3 py-1 text-xs rounded bg-red-500 text-white hover:bg-red-600"
+            onClick={clearStateScores}
+            title="Clear all state scores and highlighting"
+            disabled={Object.keys(stateScores).length === 0}
+          >
+            Clear Scores
+          </button>
 
           {/* Layer Filter Dropdown */}
-          <div className="relative layer-dropdown">
+          <div className="relative">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setLayerDropdownOpen(!layerDropdownOpen);
-              }}
-              className="px-3 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-50 flex items-center gap-1"
-              title="Hide/Show layers"
+              onClick={() => setLayerDropdownOpen(!layerDropdownOpen)}
+              className={`px-3 py-1 text-xs rounded transition-colors ${
+                hiddenLayers.size > 0
+                  ? "bg-orange-500 text-white hover:bg-orange-600"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+              title="Filter layers"
             >
-              <span>Layers</span>
-              <span className="text-gray-500">
-                {hiddenLayers.size > 0 && `(${hiddenLayers.size} hidden)`}
-              </span>
-              <span className={`transform transition-transform ${layerDropdownOpen ? 'rotate-180' : ''}`}>
-                ▼
-              </span>
+              Layers {hiddenLayers.size > 0 && `(${layerOptions.length - hiddenLayers.size}/${layerOptions.length})`}
             </button>
 
             {layerDropdownOpen && (

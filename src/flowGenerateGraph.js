@@ -3,10 +3,31 @@ import { fitViewToFlow } from './flowFunctions';
 export const GROUP_NODE_WIDTH = 300;
 
 export function generateNodesAndEdges(params) {
-    const { rowData } = params;
+    const { 
+        rowData, 
+        setNodes, 
+        stateScores, 
+        getHighestScoringContainer 
+    } = params;
+    
     if (!rowData || rowData.length === 0) return;
 
-    // 1️⃣ Build initial computedNodes with group vs custom types
+    // Get highest scoring container ID
+    const highestScoringId = getHighestScoringContainer?.();
+
+    // Calculate min and max scores for normalization
+    const scoreValues = Object.values(stateScores || {}).filter(score => typeof score === 'number');
+    const minScore = scoreValues.length > 0 ? Math.min(...scoreValues) : 0;
+    const maxScore = scoreValues.length > 0 ? Math.max(...scoreValues) : 1;
+    const scoreRange = maxScore - minScore || 1; // Avoid division by zero
+
+    // Normalize score function
+    const normalizeScore = (score) => {
+        if (typeof score !== 'number') return undefined;
+        return (score - minScore) / scoreRange;
+    };
+
+    // Build initial computedNodes with group vs custom types
     let computedNodes = rowData.map((item, index) => {
         const tags = (item.Tags || '')
             .toLowerCase()
@@ -23,15 +44,19 @@ export function generateNodesAndEdges(params) {
                 Description: item.Description || '',
                 Horizon: item.Horizon || '',
                 Tags: item.Tags || '',
+                // Add scoring data
+                isHighestScoring: highestScoringId === item.id?.toString(),
+                score: stateScores?.[item.id],
+                normalizedScore: normalizeScore(stateScores?.[item.id]),
             },
             type: isGroup ? 'group' : 'custom',
-            style: { width: GROUP_NODE_WIDTH }, // ← critical!
+            style: { width: GROUP_NODE_WIDTH },
         };
     });
 
     fetchAndCreateEdges(computedNodes, params);
-    // Fit the view to the nodes and edges
     fitViewToFlow();
+    setNodes(computedNodes);
 }
 
 

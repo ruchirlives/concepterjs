@@ -317,23 +317,34 @@ export const useOnEdgeDoubleClick = (setEdges) => {
     return onEdgeDoubleClick;
 }
 
-
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
-    const { rowData, activeGroup } = params;
+    const { rowData, activeGroup, stateScores, getHighestScoringContainer } = params;
     const { activeLayers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
-    // Keep ref updated
     useEffect(() => {
         rowDataRef.current = rowData;
     }, [rowData]);
 
     useEffect(() => {
         const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
-        generateNodesAndEdges({ ...params, rowData: filtered });
+        generateNodesAndEdges({
+            ...params,
+            rowData: filtered,
+            stateScores,
+            getHighestScoringContainer
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rowData, activeGroup, activeLayers]);
+    }, [
+        // Only include values that should trigger regeneration
+        rowData,
+        activeGroup,
+        activeLayers,
+        stateScores,
+        // Don't include getHighestScoringContainer as it's a function that changes
+        // The scores themselves (stateScores) are sufficient to trigger updates
+    ]);
 };
 
 

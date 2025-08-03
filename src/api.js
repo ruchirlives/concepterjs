@@ -642,4 +642,18 @@ export const revertDifferences = async (containerIds, differences, targetState) 
     }
 };
 
+// Calculate state scores for containers
+export const calculateStateScores = async (baseState) => {
+    try {
+        console.log("Calculating state scores for base state:", baseState);
+        const response = await apiClient.post(`${getApiUrl()}/calculate_state_scores`, {
+            baseState: baseState,
+        });
+        return response.data.scores || {};
+    } catch (error) {
+        console.error("Error calculating state scores:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
 
