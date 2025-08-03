@@ -19,7 +19,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 sourceState,
                 targetState
             });
-            
+
             // Initialize all diffs as selected
             const initialSelected = {};
             Object.keys(diffResults).forEach((containerId) => {

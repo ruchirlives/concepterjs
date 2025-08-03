@@ -56,10 +56,10 @@ const DiffPopup = ({
     const selectedCount = Object.values(selectedDiffs).filter(Boolean).length;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full flex flex-col" style={{ maxHeight: 'calc(100vh - 96px)' }}>
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
                     <h3 className="text-lg font-semibold">
                         Select Differences: {sourceState} → {targetState}
                     </h3>
@@ -71,8 +71,8 @@ const DiffPopup = ({
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4">
+                {/* Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-4 min-h-0">
                     {diffEntries.length === 0 ? (
                         <div className="text-gray-500 text-center py-8">
                             No differences found
@@ -88,10 +88,10 @@ const DiffPopup = ({
                                         type="checkbox"
                                         checked={selectedDiffs[entry.key] || false}
                                         onChange={() => onToggleDiff(entry.key)}
-                                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                     />
-                                    <div className="flex-1">
-                                        <div className="text-sm font-medium text-gray-900">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium text-gray-900 break-words">
                                             {entry.description}
                                         </div>
                                         <div className="text-xs text-gray-500 mt-1">
@@ -111,7 +111,7 @@ const DiffPopup = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-between items-center p-4 border-t border-gray-200">
+                <div className="flex justify-between items-center p-4 border-t border-gray-200 flex-shrink-0">
                     <div className="text-sm text-gray-600">
                         {selectedCount} of {diffEntries.length} selected
                     </div>
