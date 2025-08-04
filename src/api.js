@@ -520,6 +520,18 @@ export const requestDedup = async () => {
     }
 };
 
+// recopy_values GET project wide
+export const recopyValues = async () => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/recopy_values`);
+        console.log("Recopy values response:", response);
+        return response.data;
+    } catch (error) {
+        console.error("Error recopying values:", error);
+        return null;
+    }
+};
+
 
 // Save containers
 export const saveContainers = async (name) => {

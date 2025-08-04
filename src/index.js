@@ -13,11 +13,12 @@ import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
 import { setPasscode } from './apiConfig';
+import { recopyValues } from './api';
 
 // Suppress ResizeObserver error that doesn't affect functionality
 window.addEventListener('error', e => {
   if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
-      e.message.includes('ResizeObserver loop limit exceeded')) {
+    e.message.includes('ResizeObserver loop limit exceeded')) {
     e.stopImmediatePropagation();
   }
 });
@@ -25,8 +26,8 @@ window.addEventListener('error', e => {
 // Also suppress it in the console
 const originalError = console.error;
 console.error = (...args) => {
-  if (args[0]?.includes?.('ResizeObserver loop') || 
-      args[0]?.message?.includes?.('ResizeObserver loop')) {
+  if (args[0]?.includes?.('ResizeObserver loop') ||
+    args[0]?.message?.includes?.('ResizeObserver loop')) {
     return;
   }
   originalError.apply(console, args);
@@ -61,6 +62,21 @@ const MemoizedStaticContent = React.memo(() => (
   </>
 ));
 
+const handleRecopyValues = async () => {
+  try {
+    const result = await recopyValues();
+    if (result) {
+      console.log('Recopy values response:', result);
+      alert('Values recopied successfully');
+    } else {
+      alert('Failed to recopy values');
+    }
+  } catch (error) {
+    console.error('Error calling recopy values:', error);
+    alert('Error calling recopy values');
+  }
+};
+
 const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
     { id: "writeBackButton", text: "Write Back Data" },
@@ -74,7 +90,9 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
     { id: "refreshButton", text: "Refresh" },
     { id: "requestRekeyButton", text: "Request Rekey" },
     { id: "requestDedupButton", text: "Request Deduplication" },
+    { id: "recopyValuesButton", text: "Recopy Values", onClick: handleRecopyValues },
   ]);
+
 
   return (
     <div className="flex items-center flex-wrap gap-2 p-4 fixed bottom-0 bg-white border-t w-full z-10">

@@ -320,7 +320,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
     const { rowData, activeGroup, stateScores, getHighestScoringContainer } = params;
-    const { activeLayers } = useAppContext();
+    const { activeLayers, setEdges, setNodes } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     useEffect(() => {
@@ -328,6 +328,12 @@ export const useCreateNodesAndEdges = (params) => {
     }, [rowData]);
 
     useEffect(() => {
+        if (!rowData || rowData.length === 0) {
+            setNodes([]);
+            setEdges([]);
+            return;
+        }
+
         const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
         generateNodesAndEdges({
             ...params,
