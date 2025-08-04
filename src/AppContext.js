@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
-import { requestRefreshChannel } from './hooks/effectsShared';
+import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
-import { listStates, switchState, removeState, clearStates } from './api';
+import { listStates, switchState, removeState, clearStates, saveContainers } from './api';
 import toast from "react-hot-toast";
 
 const AppContext = createContext();
@@ -34,12 +34,16 @@ export const AppProvider = ({ children }) => {
     if (!stateName.trim()) return;
 
     try {
+      // Persist current state before switching
+      await handleWriteBack(rowData);
+      await saveContainers(stateName);
+
+      // Refresh available states to include newly saved state
+      const states = await listStates();
+      setAvailableStates(states);
+
       await switchState(stateName);
       setActiveState(stateName);
-
-      // Refresh available states
-      // const states = await listStates();
-      // setAvailableStates(states);
 
       // Request refresh for components that depend on state changes
       // requestRefreshChannel();
