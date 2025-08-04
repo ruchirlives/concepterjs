@@ -85,23 +85,25 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
     const buildChangesFromDiff = useCallback((diffResults, nameById) => {
         const changes = [];
         const counts = { added: 0, changed: 0, removed: 0 };
+        const enrichedDiff = enrichDiffWithMetadata(diffResults);
 
-        Object.keys(diffResults).forEach((containerId) => {
-            const containerDiffs = diffResults[containerId];
+        Object.keys(enrichedDiff).forEach((containerId) => {
+            const containerDiffs = enrichedDiff[containerId];
             const containerName = nameById[containerId] || containerId;
 
             Object.keys(containerDiffs).forEach((targetId) => {
                 const diff = containerDiffs[targetId];
+                console.log('Enriched diff:', enrichedDiff);
                 const targetName = nameById[targetId] || targetId;
 
                 if (diff.status === "added") {
-                    changes.push(`${containerName} [added a relationship with] ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [added] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
                     counts.added++;
                 } else if (diff.status === "changed") {
-                    changes.push(`${containerName} [Changed its relationship with] ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [changed] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
                     counts.changed++;
                 } else if (diff.status === "removed") {
-                    changes.push(`${containerName} [Removed its relationship with] ${targetName}: ${diff.relationship}`);
+                    changes.push(`${containerName} [removed] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
                     counts.removed++;
                 }
             });
