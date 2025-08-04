@@ -1,9 +1,24 @@
 import axios from "axios";
-import { getApiUrl } from "./apiConfig";
+import { getApiUrl, getPasscode } from "./apiConfig";
 import { requestRefreshChannel } from "hooks/effectsShared";
 
 const apiClient = axios.create({
     baseURL: getApiUrl(), // Set the base URL for all requests
+});
+
+// Add request interceptor to include passcode in all requests
+apiClient.interceptors.request.use((config) => {
+    const passcode = getPasscode();
+    if (passcode) {
+        // Add passcode to headers
+        config.headers['X-Passcode'] = passcode;
+
+        // Alternatively, you could add it to the request body for POST requests:
+        // if (config.method === 'post' && config.data) {
+        //     config.data.passcode = passcode;
+        // }
+    }
+    return config;
 });
 
 export default apiClient;
@@ -252,7 +267,7 @@ export const setNarrative = async (sourceId, targetId, narrative) => {
         const response = await apiClient.post(`${getApiUrl()}/set_position`, {
             source_id: sourceId,
             target_id: targetId,
-            position: {"narrative": narrative},
+            position: { "narrative": narrative },
         });
         return response.data;
     } catch (error) {

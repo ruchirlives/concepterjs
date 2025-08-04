@@ -12,6 +12,7 @@ import AppState from './AppState';
 import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import AppTiptap from './AppTiptap';
+import { setPasscode } from './apiConfig';
 
 // Suppress ResizeObserver error that doesn't affect functionality
 window.addEventListener('error', e => {
@@ -32,7 +33,7 @@ console.error = (...args) => {
 };
 
 
-const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
+const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer, passcode, setPasscode }) => {
   const [buttonsArray] = useState([
     { id: "writeBackButton", text: "Write Back Data" },
     { id: "loadDataButton", text: "Reload Data" },
@@ -44,9 +45,14 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
     { id: "clearButton", text: "Clear" },
     { id: "refreshButton", text: "Refresh" },
     { id: "requestRekeyButton", text: "Request Rekey" },
-    // Request dedup
     { id: "requestDedupButton", text: "Request Deduplication" },
   ]);
+
+  const handlePasscodeChange = (e) => {
+    const newPasscode = e.target.value;
+    setPasscode(newPasscode);
+    setPasscode(newPasscode); // Update the global passcode
+  };
 
   return (
     <div className="flex items-center flex-wrap gap-2 p-4 fixed bottom-0 bg-white border-t w-full z-10">
@@ -60,6 +66,15 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
           {btn.text}
         </button>
       ))}
+
+      {/* Passcode Input */}
+      <input
+        type="password"
+        placeholder="Enter passcode"
+        className="border border-gray-300 text-sm px-2 py-1 rounded min-w-[120px]"
+        value={passcode}
+        onChange={handlePasscodeChange}
+      />
 
       {/* Server Selector */}
       <select
@@ -93,14 +108,12 @@ const App = () => {
   const [isCreateFromContentModalOpen, setIsCreateFromContentModalOpen] = useState(false);
   const [keepLayout, setKeepLayout] = useState(false);
   const [server, setServer] = useState("0");
+  const [passcode, setLocalPasscode] = useState("");
 
   const handleCreateFromContent = (result) => {
     console.log('Containers created:', result);
-    // You can add a toast notification here
     alert(`${result.message}\nCreated ${result.container_ids.length} containers`);
 
-    // Optionally trigger a data reload in AppGrid
-    // You might want to broadcast this via the existing channel system
     const channel = new BroadcastChannel("containerUpdateChannel");
     channel.postMessage({ type: "CONTAINERS_CREATED", data: result });
     channel.close();
@@ -108,9 +121,26 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col overflow-auto">
-      {/* Header */}
+      {/* Header with Passcode */}
       <header className="px-6 pt-6 pb-4 bg-white border-b shadow-sm">
-        <h1 className="text-3xl font-semibold text-gray-800">Concepter</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-semibold text-gray-800">Concepter</h1>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">
+              Passcode:
+            </label>
+            <input
+              type="password"
+              placeholder="Enter passcode"
+              className="border border-gray-300 text-sm px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[150px]"
+              value={passcode}
+              onChange={(e) => {
+                setLocalPasscode(e.target.value);
+                setPasscode(e.target.value);
+              }}
+            />
+          </div>
+        </div>
       </header>
 
       {/* Main content wrapper */}
@@ -154,6 +184,8 @@ const App = () => {
         setKeepLayout={setKeepLayout}
         server={server}
         setServer={setServer}
+        passcode={passcode}
+        setPasscode={setLocalPasscode}
         onLoadContainers={() => setIsLoadModalOpen(true)}
         onCreateFromContent={() => setIsCreateFromContentModalOpen(true)}
       />
