@@ -28,12 +28,12 @@ export const CustomStateEdge = ({ id, sourceX, sourceY, targetX, targetY, source
     if (data?.counts) {
       const { added, changed, removed } = data.counts;
       const parts = [];
-      if (added > 0) parts.push(`${added} addition${added !== 1 ? 's' : ''}`);
-      if (changed > 0) parts.push(`${changed} change${changed !== 1 ? 's' : ''}`);
-      if (removed > 0) parts.push(`${removed} removal${removed !== 1 ? 's' : ''}`);
-      
-      const summary = parts.join(', ');
-      const fullText = data.fullChanges ? `\n\nClick to view details:\n${data.fullChanges}` : '';
+      if (added > 0) parts.push(`${added} addition${added !== 1 ? "s" : ""}`);
+      if (changed > 0) parts.push(`${changed} change${changed !== 1 ? "s" : ""}`);
+      if (removed > 0) parts.push(`${removed} removal${removed !== 1 ? "s" : ""}`);
+
+      const summary = parts.join(", ");
+      const fullText = data.fullChanges ? `\n\nClick to view details:\n${data.fullChanges}` : "";
       return `${summary}${fullText}`;
     }
     return data?.fullChanges ? `Click to view changes:\n${data.fullChanges}` : label;

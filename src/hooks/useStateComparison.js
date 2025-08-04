@@ -21,7 +21,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 sourceState,
                 targetState
             });
-            
+
             // Initialize all diffs as selected
             const initialSelected = {};
             Object.keys(enriched).forEach((containerId) => {
@@ -127,29 +127,53 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 if (changes.length > 0) {
                     const fullChangesText = changes.join("\n");
                     const totalChanges = counts.added + counts.changed + counts.removed;
-                    
+
                     // Create a detailed label showing breakdown
                     const labelParts = [];
                     if (counts.added > 0) labelParts.push(`+${counts.added}`);
                     if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
                     if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
-                    
-                    const detailedLabel = labelParts.join(' ');
+
+                    // Add the weights
+                    const enriched = enrichDiffWithMetadata(diffResults);
+                    let totalWeight = 0;
+
+                    if (enriched) {
+
+                        // Sum all weights from the enriched diff
+                        Object.keys(enriched).forEach((containerId) => {
+                            const containerDiffs = enriched[containerId];
+                            Object.keys(containerDiffs).forEach((targetId) => {
+                                const diff = containerDiffs[targetId];
+                                const weight = parseFloat(diff.weight) || 0;
+                                totalWeight += weight;
+                            });
+                        });
+
+                        console.log(`Total weight for ${sourceState} -> ${selectedTargetState}: ${totalWeight}`);
+                    }
+
+                    // Include weight in the label if there is a weight
+                    const detailedLabel = totalWeight > 0
+                        ? `${labelParts.join(' ')} (cost ${totalWeight})`
+                        : labelParts.join('');
+
                     const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, selectedTargetState);
 
                     initialEdges.push({
                         id: `${sourceState}-${selectedTargetState}`,
                         source: sourceState,
                         target: selectedTargetState,
-                        label: detailedLabel, // Pass detailed breakdown
+                        label: detailedLabel,
                         type: "custom",
                         animated: false,
                         style: { stroke: "#1976d2", strokeWidth: 2 },
                         data: {
                             onClick: handleEdgeClick,
-                            fullChanges: fullChangesText, // Store full text for tooltip
-                            counts: counts, // Store counts for additional use
-                            totalChanges: totalChanges
+                            fullChanges: fullChangesText,
+                            counts: counts,
+                            totalChanges: totalChanges,
+                            totalWeight: totalWeight // Store total weight for additional use
                         },
                     });
                 }

@@ -186,7 +186,7 @@ const DiffPopup = ({
                             onClick={onClose}
                             className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
                         >
-                            Cancel
+                            OK
                         </button>
                         <button
                             onClick={onCopy}
