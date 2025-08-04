@@ -32,8 +32,36 @@ console.error = (...args) => {
   originalError.apply(console, args);
 };
 
+// Memoize the components that don't depend on state
+const MemoizedStaticContent = React.memo(() => (
+  <>
+    <section id="tiptap">
+      <AppTiptap />
+    </section>
 
-const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer, passcode, setPasscode }) => {
+    <section id="matrix">
+      <AppMatrix />
+    </section>
+
+    <section id="prioritiser">
+      <AppPrioritiser />
+    </section>
+
+    <section id="layers">
+      <AppLayers />
+    </section>
+
+    <section id="states">
+      <AppState />
+    </section>
+
+    <section id="mermaid" className="mb-28">
+      <AppMermaid />
+    </section>
+  </>
+));
+
+const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKeepLayout, server, setServer }) => {
   const [buttonsArray] = useState([
     { id: "writeBackButton", text: "Write Back Data" },
     { id: "loadDataButton", text: "Reload Data" },
@@ -48,12 +76,6 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
     { id: "requestDedupButton", text: "Request Deduplication" },
   ]);
 
-  const handlePasscodeChange = (e) => {
-    const newPasscode = e.target.value;
-    setPasscode(newPasscode);
-    setPasscode(newPasscode); // Update the global passcode
-  };
-
   return (
     <div className="flex items-center flex-wrap gap-2 p-4 fixed bottom-0 bg-white border-t w-full z-10">
       {buttonsArray.map((btn) => (
@@ -66,15 +88,6 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
           {btn.text}
         </button>
       ))}
-
-      {/* Passcode Input */}
-      <input
-        type="password"
-        placeholder="Enter passcode"
-        className="border border-gray-300 text-sm px-2 py-1 rounded min-w-[120px]"
-        value={passcode}
-        onChange={handlePasscodeChange}
-      />
 
       {/* Server Selector */}
       <select
@@ -145,37 +158,14 @@ const App = () => {
 
       {/* Main content wrapper */}
       <main className="flex-1 flex flex-col gap-4 px-6 py-4 overflow-auto">
-        <section id="tiptap">
-          <AppTiptap />
-        </section>
-
+        {/* Components that depend on state - keep separate */}
         <section id="grid">
           <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
         </section>
-
-        <section id="matrix">
-          <AppMatrix />
-        </section>
-
-        <section id="prioritiser">
-          <AppPrioritiser />
-        </section>
-
-        <section id="layers">
-          <AppLayers />
-        </section>
-
-        <section id="states">
-          <AppState />
-        </section>
-
         <section id="sub">
           <AppFlow keepLayout={keepLayout} setKeepLayout={setKeepLayout} />
         </section>
-
-        <section id="mermaid" className="mb-28">
-          <AppMermaid />
-        </section>
+        <MemoizedStaticContent />
       </main>
 
       {/* Floating panel */}
@@ -184,8 +174,6 @@ const App = () => {
         setKeepLayout={setKeepLayout}
         server={server}
         setServer={setServer}
-        passcode={passcode}
-        setPasscode={setLocalPasscode}
         onLoadContainers={() => setIsLoadModalOpen(true)}
         onCreateFromContent={() => setIsCreateFromContentModalOpen(true)}
       />
