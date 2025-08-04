@@ -563,7 +563,9 @@ export const createContainersFromContent = async (prompt, content) => {
 export const switchState = async (newState) => {
     try {
         console.log("Switching to state:", newState);
-        const response = await apiClient.get(`${getApiUrl()}/switch_state/${newState}`);
+        const response = await apiClient.get(
+            `${getApiUrl()}/switch_state/${encodeURIComponent(newState)}`
+        );
         // broadcast refresh request
         requestRefreshChannel();
         return response.data;
@@ -577,7 +579,9 @@ export const switchState = async (newState) => {
 export const removeState = async (stateName) => {
     try {
         console.log("Removing state:", stateName);
-        const response = await apiClient.get(`${getApiUrl()}/remove_state/${stateName}`);
+        const response = await apiClient.get(
+            `${getApiUrl()}/remove_state/${encodeURIComponent(stateName)}`
+        );
         return response.data;
     } catch (error) {
         console.error("Error removing state:", error);
