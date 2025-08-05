@@ -69,6 +69,9 @@ const AppMatrix = () => {
     clearStateScores,
   } = useMatrixLogic();
 
+  // Add state for children tooltip
+  const [childrenTooltip, setChildrenTooltip] = React.useState(null);
+
   // Color coding and tooltip functions
   const RelationshipTooltip = ({ text, position }) => {
     if (!text) return null;
@@ -90,6 +93,32 @@ const AppMatrix = () => {
         }}
       >
         {text}
+      </div>
+    );
+  };
+
+  // Children tooltip component
+  const ChildrenTooltip = ({ children, position }) => {
+    if (!children || children.length === 0) return null;
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: position.y + 12,
+          left: position.x + 12,
+          zIndex: 1001,
+          background: "rgba(0,0,0,0.9)",
+          color: "#fff",
+          padding: "8px 12px",
+          borderRadius: "6px",
+          fontSize: "12px",
+          maxWidth: "300px",
+          wordBreak: "break-word",
+          pointerEvents: "none",
+        }}
+      >
+        <div className="font-semibold mb-1">Children:</div>
+        <div>{children.map((cid) => nameById[cid] || cid).join(", ")}</div>
       </div>
     );
   };
@@ -267,27 +296,30 @@ const AppMatrix = () => {
                                 ? "bg-yellow-200"
                                 : "bg-gray-100"
                             }`}
-                            onMouseEnter={() => {
+                            onMouseEnter={(e) => {
                               setHoveredFrom(sourceContainer.id.toString());
                               setHoveredRowId(sourceContainer.id.toString());
+                              
+                              // Show children tooltip if there are children
+                              if (childrenMap[sourceContainer.id.toString()]?.length > 0) {
+                                const rect = e.target.getBoundingClientRect();
+                                setChildrenTooltip({
+                                  children: childrenMap[sourceContainer.id.toString()],
+                                  position: { x: rect.left, y: rect.top }
+                                });
+                              }
                             }}
                             onMouseLeave={() => {
                               setHoveredFrom(null);
                               setHoveredRowId(null);
+                              setChildrenTooltip(null);
                             }}
                           >
-                            <div title={sourceContainer.Name} className="whitespace-normal text-xs">
+                            <div className="whitespace-normal text-xs">
                               {sourceContainer.Name}
                               {/* Show score if available */}
                               {stateScores[sourceContainer.id] !== undefined && (
                                 <div className="text-gray-600 text-xs mt-1">Score: {stateScores[sourceContainer.id].toFixed(3)}</div>
-                              )}
-                              {/* Show children only on hover */}
-                              {hoveredRowId === sourceContainer.id.toString() && 
-                               childrenMap[sourceContainer.id.toString()]?.length > 0 && (
-                                <div className="text-gray-400 text-xs mt-1 break-words">
-                                  ({childrenMap[sourceContainer.id.toString()].map((cid) => nameById[cid] || cid).join(", ")})
-                                </div>
                               )}
                             </div>
                           </th>
@@ -408,6 +440,8 @@ const AppMatrix = () => {
                   </table>
                   {/* Render the tooltip only once, outside the table */}
                   {hoveredCell && <RelationshipTooltip text={hoveredCell.text} position={hoveredCell.position} />}
+                  {/* Render children tooltip */}
+                  {childrenTooltip && <ChildrenTooltip children={childrenTooltip.children} position={childrenTooltip.position} />}
                   {/* EdgeMenu component */}
                   <EdgeMenu
                     ref={menuRef}

@@ -81,7 +81,11 @@ export const useMatrixLogic = () => {
     baseSourceData.forEach((source) => {
       baseTargetData.forEach((target) => {
         if (source.id !== target.id) {
-          const key = `${source.id}-${target.id}`;
+          // When flipped, we need to check the correct relationship direction
+          const key = flipped
+            ? `${target.id}-${source.id}` // flipped: target becomes parent, source becomes child
+            : `${source.id}-${target.id}`; // normal: source is parent, target is child
+
           if (forwardExists[key]) {
             sources.add(source.id);
             targets.add(target.id);

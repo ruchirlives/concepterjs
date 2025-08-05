@@ -9,31 +9,43 @@ export const useFlowLogic = () => {
   const [history, setHistory] = useState([]);
   const [layoutPositions, setLayoutPositions] = useState({});
 
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, comparatorState } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState } = useAppContext();
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
-  
+
   // Filter rowData based on hidden layers for Flow only
   const flowFilteredRowData = useMemo(() => {
     console.log('Original rowData count:', rowData.length);
     console.log('Hidden layers:', [...hiddenLayers]);
-    
+    console.log('Available layer options:', layerOptions);
+
     if (hiddenLayers.size === 0) return rowData;
 
     const filtered = rowData.filter(container => {
-      if (!container.Tags) return true;
+      // Keep containers without Tags (no layer assigned)
+      if (!container.Tags || container.Tags.trim() === '') return true;
 
       const containerTags = container.Tags
         .split(",")
         .map(tag => tag.trim())
         .filter(Boolean);
 
-      return !containerTags.some(tag => hiddenLayers.has(tag));
+      // Keep containers with empty tags after filtering
+      if (containerTags.length === 0) return true;
+
+      // Only filter out containers if their tags are:
+      // 1. In the layerOptions (recognized layers)
+      // 2. AND in hiddenLayers (unticked)
+      const shouldHide = containerTags.some(tag =>
+        layerOptions.includes(tag) && hiddenLayers.has(tag)
+      );
+
+      return !shouldHide;
     });
-    
+
     console.log('Filtered rowData count:', filtered.length);
     return filtered;
-  }, [rowData, hiddenLayers]);
+  }, [rowData, hiddenLayers, layerOptions]);
 
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
@@ -74,22 +86,22 @@ export const useFlowLogic = () => {
     activeGroup, setActiveGroup,
     history, setHistory,
     layoutPositions, setLayoutPositions,
-    
+
     // Data
     flowFilteredRowData,
     comparatorState,
-    
+
     // Actions
     handleStateChange,
     centerNode,
     handleTransform,
-    
+
     // State scores
     stateScores,
     handleCalculateStateScores,
     getHighestScoringContainer,
     clearStateScores,
-    
+
     // Context data
     rowData, setRowData,
     nodes, setNodes,
