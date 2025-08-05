@@ -28,13 +28,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
     collapsed, setCollapsed,
     activeGroup, setActiveGroup,
     history, setHistory,
-    hiddenLayers, setHiddenLayers,
-    layerDropdownOpen, setLayerDropdownOpen,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
-    layerOptions,
     comparatorState,
-    toggleLayerVisibility,
     handleStateChange,
     centerNode,
     handleTransform,
@@ -74,20 +70,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
       activeGroupChannel.close();
     }
   }, [activeGroup]);
-
-  // Close layer dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (layerDropdownOpen && !event.target.closest('.layer-dropdown')) {
-        setLayerDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [layerDropdownOpen, setLayerDropdownOpen]);
 
   // Flow effects hooks
   useCreateNodesAndEdges({
@@ -141,12 +123,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
         clearStateScores={clearStateScores}
         comparatorState={comparatorState}
         stateScores={stateScores}
-        layerDropdownOpen={layerDropdownOpen}
-        setLayerDropdownOpen={setLayerDropdownOpen}
-        hiddenLayers={hiddenLayers}
-        setHiddenLayers={setHiddenLayers}
-        layerOptions={layerOptions}
-        toggleLayerVisibility={toggleLayerVisibility}
       />
 
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>

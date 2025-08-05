@@ -7,19 +7,20 @@ export const useFlowLogic = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [activeGroup, setActiveGroup] = useState(null);
   const [history, setHistory] = useState([]);
-  const [hiddenLayers, setHiddenLayers] = useState(new Set());
-  const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
   const [layoutPositions, setLayoutPositions] = useState({});
 
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, layerOptions, comparatorState } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, comparatorState } = useAppContext();
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
-
+  
   // Filter rowData based on hidden layers for Flow only
   const flowFilteredRowData = useMemo(() => {
+    console.log('Original rowData count:', rowData.length);
+    console.log('Hidden layers:', [...hiddenLayers]);
+    
     if (hiddenLayers.size === 0) return rowData;
 
-    return rowData.filter(container => {
+    const filtered = rowData.filter(container => {
       if (!container.Tags) return true;
 
       const containerTags = container.Tags
@@ -29,20 +30,10 @@ export const useFlowLogic = () => {
 
       return !containerTags.some(tag => hiddenLayers.has(tag));
     });
+    
+    console.log('Filtered rowData count:', filtered.length);
+    return filtered;
   }, [rowData, hiddenLayers]);
-
-  // Toggle layer visibility
-  const toggleLayerVisibility = useCallback((layer) => {
-    setHiddenLayers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(layer)) {
-        newSet.delete(layer);
-      } else {
-        newSet.add(layer);
-      }
-      return newSet;
-    });
-  }, []);
 
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
@@ -82,17 +73,13 @@ export const useFlowLogic = () => {
     collapsed, setCollapsed,
     activeGroup, setActiveGroup,
     history, setHistory,
-    hiddenLayers, setHiddenLayers,
-    layerDropdownOpen, setLayerDropdownOpen,
     layoutPositions, setLayoutPositions,
     
     // Data
     flowFilteredRowData,
-    layerOptions,
     comparatorState,
     
     // Actions
-    toggleLayerVisibility,
     handleStateChange,
     centerNode,
     handleTransform,

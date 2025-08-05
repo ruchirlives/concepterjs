@@ -28,6 +28,10 @@ export const AppProvider = ({ children }) => {
   const [layerOptions, setLayerOptions] = useState([]);
   const [activeLayers, setActiveLayers] = useState([]);
 
+  // Layer dropdown state
+  const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
+  const [hiddenLayers, setHiddenLayers] = useState(new Set());
+
 
   // State management functions
   const handleStateSwitch = async (stateName) => {
@@ -143,6 +147,11 @@ export const AppProvider = ({ children }) => {
     handleStateSwitch,
     handleRemoveState,
     handleClearStates,
+    // Layer dropdown state
+    layerDropdownOpen,
+    setLayerDropdownOpen,
+    hiddenLayers,
+    setHiddenLayers,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

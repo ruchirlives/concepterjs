@@ -6,7 +6,7 @@ import { useStateScores } from './useStateScores';
 import toast from 'react-hot-toast';
 
 export const useMatrixLogic = () => {
-  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState } = useAppContext();
+  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState, hiddenLayers } = useAppContext();
   const [relationships, setRelationships] = useState({});
   const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
@@ -31,24 +31,28 @@ export const useMatrixLogic = () => {
   const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
-  // Filter data by layers
+  // Filter data by layers (including global hidden layers)
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
     const filterByLayer = (data, layer) => {
-      if (!layer) return data;
-      return data.filter((container) => {
-        if (!container.Tags) return false;
-        const containerTags = container.Tags.split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean);
-        return containerTags.includes(layer);
-      });
+      if (!layer) {
+        // Apply global hidden layers filter when no specific layer is selected
+        const filtered = data.filter((container) => {
+          const shouldInclude = !hiddenLayers.has(container.Layer);
+          console.log(`Container ${container.Name} (Layer: ${container.Layer}) - Include: ${shouldInclude}`);
+          return shouldInclude;
+        });
+        console.log(`Filtered ${data.length} to ${filtered.length} containers`);
+        return filtered;
+      }
+      // Apply both specific layer filter and global hidden layers filter
+      return data.filter((container) => container.Layer === layer && !hiddenLayers.has(container.Layer));
     };
 
     return {
       fromLayerFilteredData: filterByLayer(rowData, selectedFromLayer),
       toLayerFilteredData: filterByLayer(rowData, selectedToLayer),
     };
-  }, [rowData, selectedFromLayer, selectedToLayer]);
+  }, [rowData, selectedFromLayer, selectedToLayer, hiddenLayers]);
 
   // Combined filtered data
   const combinedFilteredData = useMemo(() => {
@@ -398,6 +402,11 @@ export const useMatrixLogic = () => {
     };
   }, [menuRef, hideMenu]);
 
+  // Filter layer options to exclude hidden layers
+  const availableLayerOptions = useMemo(() => {
+    return layerOptions.filter(layer => !hiddenLayers.has(layer));
+  }, [layerOptions, hiddenLayers]);
+
   return {
     // State
     relationships,
@@ -436,7 +445,7 @@ export const useMatrixLogic = () => {
     nameById,
     rowData,
     edges,
-    layerOptions,
+    layerOptions: availableLayerOptions,
     comparatorState,
 
     // Actions

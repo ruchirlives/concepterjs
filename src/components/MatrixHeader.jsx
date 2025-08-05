@@ -1,5 +1,6 @@
 import React from 'react';
 import StateDropdown, { ComparatorDropdown } from './StateDropdown';
+import LayerDropdown from './LayerDropdown';
 
 const MatrixHeader = ({
   collapsed,
@@ -33,6 +34,13 @@ const MatrixHeader = ({
 
         <StateDropdown onStateChange={handleStateChange} />
         <ComparatorDropdown />
+
+        {/* Add the reusable LayerDropdown component */}
+        <LayerDropdown 
+          buttonText="Filter Layers"
+          title="Filter layers in Matrix"
+          dropdownTitle="Hide Layers in Matrix"
+        />
 
         {/* From Layer Filter */}
         <div className="flex items-center gap-1">

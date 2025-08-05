@@ -16,18 +16,36 @@ import { setPasscode } from './apiConfig';
 import { recopyValues } from './api';
 
 // Suppress ResizeObserver error that doesn't affect functionality
-window.addEventListener('error', e => {
-  if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
-    e.message.includes('ResizeObserver loop limit exceeded')) {
+const suppressResizeObserverError = (e) => {
+  if (
+    e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+    e.message === 'ResizeObserver loop limit exceeded' ||
+    e.message.includes('ResizeObserver')
+  ) {
     e.stopImmediatePropagation();
+    e.preventDefault();
+    return true;
+  }
+  return false;
+};
+
+// Handle both error and unhandledrejection events
+window.addEventListener('error', suppressResizeObserverError);
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason && typeof e.reason === 'string' && e.reason.includes('ResizeObserver')) {
+    e.preventDefault();
   }
 });
 
-// Also suppress it in the console
+// Suppress console errors for ResizeObserver
 const originalError = console.error;
 console.error = (...args) => {
-  if (args[0]?.includes?.('ResizeObserver loop') ||
-    args[0]?.message?.includes?.('ResizeObserver loop')) {
+  const message = args[0];
+  if (
+    typeof message === 'string' && 
+    (message.includes('ResizeObserver') || 
+     message.includes('loop completed with undelivered notifications'))
+  ) {
     return;
   }
   originalError.apply(console, args);
@@ -46,10 +64,6 @@ const MemoizedStaticContent = React.memo(() => (
 
     <section id="prioritiser">
       <AppPrioritiser />
-    </section>
-
-    <section id="layers">
-      <AppLayers />
     </section>
 
     <section id="states">
@@ -179,6 +193,9 @@ const App = () => {
         {/* Components that depend on state - keep separate */}
         <section id="grid">
           <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
+        </section>
+        <section id="layers">
+          <AppLayers />
         </section>
         <section id="sub">
           <AppFlow keepLayout={keepLayout} setKeepLayout={setKeepLayout} />
