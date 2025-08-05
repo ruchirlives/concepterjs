@@ -34,18 +34,12 @@ export const useMatrixLogic = () => {
   // Filter data by layers (including global hidden layers)
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
     const filterByLayer = (data, layer) => {
-      if (!layer) {
-        // Apply global hidden layers filter when no specific layer is selected
-        const filtered = data.filter((container) => {
-          const shouldInclude = !hiddenLayers.has(container.Layer);
-          console.log(`Container ${container.Name} (Layer: ${container.Layer}) - Include: ${shouldInclude}`);
-          return shouldInclude;
-        });
-        console.log(`Filtered ${data.length} to ${filtered.length} containers`);
-        return filtered;
-      }
-      // Apply both specific layer filter and global hidden layers filter
-      return data.filter((container) => container.Layer === layer && !hiddenLayers.has(container.Layer));
+      return data.filter((container) => {
+        const tags = (container.Tags || '').split(',').map((t) => t.trim());
+        const inSelectedLayer = layer ? tags.includes(layer) : true;
+        const notHidden = !tags.some((t) => hiddenLayers.has(t));
+        return inSelectedLayer && notHidden;
+      });
     };
 
     return {
