@@ -39,6 +39,9 @@ export const updateMetadataFor = (
 };
 
 export const enrichDiffWithMetadata = (diff) => {
+  // Load all metadata once at the beginning
+  const allMetadata = loadTransitionMetadata();
+
   const enriched = {};
   Object.keys(diff).forEach((cid) => {
     enriched[cid] = {};
@@ -49,7 +52,11 @@ export const enrichDiffWithMetadata = (diff) => {
         const current = rel.relationship_dict?.label || 'None';
         return `${base} -> ${current}`;
       })();
-      const meta = getMetadataFor(cid, tid, transitionLabel);
+
+      // Use the pre-loaded metadata instead of calling getMetadataFor
+      const key = generateKey(cid, tid, transitionLabel);
+      const meta = allMetadata[key] || {};
+
       if (Object.keys(meta).length) {
         Object.assign(rel, meta);
       }
