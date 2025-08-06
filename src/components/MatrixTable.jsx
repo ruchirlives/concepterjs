@@ -18,7 +18,7 @@ const MatrixTable = ({
   nameById,
   relationships,
   forwardExists,
-  edges,
+  edgeMap,
   editingCell,
   inputRef,
   handleCellClick,
@@ -95,19 +95,19 @@ const MatrixTable = ({
                 </div>
               </th>
               {filteredTargets.map((targetContainer) => (
-                <MatrixCell
-                  key={`${sourceContainer.id}-${targetContainer.id}`}
-                  sourceContainer={sourceContainer}
-                  targetContainer={targetContainer}
-                  flipped={flipped}
-                  relationships={relationships}
-                  forwardExists={forwardExists}
-                  edges={edges}
-                  editingCell={editingCell}
-                  inputRef={inputRef}
-                  handleCellClick={handleCellClick}
-                  handleEdgeMenu={handleEdgeMenu}
-                  handleKeyDown={handleKeyDown}
+              <MatrixCell
+                key={`${sourceContainer.id}-${targetContainer.id}`}
+                sourceContainer={sourceContainer}
+                targetContainer={targetContainer}
+                flipped={flipped}
+                relationships={relationships}
+                forwardExists={forwardExists}
+                edgeMap={edgeMap}
+                editingCell={editingCell}
+                inputRef={inputRef}
+                handleCellClick={handleCellClick}
+                handleEdgeMenu={handleEdgeMenu}
+                handleKeyDown={handleKeyDown}
                   handleBlur={handleBlur}
                   setHoveredRowId={setHoveredRowId}
                   setHoveredCell={setHoveredCell}

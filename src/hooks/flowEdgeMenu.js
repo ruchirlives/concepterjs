@@ -16,34 +16,35 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         console.log("Edge Context menu triggered", event);
         console.log("Edge Data:", edge);
         event.preventDefault(); // Prevent default context menu
-        menuRef.current.edgeId = edge.id; // Store the edge ID in the menuRef for later use
+        menuRef.current.edgeId = edge?.id || null; // Store the edge ID if available
+        menuRef.current.edge = edge; // Store full edge data
 
-        displayContextMenu(menuRef, event, { data: { id: "edge" } }, flowWrapperRef); // Call the function to display the context menu
+        displayContextMenu(menuRef, event, { data: { id: "edge" } }, flowWrapperRef); // Display the context menu
     };
 
     const onMenuItemClick = async (action, rowData, setRowData) => {
-        // Get source and target nodes from the edge
-        const edgeId = menuRef.current.edgeId;
-        const edge = edges.find((e) => e.id === edgeId);
+        // Get source and target nodes from the stored edge
+        const edgeData = menuRef.current.edge;
+        const edgeId = edgeData?.id;
+        const edge = edgeId ? edges.find((e) => e.id === edgeId) : edgeData;
+        if (!edge) return;
         console.log("Selected Edge:", edge);
         const sourceNodeId = edge.source;
         const targetNodeId = edge.target;
         console.log("Source Node ID:", sourceNodeId);
         console.log("Target Node ID:", targetNodeId);
 
-        if (action === "delete edge") {
-            const edgeId = menuRef.current.edgeId;
+        if (action === "delete edge" && edgeId) {
             console.log("Edge Id:", action, edgeId);
-
             // Perform delete edge action
             removeEdgeById(edgeId);
         }
         // Add other actions here if needed
-        else if (action === "edit edge") {
+        else if (action === "edit edge" && edgeId) {
             // Handle edit edge action here
             console.log("Edit edge action triggered");
         }
-        else if (action === "flip edge") {
+        else if (action === "flip edge" && edgeId) {
             // Handle flip edge action here
             console.log("Flip edge action triggered");
             // 1. Get metadata from the old edge
@@ -69,14 +70,14 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
 
             requestRefreshChannel();
         }
-        else if (action === "rename") {
+        else if (action === "rename" && edgeId) {
             // Handle rename action here useOnEdgeDoubleClick
             console.log("Rename action triggered");
             onEdgeDoubleClick(null, edge);
 
 
         }
-        else if (action === "insert node") {
+        else if (action === "insert node" && edgeId) {
             // Handle insert node action here
             console.log("Insert node action triggered");
             // Insert a new node between the source and target nodes
@@ -109,7 +110,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             // reload the channel to reflect the suggested relationship
             requestRefreshChannel();
         }
-        else if (action === "edit narrative") {
+        else if (action === "edit narrative" && edgeId) {
             // Handle edit narrative action here
             console.log("Edit narrative action triggered");
             // Get the narrative from the edge
@@ -118,7 +119,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             setTiptapContent(narrative); // Set the narrative in the AppContext
             console.log("setTiptapContent called with:", narrative);
         }
-        else if (action === "replace narrative") {
+        else if (action === "replace narrative" && edgeId) {
             // Handle replace narrative action here
             console.log("Replace narrative action triggered");
             // You can implement the logic to replace the narrative of the edge here

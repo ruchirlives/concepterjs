@@ -42,7 +42,7 @@ const AppMatrix = () => {
     filteredTargets,
     nameById,
     rowData,
-    edges,
+    edgeMap,
     layerOptions,
     comparatorState,
 
@@ -339,12 +339,7 @@ const AppMatrix = () => {
                               );
                             }
 
-                            // Find the actual edge from the edges array
-                            const edge = edges.find(
-                              (e) =>
-                                e.source === String(flipped ? targetContainer.id : sourceContainer.id) &&
-                                e.target === String(flipped ? sourceContainer.id : targetContainer.id)
-                            );
+                            const edge = edgeMap[key];
 
                             return (
                               <td
@@ -359,9 +354,7 @@ const AppMatrix = () => {
                                 }
                                 onContextMenu={(event) => {
                                   event.preventDefault();
-                                  if (edge) {
-                                    handleEdgeMenu(event, edge);
-                                  }
+                                  handleEdgeMenu(event, edge);
                                 }}
                                 onMouseEnter={(e) => {
                                   setHoveredRowId(sourceContainer.id.toString()); // Highlight the row header
