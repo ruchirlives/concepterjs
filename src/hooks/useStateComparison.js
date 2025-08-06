@@ -148,7 +148,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                                 const diff = containerDiffs[targetId];
                                 const weight = parseFloat(diff.weight) || 0;
                                 totalWeight += weight;
-                                
+
                                 // Collect non-null qual_labels
                                 if (diff.qual_label && diff.qual_label.trim() !== '') {
                                     qualLabels.add(diff.qual_label);
@@ -161,11 +161,11 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
                     // Include weight and qual_labels in the label
                     let detailedLabel = labelParts.join(' ');
-                    
+
                     if (totalWeight > 0) {
                         detailedLabel += ` (cost ${totalWeight})`;
                     }
-                    
+
                     if (qualLabels.size > 0) {
                         detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
                     }

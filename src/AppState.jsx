@@ -51,6 +51,13 @@ const App = () => {
     setSelectedTargetState(newState);
   };
 
+  // Handle closing diff popup and refresh like dropdown selection
+  const handleCloseDiffPopup = () => {
+    closeDiffPopup();
+    // Trigger the same refresh as selecting from dropdown
+    handleTargetStateChange(selectedTargetState);
+  };
+
   return (
     <div className="bg-white rounded shadow">
       <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
@@ -100,7 +107,7 @@ const App = () => {
         selectedDiffs={selectedDiffs}
         onToggleDiff={toggleDiffSelection}
         onCopy={copySelectedDiffs}
-        onClose={closeDiffPopup}
+        onClose={handleCloseDiffPopup}
         rowData={rowData}
       />
     </div>
