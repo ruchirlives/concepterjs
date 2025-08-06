@@ -93,7 +93,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
             Object.keys(containerDiffs).forEach((targetId) => {
                 const diff = containerDiffs[targetId];
-                console.log('Enriched diff:', enrichedDiff);
+                // console.log('Enriched diff:', enrichedDiff);
                 const targetName = nameById[targetId] || targetId;
 
                 if (diff.status === "added") {

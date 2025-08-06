@@ -114,11 +114,11 @@ export function buildVisibleEdges(params) {
             }
 
             // If child is not tagged as input or output, skip it
-            const childTags = c.tags
-            if (!childTags.some(t => t.trim() === 'input' || t.trim() === 'output')) {
-                // console.log('Skipping child without input/output tag:', c);
-                return;
-            }
+            // const childTags = c.tags
+            // if (!childTags.some(t => t.trim() === 'input' || t.trim() === 'output')) {
+            //     // console.log('Skipping child without input/output tag:', c);
+            //     return;
+            // }
 
             // B) buried child → reroute & handle on ancestor
             const ancId = findVisibleAncestor(childId);
@@ -132,10 +132,10 @@ export function buildVisibleEdges(params) {
             ancNode.data.children = ancNode.data.children || [];
             if (!ancNode.data.children.some(ch => ch.id === childId)) {
                 const buried = nodeById[childId];
-                // Ensure tags is an array and includes 'input' or 'output'
+                // Ensure tags is an array
                 let tags = buried.data.Tags;
                 if (typeof tags === 'string') tags = tags.split(',').map(t => t.trim()).filter(Boolean);
-                if (!tags.includes('input') && !tags.includes('output')) tags.push('input'); // or 'output' as needed
+                if (!Array.isArray(tags)) tags = []; // Ensure it's an array even if no tags
                 ancNode.data.children.push({
                     id: childId,
                     name: buried.data.Name,
@@ -144,15 +144,27 @@ export function buildVisibleEdges(params) {
                 });
             }
 
-            // push edge from parentId → ancId using that handle
-            newEdges.push({
-                id: edgeId,
-                source: parentId,
-                // sourceHandle: `out-group-${parentId}`,
-                target: ancId,
-                targetHandle: `in-child-${childId}-on-${ancId}`,
-                /* style/label… */
-            });
+            // Create unique edge ID for buried child edges
+            const buriedEdgeId = `${parentId}-to-${ancId}-via-${childId}`;
+            if (!newEdges.some(e => e.id === buriedEdgeId)) {
+                // push edge from parentId → ancId using that handle
+                newEdges.push({
+                    id: buriedEdgeId,
+                    source: parentId,
+                    target: ancId,
+                    type: 'customEdge', // Add this to use the same edge renderer
+                    // Remove the specific targetHandle - let React Flow use the default
+                    // targetHandle: `in-child-${childId}-on-${ancId}`,
+                    data: { 
+                        buriedChild: childId,
+                        label: `→ ${nodeById[childId]?.data.Name || childId}` 
+                    },
+                    style: { 
+                        stroke: colors.gray[400],
+                        strokeDasharray: '5,5' // Make buried edges visually distinct
+                    }
+                });
+            }
         });
     });
 
@@ -165,16 +177,16 @@ export function buildVisibleEdges(params) {
             if (visibleNodes.some(n => n.id === parentId)) return;
 
             // If parent is not tagged as input or output, skip it
-            const parentTagsRaw = nodeById[parentId]?.data.Tags || [];
-            const parentTags = Array.isArray(parentTagsRaw)
-                ? parentTagsRaw
-                : typeof parentTagsRaw === 'string'
-                    ? parentTagsRaw.split(',').map(s => s.trim()).filter(Boolean)
-                    : [];
-            if (!parentTags.some(t => t === 'input' || t === 'output')) {
-                // skip
-                return;
-            }
+            // const parentTagsRaw = nodeById[parentId]?.data.Tags || [];
+            // const parentTags = Array.isArray(parentTagsRaw)
+            //     ? parentTagsRaw
+            //     : typeof parentTagsRaw === 'string'
+            //         ? parentTagsRaw.split(',').map(s => s.trim()).filter(Boolean)
+            //         : [];
+            // if (!parentTags.some(t => t === 'input' || t === 'output')) {
+            //     // skip
+            //     return;
+            // }
 
             // find the nearest visible ancestor of the buried parent
             const ancId = findVisibleAncestor(parentId);
@@ -187,7 +199,7 @@ export function buildVisibleEdges(params) {
                 const buried = nodeById[parentId];
                 let tags = buried.data.Tags;
                 if (typeof tags === 'string') tags = tags.split(',').map(t => t.trim()).filter(Boolean);
-                if (!tags.includes('input') && !tags.includes('output')) tags.push('output'); // or 'input' as needed
+                if (!Array.isArray(tags)) tags = []; // Ensure it's an array even if no tags
                 ancNode.data.children.push({
                     id: parentId,
                     name: buried.data.Name,
@@ -203,8 +215,17 @@ export function buildVisibleEdges(params) {
                     id: edgeId,
                     source: ancId,
                     target: childId,
-                    sourceHandle: `out-child-${parentId}-on-${ancId}`,
-                    /* style/label… */
+                    type: 'customEdge', // Add this to use the same edge renderer
+                    // Remove the specific sourceHandle - let React Flow use the default
+                    // sourceHandle: `out-child-${parentId}-on-${ancId}`,
+                    data: { 
+                        buriedParent: parentId,
+                        label: `from ${nodeById[parentId]?.data.Name || parentId}` 
+                    },
+                    style: { 
+                        stroke: colors.gray[400],
+                        strokeDasharray: '5,5' // Make buried edges visually distinct
+                    }
                 });
             }
         });
