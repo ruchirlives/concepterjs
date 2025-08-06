@@ -17,7 +17,7 @@ export const useMatrixLogic = () => {
   const [childrenMap, setChildrenMap] = useState({});
   const [hoveredFrom, setHoveredFrom] = useState(null);
   const [hoveredRowId, setHoveredRowId] = useState(null);
-  const [flipped, setFlipped] = useState(true);
+  const [flipped, setFlipped] = useState(false);
   const [selectedFromLayer, setSelectedFromLayer] = useState("");
   const [selectedToLayer, setSelectedToLayer] = useState("");
   const [differences, setDifferences] = useState({});
