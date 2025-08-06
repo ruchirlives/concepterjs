@@ -108,9 +108,12 @@ export const useMatrixLogic = () => {
   // Build a lookup of edges for every visible relationship
   const edgeMap = useMemo(() => {
     const existing = {};
-    edges.forEach((e) => {
-      existing[`${e.source}-${e.target}`] = e;
-    });
+    // Add null check for edges array
+    if (edges && Array.isArray(edges)) {
+      edges.forEach((e) => {
+        existing[`${e.source}-${e.target}`] = e;
+      });
+    }
 
     const map = {};
     filteredSources.forEach((source) => {
@@ -290,6 +293,13 @@ export const useMatrixLogic = () => {
 
       parentChildMap.forEach(({ container_id, children }) => {
         const parentId = container_id.toString();
+        
+        // Add null check for children
+        if (!children || !Array.isArray(children)) {
+          newChildrenMap[parentId] = [];
+          return;
+        }
+        
         newChildrenMap[parentId] = children.map((c) => c.id.toString());
 
         children.forEach((child) => {

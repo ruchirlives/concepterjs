@@ -59,12 +59,15 @@ export const CustomStateEdge = ({ id, sourceX, sourceY, targetX, targetY, source
             border: "2px solid #fff",
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
             minWidth: "20px",
+            maxWidth: "200px",
             lineHeight: "1.2",
             textAlign: "center",
             pointerEvents: "all",
             fontFamily: "system-ui, -apple-system, sans-serif",
             cursor: data?.onClick ? "pointer" : "default",
-            whiteSpace: "nowrap",
+            whiteSpace: "pre-line",
+            wordWrap: "break-word",
+            overflowWrap: "break-word",
           }}
           className="nodrag nopan"
           onClick={handleClick}

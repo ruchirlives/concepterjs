@@ -14,8 +14,8 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
     // Create edge click handler
     const createEdgeClickHandler = useCallback((diffResults, sourceState, targetState) => {
-        return () => {
-            const enriched = enrichDiffWithMetadata(diffResults);
+        return async () => {
+            const enriched = await enrichDiffWithMetadata(diffResults);
             setCurrentDiffResults({
                 results: enriched,
                 sourceState,
@@ -82,10 +82,10 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
     }, []);
 
     // Build changes array from diff results - now returns counts object
-    const buildChangesFromDiff = useCallback((diffResults, nameById) => {
+    const buildChangesFromDiff = useCallback(async (diffResults, nameById) => {
         const changes = [];
         const counts = { added: 0, changed: 0, removed: 0 };
-        const enrichedDiff = enrichDiffWithMetadata(diffResults);
+        const enrichedDiff = await enrichDiffWithMetadata(diffResults);
 
         Object.keys(enrichedDiff).forEach((containerId) => {
             const containerDiffs = enrichedDiff[containerId];
@@ -93,7 +93,6 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
             Object.keys(containerDiffs).forEach((targetId) => {
                 const diff = containerDiffs[targetId];
-                // console.log('Enriched diff:', enrichedDiff);
                 const targetName = nameById[targetId] || targetId;
 
                 if (diff.status === "added") {
@@ -123,7 +122,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
             try {
                 // Compare sourceState with selectedTargetState
                 const diffResults = await compareStates(sourceState, containerIds);
-                const { changes, counts } = buildChangesFromDiff(diffResults, nameById);
+                const { changes, counts } = await buildChangesFromDiff(diffResults, nameById);
 
                 // Only create edge if there are changes
                 if (changes.length > 0) {
@@ -136,29 +135,40 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                     if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
                     if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
 
-                    // Add the weights
-                    const enriched = enrichDiffWithMetadata(diffResults);
+                    // Add the weights and qual_labels
+                    const enriched = await enrichDiffWithMetadata(diffResults);
                     let totalWeight = 0;
+                    const qualLabels = new Set(); // Use Set to avoid duplicates
 
                     if (enriched) {
-
-                        // Sum all weights from the enriched diff
+                        // Sum all weights and collect qual_labels from the enriched diff
                         Object.keys(enriched).forEach((containerId) => {
                             const containerDiffs = enriched[containerId];
                             Object.keys(containerDiffs).forEach((targetId) => {
                                 const diff = containerDiffs[targetId];
                                 const weight = parseFloat(diff.weight) || 0;
                                 totalWeight += weight;
+                                
+                                // Collect non-null qual_labels
+                                if (diff.qual_label && diff.qual_label.trim() !== '') {
+                                    qualLabels.add(diff.qual_label);
+                                }
                             });
                         });
 
                         console.log(`Total weight for ${sourceState} -> ${selectedTargetState}: ${totalWeight}`);
                     }
 
-                    // Include weight in the label if there is a weight
-                    const detailedLabel = totalWeight > 0
-                        ? `${labelParts.join(' ')} (cost ${totalWeight})`
-                        : labelParts.join('');
+                    // Include weight and qual_labels in the label
+                    let detailedLabel = labelParts.join(' ');
+                    
+                    if (totalWeight > 0) {
+                        detailedLabel += ` (cost ${totalWeight})`;
+                    }
+                    
+                    if (qualLabels.size > 0) {
+                        detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
+                    }
 
                     const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, selectedTargetState);
 

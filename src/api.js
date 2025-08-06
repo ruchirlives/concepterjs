@@ -546,6 +546,49 @@ export const saveContainers = async (name) => {
     }
 };
 
+export const saveTransitionMetadata = async (metadata) => {
+    try {
+        // Add debugging
+        console.log("Saving transition metadata to API...", metadata);
+
+        const response = await apiClient.post(`${getApiUrl()}/save_transition_metadata`, {
+            metadata: metadata,
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        console.log("Transition metadata saved successfully:", response.data);
+        return response.data;
+    } catch (e) {
+        console.error('Failed to save transition metadata', e);
+        console.error('Error details:', e.response?.data);
+        console.error('Error status:', e.response?.status);
+        console.error('Full error object:', e);
+        throw e;
+    }
+};
+
+export const loadTransitionMetadata = async () => {
+    try {
+        console.log("Loading transition metadata from API...");
+        const response = await apiClient.get(`${getApiUrl()}/load_transition_metadata`, {
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        console.log("Transition metadata loaded successfully:", response.data);
+        return response.data;
+    } catch (e) {
+        console.error('Failed to load transition metadata', e);
+        console.error('Error details:', e.response?.data);
+        console.error('Error status:', e.response?.status);
+        return null;
+    }
+};
+
+
 export const clearContainers = async () => {
     try {
         const response = await apiClient.get(`${getApiUrl()}/clear_containers`);
