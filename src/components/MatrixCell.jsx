@@ -32,8 +32,8 @@ const MatrixCell = ({
 
   const edge = edges.find(
     (e) =>
-      e.source === (flipped ? targetContainer.id : sourceContainer.id) &&
-      e.target === (flipped ? sourceContainer.id : targetContainer.id)
+      String(e.source) === String(flipped ? targetContainer.id : sourceContainer.id) &&
+      String(e.target) === String(flipped ? sourceContainer.id : targetContainer.id)
   );
 
   return (
