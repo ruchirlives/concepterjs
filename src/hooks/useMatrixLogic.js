@@ -105,6 +105,31 @@ export const useMatrixLogic = () => {
     return filteredSources.map((c) => c.id).join(",");
   }, [filteredSources]);
 
+  // Build a lookup of edges for every visible relationship
+  const edgeMap = useMemo(() => {
+    const existing = {};
+    edges.forEach((e) => {
+      existing[`${e.source}-${e.target}`] = e;
+    });
+
+    const map = {};
+    filteredSources.forEach((source) => {
+      filteredTargets.forEach((target) => {
+        if (source.id === target.id) return;
+        const sourceId = flipped ? target.id : source.id;
+        const targetId = flipped ? source.id : target.id;
+        const key = `${sourceId}-${targetId}`;
+        map[key] =
+          existing[key] || {
+            source: String(sourceId),
+            target: String(targetId),
+          };
+      });
+    });
+
+    return map;
+  }, [edges, filteredSources, filteredTargets, flipped]);
+
   // Event handlers
   const handleStateChange = useCallback((newState) => {
     console.log(`Matrix state changed to: ${newState}`);
@@ -442,7 +467,7 @@ export const useMatrixLogic = () => {
     filteredTargets,
     nameById,
     rowData,
-    edges,
+    edgeMap,
     layerOptions: availableLayerOptions,
     comparatorState,
 
