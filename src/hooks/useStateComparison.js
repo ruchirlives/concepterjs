@@ -118,75 +118,75 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
         for (const state of states) {
             if (state === selectedTargetState) continue;
 
-            let sourceState, targetState;
+            let sourceState, targetState, diffResults;
             if (flipDirection) {
+                // Selected is source, compare selected to each other state
                 sourceState = selectedTargetState;
                 targetState = state;
             } else {
+                // Selected is target, compare each other state to selected
                 sourceState = state;
                 targetState = selectedTargetState;
             }
 
-            try {
-                const diffResults = await compareStates(sourceState, containerIds);
-                const { changes, counts } = await buildChangesFromDiff(diffResults, nameById);
+            // Use new compareStates signature
+            diffResults = await compareStates(sourceState, targetState, containerIds);
 
-                if (changes.length > 0) {
-                    const fullChangesText = changes.join("\n");
-                    const totalChanges = counts.added + counts.changed + counts.removed;
+            const { changes, counts } = await buildChangesFromDiff(diffResults, nameById);
 
-                    const labelParts = [];
-                    if (counts.added > 0) labelParts.push(`+${counts.added}`);
-                    if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
-                    if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
+            if (changes.length > 0) {
+                const fullChangesText = changes.join("\n");
+                const totalChanges = counts.added + counts.changed + counts.removed;
 
-                    const enriched = await enrichDiffWithMetadata(diffResults);
-                    let totalWeight = 0;
-                    const qualLabels = new Set();
+                const labelParts = [];
+                if (counts.added > 0) labelParts.push(`+${counts.added}`);
+                if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
+                if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
 
-                    if (enriched) {
-                        Object.keys(enriched).forEach((containerId) => {
-                            const containerDiffs = enriched[containerId];
-                            Object.keys(containerDiffs).forEach((targetId) => {
-                                const diff = containerDiffs[targetId];
-                                const weight = parseFloat(diff.weight) || 0;
-                                totalWeight += weight;
-                                if (diff.qual_label && diff.qual_label.trim() !== '') {
-                                    qualLabels.add(diff.qual_label);
-                                }
-                            });
+                const enriched = await enrichDiffWithMetadata(diffResults);
+                let totalWeight = 0;
+                const qualLabels = new Set();
+
+                if (enriched) {
+                    Object.keys(enriched).forEach((containerId) => {
+                        const containerDiffs = enriched[containerId];
+                        Object.keys(containerDiffs).forEach((targetId) => {
+                            const diff = containerDiffs[targetId];
+                            const weight = parseFloat(diff.weight) || 0;
+                            totalWeight += weight;
+                            if (diff.qual_label && diff.qual_label.trim() !== '') {
+                                qualLabels.add(diff.qual_label);
+                            }
                         });
-                    }
-
-                    let detailedLabel = labelParts.join(' ');
-                    if (totalWeight > 0) {
-                        detailedLabel += ` (cost ${totalWeight})`;
-                    }
-                    if (qualLabels.size > 0) {
-                        detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
-                    }
-
-                    const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, targetState);
-
-                    initialEdges.push({
-                        id: `${sourceState}-${targetState}`,
-                        source: sourceState,
-                        target: targetState,
-                        label: detailedLabel,
-                        type: "custom",
-                        animated: false,
-                        style: { stroke: "#1976d2", strokeWidth: 2 },
-                        data: {
-                            onClick: handleEdgeClick,
-                            fullChanges: fullChangesText,
-                            counts: counts,
-                            totalChanges: totalChanges,
-                            totalWeight: totalWeight
-                        },
                     });
                 }
-            } catch (err) {
-                console.error(`Error comparing ${sourceState} with ${targetState}:`, err);
+
+                let detailedLabel = labelParts.join(' ');
+                if (totalWeight > 0) {
+                    detailedLabel += ` (cost ${totalWeight})`;
+                }
+                if (qualLabels.size > 0) {
+                    detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
+                }
+
+                const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, targetState);
+
+                initialEdges.push({
+                    id: `${sourceState}-${targetState}`,
+                    source: sourceState,
+                    target: targetState,
+                    label: detailedLabel,
+                    type: "custom",
+                    animated: false,
+                    style: { stroke: "#1976d2", strokeWidth: 2 },
+                    data: {
+                        onClick: handleEdgeClick,
+                        fullChanges: fullChangesText,
+                        counts: counts,
+                        totalChanges: totalChanges,
+                        totalWeight: totalWeight
+                    },
+                });
             }
         }
 
@@ -211,8 +211,8 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                     data: {
                         label: state,
                         Name: state,
-                        isTarget: flipDirection ? false : state === selectedTargetState,
-                        isSource: flipDirection ? state === selectedTargetState : false,
+                        isTarget: !flipDirection && state === selectedTargetState,
+                        isSource: flipDirection && state === selectedTargetState,
                     },
                     position: { x: 0, y: 0 }, // Will be overwritten by layouter
                 }));
