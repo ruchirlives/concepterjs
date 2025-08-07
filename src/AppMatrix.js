@@ -45,7 +45,7 @@ const AppMatrix = () => {
     edgeMap,
     layerOptions,
     comparatorState,
-    rawDifferences, // Add this
+    rawDifferences,
 
     // Actions
     handleStateChange,
@@ -201,12 +201,13 @@ const AppMatrix = () => {
             Flip Axis
           </button>
 
+          {/* Export to Excel Button */}
           <button
             className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
             onClick={handleExportExcel}
-            title="Export current view"
+            title="Export current view to Excel"
           >
-            Export Excel
+            Export to Excel
           </button>
 
           <button
