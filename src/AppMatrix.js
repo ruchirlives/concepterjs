@@ -45,6 +45,7 @@ const AppMatrix = () => {
     edgeMap,
     layerOptions,
     comparatorState,
+    rawDifferences, // Add this
 
     // Actions
     handleStateChange,
@@ -139,7 +140,7 @@ const AppMatrix = () => {
           <ComparatorDropdown />
 
           {/* Add the LayerDropdown component here */}
-          <LayerDropdown 
+          <LayerDropdown
             buttonText="Global Filter"
             title="Hide layers globally (affects both Flow and Matrix)"
             dropdownTitle="Hide Layers Globally"
@@ -183,9 +184,8 @@ const AppMatrix = () => {
 
           {/* Hide Empty Toggle Button */}
           <button
-            className={`px-3 py-1 text-xs rounded transition-colors ${
-              hideEmpty ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={`px-3 py-1 text-xs rounded transition-colors ${hideEmpty ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             onClick={() => setHideEmpty(!hideEmpty)}
             title={hideEmpty ? "Show all containers" : "Hide empty rows/columns"}
           >
@@ -291,15 +291,15 @@ const AppMatrix = () => {
                               getHighestScoringContainer() === sourceContainer.id.toString()
                                 ? "bg-yellow-400"
                                 : hoveredFrom && childrenMap[hoveredFrom]?.includes(sourceContainer.id.toString())
-                                ? "bg-yellow-100"
-                                : hoveredRowId === sourceContainer.id.toString()
-                                ? "bg-yellow-200"
-                                : "bg-gray-100"
-                            }`}
+                                  ? "bg-yellow-100"
+                                  : hoveredRowId === sourceContainer.id.toString()
+                                    ? "bg-yellow-200"
+                                    : "bg-gray-100"
+                              }`}
                             onMouseEnter={(e) => {
                               setHoveredFrom(sourceContainer.id.toString());
                               setHoveredRowId(sourceContainer.id.toString());
-                              
+
                               // Show children tooltip if there are children
                               if (childrenMap[sourceContainer.id.toString()]?.length > 0) {
                                 const rect = e.target.getBoundingClientRect();
@@ -329,6 +329,10 @@ const AppMatrix = () => {
                             const key = flipped ? `${targetContainer.id}-${sourceContainer.id}` : `${sourceContainer.id}-${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
                             const value = relationships[key] || "";
+
+                            // Check if there's a difference for this specific relationship
+                            const isDifferentFromComparator = comparatorState && rawDifferences[sourceContainer.id]?.[targetContainer.id];
+
                             const isDiagonal = sourceContainer.id === targetContainer.id;
 
                             if (isDiagonal) {
@@ -344,9 +348,8 @@ const AppMatrix = () => {
                             return (
                               <td
                                 key={key}
-                                className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${
-                                  forwardExists[key] ? getRelationshipColor(value) : "bg-white"
-                                }`}
+                                className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${forwardExists[key] ? getRelationshipColor(value, isDifferentFromComparator) : "bg-white"
+                                  }`}
                                 onClick={() =>
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
@@ -440,7 +443,7 @@ const AppMatrix = () => {
                     ref={menuRef}
                     onMenuItemClick={onMenuItemClick}
                     rowData={rowData}
-                    setRowData={() => {}}
+                    setRowData={() => { }}
                     edges={filteredSources
                       .map((source) =>
                         filteredTargets.map((target) => ({
@@ -450,7 +453,7 @@ const AppMatrix = () => {
                         }))
                       )
                       .flat()}
-                    setEdges={() => {}}
+                    setEdges={() => { }}
                   />
                 </div>
               </div>

@@ -24,6 +24,7 @@ export const useMatrixLogic = () => {
   const [loadingDifferences, setLoadingDifferences] = useState(false);
   const [differencesTrigger, setDifferencesTrigger] = useState(0);
   const [showDropdowns, setShowDropdowns] = useState({});
+  const [rawDifferences, setRawDifferences] = useState({});
 
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
@@ -264,10 +265,9 @@ export const useMatrixLogic = () => {
     setShowDropdowns((prev) => ({ ...prev, [containerId]: !prev[containerId] }));
   };
 
-  const getRelationshipColor = (value) => {
+  const getRelationshipColor = (value, isDifferentFromComparator) => {
     if (!value) return "bg-yellow-50";
-    if (value.includes("parent")) return "bg-blue-50";
-    if (value.includes("child")) return "bg-green-50";
+    if (isDifferentFromComparator) return "bg-blue-50";
     return "bg-yellow-50";
   };
 
@@ -404,6 +404,7 @@ export const useMatrixLogic = () => {
         });
 
         setDifferences(differencesMap);
+        setRawDifferences(differenceResults);
       } catch (error) {
         console.error("Error fetching differences:", error);
         setDifferences({});
@@ -467,6 +468,7 @@ export const useMatrixLogic = () => {
     loadingDifferences,
     showDropdowns,
     setShowDropdowns,
+    rawDifferences,
 
     // Refs
     inputRef,
