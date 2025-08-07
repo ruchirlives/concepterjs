@@ -68,7 +68,8 @@ const App = () => {
       "Source State",
       "Target State",
       "Change Details",
-      "Cost"
+      "Costs",
+      "Total Cost"
     ]);
     edges.forEach((edge) => {
       const sourceNode = nodes.find(n => n.id === edge.source);
@@ -97,7 +98,8 @@ const App = () => {
         sourceNode?.data.label || edge.source,
         targetNode?.data.label || edge.target,
         qualitativeText,
-        qualLabelText // <-- Add value to row
+        qualLabelText, // <-- Add value to row
+        edgeData.totalWeight || "0"
       ]);
     });
 

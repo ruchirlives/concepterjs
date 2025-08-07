@@ -103,11 +103,11 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 let to_append_cost = "";
                 if (diff.weight || diff.qual_label) {
                     to_append_cost = "cost:";
-                    if (diff.weight) {
-                        to_append_cost += ` ${diff.weight}`;
-                    }
                     if (diff.qual_label) {
                         to_append_cost += ` ${diff.qual_label}`;
+                    }
+                    if (diff.weight) {
+                        to_append_cost += ` est. ${diff.weight}`;
                     }
                     to_append_cost = ` (${to_append_cost.trim()})`;
                 }
@@ -207,14 +207,15 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 }
 
                 let detailedLabel = labelParts.join(' ');
-                if (totalWeight > 0) {
-                    detailedLabel += ` (cost ${totalWeight})`;
-                }
                 if (qualLabelsSet.size > 0) {
                     detailedLabel += ` [${Array.from(qualLabelsSet).join(', ')}]`;
                 }
+                if (totalWeight > 0) {
+                    detailedLabel += ` (cost ${totalWeight})`;
+                }
 
                 const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, targetState);
+
 
                 initialEdges.push({
                     id: `${sourceState}-${targetState}`,
@@ -231,7 +232,6 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                         totalChanges: totalChanges,
                         totalWeight: totalWeight,
                         changesArray: descriptions,
-                        costsArray: costs,
                         costNumbers: costNumbers,
                         qual_label: qualLabels // <-- use qual_label as requested
                     },
