@@ -332,8 +332,11 @@ const AppMatrix = () => {
                             const value = relationships[key] || "";
 
                             // Check if there's a difference for this specific relationship
-                            const isDifferentFromComparator = comparatorState && rawDifferences[sourceContainer.id]?.[targetContainer.id];
-
+                            const isDifferentFromComparator = comparatorState && (
+                              flipped
+                                ? rawDifferences[targetContainer.id]?.[sourceContainer.id]
+                                : rawDifferences[sourceContainer.id]?.[targetContainer.id]
+                            );
                             const isDiagonal = sourceContainer.id === targetContainer.id;
 
                             if (isDiagonal) {

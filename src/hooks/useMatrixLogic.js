@@ -225,7 +225,7 @@ export const useMatrixLogic = () => {
   const handleCopyDiff = async (containerId) => {
     try {
       const containerIds = [containerId];
-      const differenceResults = await compareStates(comparatorState, containerIds);
+      const differenceResults = await compareStates(comparatorState, activeState, containerIds);
 
       if (!differenceResults || !differenceResults[containerId]) {
         toast.error("No differences found for this container");
@@ -244,7 +244,7 @@ export const useMatrixLogic = () => {
   const handleRevertDiff = async (containerId) => {
     try {
       const containerIds = [containerId];
-      const differenceResults = await compareStates(comparatorState, containerIds);
+      const differenceResults = await compareStates(comparatorState, activeState, containerIds);
 
       if (!differenceResults || !differenceResults[containerId]) {
         toast.error("No differences found for this container");
@@ -380,7 +380,13 @@ export const useMatrixLogic = () => {
       setDifferences({});
       try {
         const containerIds = filteredSources.map((container) => container.id);
-        const differenceResults = await compareStates(comparatorState, containerIds);
+
+        const differenceResults = await compareStates(
+          comparatorState,   // sourceState (comparator)
+          activeState,       // targetState (current state)
+          containerIds
+        );
+        console.log("Difference results:", differenceResults);
 
         const differencesMap = {};
 
@@ -421,6 +427,7 @@ export const useMatrixLogic = () => {
     filteredSources,
     nameById,
     containerIdsString,
+    activeState
   ]);
 
   useEffect(() => {
