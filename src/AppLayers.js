@@ -15,7 +15,7 @@ const AppLayers = () => {
 
   // Extract tags from rowData and add as layers, but only when not collapsed
   useEffect(() => {
-    if (collapsed || !rowData) return;
+    if (!rowData) return;
     const tagSet = new Set();
     rowData.forEach(row => {
       if (row.Tags) {
