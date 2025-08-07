@@ -137,7 +137,7 @@ const CustomEdge = ({
         }
         if (typeof onEdgeDoubleClick === 'function') {
             // Pass the event and edge object (mimic ReactFlow's signature)
-            onEdgeDoubleClick(e, { id, source, target, label: data?.label });
+            onEdgeDoubleClick(e, { id, source, target, label: data?.fullLabel ?? data?.label });
         }
     };
 
@@ -161,7 +161,6 @@ const CustomEdge = ({
                     x={labelX - 60}
                     y={labelY - 20}
                     requiredExtensions="http://www.w3.org/1999/xhtml"
-                    style={{ pointerEvents: 'none' }}
                 >
                     <div
                         ref={labelRef}
@@ -170,6 +169,7 @@ const CustomEdge = ({
                         onMouseLeave={handleMouseLeave}
                         onClick={handleLabelClick}
                         onDoubleClick={handleLabelDoubleClick}
+                        title={data?.description}
                         style={{
                             pointerEvents: 'auto',
                             background: '#f9fafb',
@@ -194,7 +194,7 @@ const CustomEdge = ({
 
             {hovered && data?.description && (
                 <Tooltip x={tooltipPos.x} y={tooltipPos.y}>
-                    {data.description}HELLO
+                    {data.description}
                 </Tooltip>
             )}
         </>

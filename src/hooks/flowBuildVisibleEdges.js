@@ -59,12 +59,13 @@ export function buildVisibleEdges(params) {
                     let data;
                     // console.log('DEBUG EDGE POSITION:', c.position);
                     if (c.position !== null && typeof c.position === 'object' && c.position.label) {
-                        const label = c.position.label.length > 20
-                            ? c.position.label.substring(0, 20) + '...'
-                            : c.position.label;
-                        data = { label: label, description: c.position.description };
+                        const fullLabel = c.position.label;
+                        const label = fullLabel.length > 20
+                            ? fullLabel.substring(0, 20) + '...'
+                            : fullLabel;
+                        data = { label: label, fullLabel: fullLabel, description: c.position.description };
                     } else {
-                        data = { label: "" };
+                        data = { label: "", fullLabel: "" };
                     }
 
                     // assemble edge object
