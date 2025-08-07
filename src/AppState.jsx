@@ -75,38 +75,21 @@ const App = () => {
       const targetNode = nodes.find(n => n.id === edge.target);
       const edgeData = edge.data || {};
 
+      // Restore qualitativeText (change details)
       let qualitativeText = "No qualitative changes available";
-      let costText = "";
-
-      if (edgeData.fullChanges) {
-        const lines = edgeData.fullChanges.split('\n');
-        const descriptions = [];
-        const costs = [];
-        lines.forEach(line => {
-          // Extract up to the first colon
-          const idx = line.indexOf(':');
-          if (idx > 0) {
-            descriptions.push(line.slice(0, idx).trim());
-          } else if (line.trim().length > 0) {
-            descriptions.push(line.trim());
-          }
-          // Extract cost value
-          const costMatch = line.match(/\(cost:\s*([^)]+)\)/i);
-          if (costMatch && costMatch[1].trim()) {
-            costs.push(costMatch[1].trim());
-          }
-        });
-        if (descriptions.length > 0) {
-          qualitativeText = descriptions.join('\n');
-          if (qualitativeText.includes('\n')) {
-            qualitativeText = `"${qualitativeText}"`;
-          }
+      if (edgeData.changesArray && edgeData.changesArray.length > 0) {
+        qualitativeText = edgeData.changesArray.join('\n');
+        if (qualitativeText.includes('\n')) {
+          qualitativeText = `"${qualitativeText}"`;
         }
-        if (costs.length > 0) {
-          costText = costs.join('\n');
-          if (costText.includes('\n')) {
-            costText = `"${costText}"`;
-          }
+      }
+
+      // Add qual_label column
+      let qualLabelText = "";
+      if (edgeData.qual_label && edgeData.qual_label.some(q => q)) {
+        qualLabelText = edgeData.qual_label.filter(q => q).join('\n');
+        if (qualLabelText.includes('\n')) {
+          qualLabelText = `"${qualLabelText}"`;
         }
       }
 
@@ -114,7 +97,7 @@ const App = () => {
         sourceNode?.data.label || edge.source,
         targetNode?.data.label || edge.target,
         qualitativeText,
-        costText
+        qualLabelText // <-- Add value to row
       ]);
     });
 

@@ -78,12 +78,17 @@ const DiffPopup = ({ show, diffResults, selectedDiffs, onToggleDiff, onCopy, onC
       const key = `${containerId}-${targetId}`;
 
       let description = "";
+      let to_append = "";
+      if (diff.relationship) {
+        to_append = ` [with] ${diff.relationship}`;
+      }
+
       if (diff.status === "added") {
-        description = `${containerName} [added a relationship with] ${targetName}: ${diff.relationship}`;
+        description = `${containerName} [added a relationship to] ${targetName}${to_append}`;
       } else if (diff.status === "changed") {
-        description = `${containerName} [changed its relationship with] ${targetName}: ${diff.relationship}`;
+        description = `${containerName} [changed its relationship to] ${targetName}${to_append}`;
       } else if (diff.status === "removed") {
-        description = `${containerName} [removed its relationship with] ${targetName}: ${diff.relationship}`;
+        description = `${containerName} [removed its relationship with] ${targetName}${to_append}`;
       }
 
       diffEntries.push({

@@ -95,14 +95,31 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 const diff = containerDiffs[targetId];
                 const targetName = nameById[targetId] || targetId;
 
+                let to_append = "";
+                if (diff.relationship) {
+                    to_append = ` [with] ${diff.relationship}`;
+                }
+
+                let to_append_cost = "";
+                if (diff.weight || diff.qual_label) {
+                    to_append_cost = "cost:";
+                    if (diff.weight) {
+                        to_append_cost += ` ${diff.weight}`;
+                    }
+                    if (diff.qual_label) {
+                        to_append_cost += ` ${diff.qual_label}`;
+                    }
+                    to_append_cost = ` (${to_append_cost.trim()})`;
+                }
+
                 if (diff.status === "added") {
-                    changes.push(`${containerName} [added] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
+                    changes.push(`${containerName} [added] ${targetName}${to_append} ${to_append_cost}`.trim());
                     counts.added++;
                 } else if (diff.status === "changed") {
-                    changes.push(`${containerName} [changed] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
+                    changes.push(`${containerName} [changed] ${targetName}${to_append} ${to_append_cost}`.trim());
                     counts.changed++;
                 } else if (diff.status === "removed") {
-                    changes.push(`${containerName} [removed] ${targetName}: ${diff.relationship} (cost: ${diff.weight || ''} ${diff.qual_label || ''})`);
+                    changes.push(`${containerName} [removed] ${targetName}${to_append} ${to_append_cost}`.trim());
                     counts.removed++;
                 }
             });
@@ -138,6 +155,34 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 const fullChangesText = changes.join("\n");
                 const totalChanges = counts.added + counts.changed + counts.removed;
 
+                // Build arrays for export
+                const descriptions = [];
+                const costs = [];
+                const costNumbers = [];
+                const qualLabels = [];
+                changes.forEach(line => {
+                    // Remove (cost ...) from end for description
+                    const desc = line.replace(/\s*\(cost[^)]*\)\s*$/i, '').trim();
+                    descriptions.push(desc);
+
+                    // Extract cost value if present
+                    const costMatch = line.match(/\(cost\s*([^)]+)\)/i);
+                    if (costMatch && costMatch[1].trim()) {
+                        costs.push(costMatch[1].trim());
+
+                        // Try to extract the qualitative label (first non-number word)
+                        const parts = costMatch[1].trim().split(/\s+/);
+                        const numMatch = parts[0].match(/[\d.]+/);
+                        costNumbers.push(numMatch ? numMatch[0] : "");
+
+                        qualLabels.push(parts.length > 1 ? parts.slice(1).join(' ') : "");
+                    } else {
+                        costs.push("");
+                        costNumbers.push("");
+                        qualLabels.push("");
+                    }
+                });
+
                 const labelParts = [];
                 if (counts.added > 0) labelParts.push(`+${counts.added}`);
                 if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
@@ -145,7 +190,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
 
                 const enriched = await enrichDiffWithMetadata(diffResults);
                 let totalWeight = 0;
-                const qualLabels = new Set();
+                const qualLabelsSet = new Set();
 
                 if (enriched) {
                     Object.keys(enriched).forEach((containerId) => {
@@ -155,7 +200,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                             const weight = parseFloat(diff.weight) || 0;
                             totalWeight += weight;
                             if (diff.qual_label && diff.qual_label.trim() !== '') {
-                                qualLabels.add(diff.qual_label);
+                                qualLabelsSet.add(diff.qual_label);
                             }
                         });
                     });
@@ -165,8 +210,8 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                 if (totalWeight > 0) {
                     detailedLabel += ` (cost ${totalWeight})`;
                 }
-                if (qualLabels.size > 0) {
-                    detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
+                if (qualLabelsSet.size > 0) {
+                    detailedLabel += ` [${Array.from(qualLabelsSet).join(', ')}]`;
                 }
 
                 const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, targetState);
@@ -184,7 +229,11 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                         fullChanges: fullChangesText,
                         counts: counts,
                         totalChanges: totalChanges,
-                        totalWeight: totalWeight
+                        totalWeight: totalWeight,
+                        changesArray: descriptions,
+                        costsArray: costs,
+                        costNumbers: costNumbers,
+                        qual_label: qualLabels // <-- use qual_label as requested
                     },
                 });
             }
