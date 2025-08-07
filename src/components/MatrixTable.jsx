@@ -1,6 +1,6 @@
-import React from 'react';
-import MatrixCell from './MatrixCell';
-import DifferenceCell from './DifferenceCell';
+import React from "react";
+import MatrixCell from "./MatrixCell";
+import DifferenceCell from "./DifferenceCell";
 
 const MatrixTable = ({
   filteredSources,
@@ -31,7 +31,7 @@ const MatrixTable = ({
   showDropdowns,
   toggleDropdown,
   handleCopyDiff,
-  handleRevertDiff
+  handleRevertDiff,
 }) => {
   return (
     <div className="overflow-x-auto overflow-y-auto w-full h-full" style={{ maxHeight: "600px" }}>
@@ -95,19 +95,19 @@ const MatrixTable = ({
                 </div>
               </th>
               {filteredTargets.map((targetContainer) => (
-              <MatrixCell
-                key={`${sourceContainer.id}-${targetContainer.id}`}
-                sourceContainer={sourceContainer}
-                targetContainer={targetContainer}
-                flipped={flipped}
-                relationships={relationships}
-                forwardExists={forwardExists}
-                edgeMap={edgeMap}
-                editingCell={editingCell}
-                inputRef={inputRef}
-                handleCellClick={handleCellClick}
-                handleEdgeMenu={handleEdgeMenu}
-                handleKeyDown={handleKeyDown}
+                <MatrixCell
+                  key={`${sourceContainer.id}-${targetContainer.id}`}
+                  sourceContainer={sourceContainer}
+                  targetContainer={targetContainer}
+                  flipped={flipped}
+                  relationships={relationships}
+                  forwardExists={forwardExists}
+                  edgeMap={edgeMap}
+                  editingCell={editingCell}
+                  inputRef={inputRef}
+                  handleCellClick={handleCellClick}
+                  handleEdgeMenu={handleEdgeMenu}
+                  handleKeyDown={handleKeyDown}
                   handleBlur={handleBlur}
                   setHoveredRowId={setHoveredRowId}
                   setHoveredCell={setHoveredCell}
