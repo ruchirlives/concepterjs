@@ -199,7 +199,20 @@ export const useMatrixLogic = () => {
         const key = `${source.id}-${target.id}`;
         values.push(relationships[key] || "");
       });
-      values.push(differences[source.id] || "No difference");
+
+      const sourceDiffs = rawDifferences[source.id] || {};
+      const diffStrings = Object.entries(sourceDiffs).map(([targetId, diff]) => {
+        const targetName = nameById[targetId] || targetId;
+        if (diff.status === "added") {
+          return `Added ${targetName}: ${diff.relationship}`;
+        } else if (diff.status === "changed") {
+          return `Changed ${targetName}: ${diff.relationship}`;
+        } else if (diff.status === "removed") {
+          return `Removed ${targetName}: ${diff.relationship}`;
+        }
+        return `${targetName}: ${diff.relationship}`;
+      });
+      values.push(diffStrings.length > 0 ? diffStrings.join("\n") : "No difference");
       return values.join("\t");
     });
     const tsv = [headers.join("\t"), ...rows].join("\n");
@@ -220,7 +233,7 @@ export const useMatrixLogic = () => {
         </button>
       </div>
     ));
-  }, [filteredSources, filteredTargets, relationships, differences, comparatorState]);
+  }, [filteredSources, filteredTargets, relationships, rawDifferences, comparatorState, nameById]);
 
   const handleCopyDiff = async (containerId) => {
     try {
