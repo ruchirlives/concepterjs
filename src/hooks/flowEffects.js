@@ -285,13 +285,16 @@ export const useOnEdgeDoubleClick = (setEdges) => {
             const sourceId = edge.source;
             const targetId = edge.target;
             // Open an input dialog to edit the edge label
-            const newLabel = window.prompt('Enter new label:', edge.label || '');
+            const currentLabel = edge.label ?? edge.data?.fullLabel ?? edge.data?.label ?? '';
+            const newLabel = window.prompt('Enter new label:', currentLabel);
             if (newLabel !== null) {
                 // Update the edge label in the state
                 setEdges((eds) =>
                     eds.map((e) => {
                         if (e.id === edge.id) {
-                            return { ...e, label: newLabel };
+                            const fullLabel = newLabel;
+                            const label = fullLabel.length > 20 ? fullLabel.substring(0, 20) + '...' : fullLabel;
+                            return { ...e, data: { ...e.data, label, fullLabel } };
                         }
                         return e;
                     })
