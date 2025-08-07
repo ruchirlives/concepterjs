@@ -4,7 +4,7 @@ import { getLayoutedElements } from './flowLayouter';
 import toast from 'react-hot-toast';
 import { enrichDiffWithMetadata } from '../transitionMetadata';
 
-export const useStateComparison = (rowData, selectedTargetState, setDiffDict, collapsed) => {
+export const useStateComparison = (rowData, selectedTargetState, setDiffDict, collapsed, flipDirection = false) => {
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -115,67 +115,63 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
     const createComparisonEdges = useCallback(async (states, selectedTargetState, nameById, containerIds) => {
         const initialEdges = [];
 
-        for (const sourceState of states) {
-            // Skip if comparing with itself
-            if (sourceState === selectedTargetState) continue;
+        for (const state of states) {
+            if (state === selectedTargetState) continue;
+
+            let sourceState, targetState;
+            if (flipDirection) {
+                sourceState = selectedTargetState;
+                targetState = state;
+            } else {
+                sourceState = state;
+                targetState = selectedTargetState;
+            }
 
             try {
-                // Compare sourceState with selectedTargetState
                 const diffResults = await compareStates(sourceState, containerIds);
                 const { changes, counts } = await buildChangesFromDiff(diffResults, nameById);
 
-                // Only create edge if there are changes
                 if (changes.length > 0) {
                     const fullChangesText = changes.join("\n");
                     const totalChanges = counts.added + counts.changed + counts.removed;
 
-                    // Create a detailed label showing breakdown
                     const labelParts = [];
                     if (counts.added > 0) labelParts.push(`+${counts.added}`);
                     if (counts.changed > 0) labelParts.push(`~${counts.changed}`);
                     if (counts.removed > 0) labelParts.push(`-${counts.removed}`);
 
-                    // Add the weights and qual_labels
                     const enriched = await enrichDiffWithMetadata(diffResults);
                     let totalWeight = 0;
-                    const qualLabels = new Set(); // Use Set to avoid duplicates
+                    const qualLabels = new Set();
 
                     if (enriched) {
-                        // Sum all weights and collect qual_labels from the enriched diff
                         Object.keys(enriched).forEach((containerId) => {
                             const containerDiffs = enriched[containerId];
                             Object.keys(containerDiffs).forEach((targetId) => {
                                 const diff = containerDiffs[targetId];
                                 const weight = parseFloat(diff.weight) || 0;
                                 totalWeight += weight;
-
-                                // Collect non-null qual_labels
                                 if (diff.qual_label && diff.qual_label.trim() !== '') {
                                     qualLabels.add(diff.qual_label);
                                 }
                             });
                         });
-
-                        console.log(`Total weight for ${sourceState} -> ${selectedTargetState}: ${totalWeight}`);
                     }
 
-                    // Include weight and qual_labels in the label
                     let detailedLabel = labelParts.join(' ');
-
                     if (totalWeight > 0) {
                         detailedLabel += ` (cost ${totalWeight})`;
                     }
-
                     if (qualLabels.size > 0) {
                         detailedLabel += ` [${Array.from(qualLabels).join(', ')}]`;
                     }
 
-                    const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, selectedTargetState);
+                    const handleEdgeClick = createEdgeClickHandler(diffResults, sourceState, targetState);
 
                     initialEdges.push({
-                        id: `${sourceState}-${selectedTargetState}`,
+                        id: `${sourceState}-${targetState}`,
                         source: sourceState,
-                        target: selectedTargetState,
+                        target: targetState,
                         label: detailedLabel,
                         type: "custom",
                         animated: false,
@@ -185,17 +181,17 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                             fullChanges: fullChangesText,
                             counts: counts,
                             totalChanges: totalChanges,
-                            totalWeight: totalWeight // Store total weight for additional use
+                            totalWeight: totalWeight
                         },
                     });
                 }
             } catch (err) {
-                console.error(`Error comparing ${sourceState} with ${selectedTargetState}:`, err);
+                console.error(`Error comparing ${sourceState} with ${targetState}:`, err);
             }
         }
 
         return initialEdges;
-    }, [buildChangesFromDiff, createEdgeClickHandler]);
+    }, [buildChangesFromDiff, createEdgeClickHandler, flipDirection]);
 
     // Main effect to load and process state data
     useEffect(() => {
@@ -215,7 +211,8 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
                     data: {
                         label: state,
                         Name: state,
-                        isTarget: state === selectedTargetState,
+                        isTarget: flipDirection ? false : state === selectedTargetState,
+                        isSource: flipDirection ? state === selectedTargetState : false,
                     },
                     position: { x: 0, y: 0 }, // Will be overwritten by layouter
                 }));
@@ -250,7 +247,7 @@ export const useStateComparison = (rowData, selectedTargetState, setDiffDict, co
         };
 
         loadStateComparison();
-    }, [rowData, selectedTargetState, collapsed, createComparisonEdges]);
+    }, [rowData, selectedTargetState, collapsed, createComparisonEdges, flipDirection]);
 
     return {
         nodes,

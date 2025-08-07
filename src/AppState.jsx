@@ -13,11 +13,12 @@ const App = () => {
   const { rowData, setDiffDict } = useAppContext();
   const [selectedTargetState, setSelectedTargetState] = useState("base");
   const [collapsed, setCollapsed] = useState(true);
+  const [flipDirection, setFlipDirection] = useState(false);
 
   // Use the custom hook for state comparison logic
-  const { 
-    nodes, 
-    edges, 
+  const {
+    nodes,
+    edges,
     loading,
     showDiffPopup,
     currentDiffResults,
@@ -26,10 +27,11 @@ const App = () => {
     copySelectedDiffs,
     closeDiffPopup
   } = useStateComparison(
-    rowData, 
-    selectedTargetState, 
-    setDiffDict, 
-    collapsed
+    rowData,
+    selectedTargetState,
+    setDiffDict,
+    collapsed,
+    flipDirection // <-- add this argument
   );
 
   // Define custom node and edge types
@@ -169,8 +171,17 @@ const App = () => {
         <div className="flex items-center gap-4">
           <span className="font-semibold">State Diagram</span>
           <div className="flex items-center gap-2">
-            <span className="text-sm">Target State:</span>
+            <span className="text-sm">
+              {flipDirection ? "Source State:" : "Target State:"}
+            </span>
             <StateDropdown onStateChange={handleTargetStateChange} className="min-w-32" />
+            <button
+              className="ml-2 px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300"
+              onClick={() => setFlipDirection(f => !f)}
+              title="Flip source/target direction"
+            >
+              Flip
+            </button>
           </div>
           {loading && <span className="text-xs text-gray-500">Loading...</span>}
           
