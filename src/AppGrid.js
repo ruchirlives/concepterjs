@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useAppContext, rowInLayers } from "./AppContext";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry } from "ag-grid-community";
-import { createNewRow } from "./components/ModalNewContainer"; // Import the function to create a new row
+import useCreateNewRow from "./components/ModalNewContainer"; // Import the function to create a new row
 import NamePromptModal from "./components/ModalNamePrompt";
 
 // My imports
@@ -44,7 +44,7 @@ const App = () => {
 
   // State to store name of the current container
   const [currentContainer, setCurrentContainer] = useState(null);
-  const [activeGroup, setActiveGroup] = useState(null);
+  const [setActiveGroup] = useState(null);
   const [collapsed, setCollapsed] = React.useState(true);
 
   // Reference to the grid API
@@ -110,18 +110,7 @@ const App = () => {
 
   };
 
-  const handleAddRow = createNewRow(setRowData, activeGroup, activeLayers); // Function to create a new row
-
-  // Handle row selection and fetch children dynamically
-  // const onRowSelected = async (event) => {
-  //   if (event.node.__selected) {
-  //     const parentRow = event.data;
-  //     setLastSelectedRow(parentRow); // Save the last selected row
-  //     // Fetch children from the API
-  //     const children = await fetchChildren(parentRow.id);
-  //     setMiniMapData(children); // Populate mini-map with fetched children
-  //   }
-  // };
+  const handleAddRow = useCreateNewRow(); // Function to create a new row
 
   // Add a child row to the main grid if it doesn’t already exist
   const addRowIfNotExists = (child) => {

@@ -5,11 +5,11 @@ import { useStateScores } from './useStateScores';
 
 export const useFlowLogic = () => {
   const [collapsed, setCollapsed] = useState(true);
-  const [activeGroup, setActiveGroup] = useState(null);
+
   const [history, setHistory] = useState([]);
   const [layoutPositions, setLayoutPositions] = useState({});
 
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState, activeGroup, setActiveGroup } = useAppContext();
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 

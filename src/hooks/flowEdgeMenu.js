@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
-import { createNewRow } from '../components/ModalNewContainer';
+import useCreateNewRow from '../components/ModalNewContainer';
 import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
@@ -9,8 +9,9 @@ import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDouble
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent, setTiptapContent, activeLayers, edges, setEdges } = useAppContext();
+    const { tiptapContent, setTiptapContent, edges, setEdges } = useAppContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
+    const newRowFunc = useCreateNewRow();
 
     const handleEdgeMenu = (event, edge) => {
         console.log("Edge Context menu triggered", event);
@@ -85,8 +86,8 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             // First remove the edge
             removeEdgeById(edgeId);
 
-            // Use createNewRow to create a new node(s)
-            const newNodes = await createNewRow(setRowData, activeGroup, activeLayers)();
+            // useCreateNewRow to create a new node(s)
+            const newNodes = await newRowFunc();
             console.log("New Nodes:", newNodes);
 
             // For each new node, use the addChildren function to add the new node as a child of the source node

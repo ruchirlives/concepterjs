@@ -2,20 +2,19 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAppContext, rowInLayers } from '../AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
 import { setPosition } from '../api';
-import { createNewRow } from '../components/ModalNewContainer';
+import useCreateNewRow from '../components/ModalNewContainer';
 import { generateNodesAndEdges } from './flowGenerateGraph';
 import { handleEdgeConnection, handleEdgeRemoval, requestAddChild } from './flowFunctions';
 
 
 export const useOnConnectEnd = (params) => {
-    const { setEdges, addEdge, setNodes, setRowData, screenToFlowPosition, activeGroup, setLayoutPositions } = params;
-    const { activeLayers } = useAppContext();
+    const { setEdges, addEdge, setNodes, screenToFlowPosition, setLayoutPositions } = params;
+    const newRowFunc = useCreateNewRow();
 
     const onConnectEnd = useCallback(
         (event, connectionState) => {
 
             const createNode = async (event) => {
-                const newRowFunc = createNewRow(setRowData, activeGroup, activeLayers);
                 const newRows = await newRowFunc(); // returns array or null
 
                 if (!Array.isArray(newRows) || newRows.length === 0) {
@@ -121,7 +120,7 @@ export const useOnConnectEnd = (params) => {
             }
         },
         // Notice we removed rowData from the dependency array.
-        [setNodes, setRowData, screenToFlowPosition, setEdges, addEdge, activeGroup, setLayoutPositions, activeLayers]
+        [setNodes, screenToFlowPosition, setEdges, addEdge, setLayoutPositions, newRowFunc]
     );
 
     return onConnectEnd;

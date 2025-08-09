@@ -13,6 +13,7 @@ export const AppProvider = ({ children }) => {
   const [lastLoadedFile, setLastLoadedFile] = useState(null);
 
   // State management
+  const [activeGroup, setActiveGroup] = useState(null);
   const [activeState, setActiveState] = useState("base");
   const [availableStates, setAvailableStates] = useState([]);
   const [comparatorState, setComparatorState] = useState("base");
@@ -137,6 +138,8 @@ export const AppProvider = ({ children }) => {
     lastLoadedFile,
     setLastLoadedFile,
     // State management
+    activeGroup,
+    setActiveGroup,
     activeState,
     availableStates,
     setAvailableStates,

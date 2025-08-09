@@ -17,19 +17,26 @@ let setModalVisible = () => { }; // Will be updated by the modal component
 export default function NamePromptModal() {
   const [visible, setVisible] = useState(false);
   const [namesInput, setNamesInput] = useState("");
+  const [splitByComma, setSplitByComma] = useState(false); // NEW
 
   setModalVisible = setVisible;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    resolveNamePromise(namesInput || null);
+    // Pass both the input and the toggle value
+    resolveNamePromise({
+      namesInput: namesInput || null,
+      splitByComma
+    });
     setNamesInput("");
+    setSplitByComma(false);
     setVisible(false);
   };
 
   const handleCancel = () => {
     resolveNamePromise(null);
     setNamesInput("");
+    setSplitByComma(false);
     setVisible(false);
   };
 
@@ -46,6 +53,17 @@ export default function NamePromptModal() {
           style={{ width: "100%", padding: "8px" }}
           autoFocus
         />
+        <div style={{ margin: "0.5rem 0" }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={splitByComma}
+              onChange={(e) => setSplitByComma(e.target.checked)}
+              style={{ marginRight: "0.5em" }}
+            />
+            Also split by commas
+          </label>
+        </div>
         <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
           <button type="button" onClick={handleCancel}>Cancel</button>
           <button type="submit">Create</button>
