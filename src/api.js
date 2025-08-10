@@ -732,4 +732,14 @@ export const calculateStateScores = async (baseState) => {
     }
 };
 
+export const getContainerBudgetApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/get_container_budget`, { container_ids: containerIds });
+    return response.data.budgets;
+};
+
+export const convertToBudgetContainerApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/convert_to_budget_container`, { container_ids: containerIds });
+    return response.data;
+};
+
 

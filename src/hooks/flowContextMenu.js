@@ -18,6 +18,8 @@ import {
     addChildren,
     add_similar,
     api_build_chain_beam,
+    getContainerBudgetApi,
+    convertToBudgetContainerApi,
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -56,8 +58,34 @@ export const menuItems = [
     { handler: "unmakeInputNode", label: "Unmake Input Node" },
     { handler: "unmakeOutputNode", label: "Unmake Output Node" },
     { handler: "unmakeGroupNode", label: "Unmake Group Node" },
+    { handler: "getContainerBudgetAction", label: "Get Container Budget" },
+    { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container" },
 ];
 /* eslint-disable no-unused-vars */
+
+async function getContainerBudgetAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const budgets = await getContainerBudgetApi(selectedIds);
+    if (!budgets.length) {
+        toast("No budgets found for selected containers.");
+        return;
+    }
+    let msg = budgets.map(b => `ID: ${b.Name} — Budget: ${b.Budget}`).join('\n');
+    toast(msg, { duration: 8000 });
+}
+
+async function convertToBudgetContainerAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await convertToBudgetContainerApi(selectedIds);
+    toast.success(res.message || "Converted to budget container.");
+    requestRefreshChannel();
+}
 
 // rename
 async function rename({ selectedNodes, selectedIds, rowData, setRowData }) {
