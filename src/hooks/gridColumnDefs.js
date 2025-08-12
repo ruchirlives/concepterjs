@@ -41,6 +41,7 @@ const columnDefs = [
     { field: "Cost", headerName: "Cost", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
     // Budget
     { field: "Budget", headerName: "Budget", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
+    { field: "Function", headerName: "Function", filter: "agTextColumnFilter", sortable: true, editable: true, flex: 1 },
 ];
 
 export default columnDefs;

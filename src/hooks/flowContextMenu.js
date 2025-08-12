@@ -20,6 +20,7 @@ import {
     api_build_chain_beam,
     getContainerBudgetApi,
     convertToBudgetContainerApi,
+    addFinanceContainerApi
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -60,6 +61,7 @@ export const menuItems = [
     { handler: "unmakeGroupNode", label: "Unmake Group Node" },
     { handler: "getContainerBudgetAction", label: "Get Container Budget" },
     { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container" },
+    { handler: "addFinanceContainerAction", label: "Add Finance Container" },
 ];
 /* eslint-disable no-unused-vars */
 
@@ -84,6 +86,16 @@ async function convertToBudgetContainerAction({ selectedIds }) {
     }
     const res = await convertToBudgetContainerApi(selectedIds);
     toast.success(res.message || "Converted to budget container.");
+    requestRefreshChannel();
+}
+
+async function addFinanceContainerAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await addFinanceContainerApi(selectedIds);
+    toast.success(res.message || "Converted to finance container.");
     requestRefreshChannel();
 }
 

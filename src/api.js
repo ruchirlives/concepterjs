@@ -742,4 +742,7 @@ export const convertToBudgetContainerApi = async (containerIds) => {
     return response.data;
 };
 
-
+export const addFinanceContainerApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/add_finance_container`, { container_ids: containerIds });
+    return response.data;
+};
