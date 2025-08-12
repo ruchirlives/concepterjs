@@ -42,6 +42,8 @@ export function generateNodesAndEdges(params) {
                 id: item.id,
                 Name: item.Name || `Node ${item.id}`,
                 Description: item.Description || '',
+                Budget: item.Budget || undefined,
+                Cost: item.Cost || undefined,
                 Horizon: item.Horizon || '',
                 Tags: item.Tags || '',
                 // Add scoring data

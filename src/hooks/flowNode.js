@@ -119,6 +119,15 @@ const FlowNode = ({ data, style, selected }) => {
             )}
           </div>
         )}
+        {/* Show budget if available */}
+        {data.Budget !== undefined && (
+          <div className="text-xs text-blue-700 mt-1">
+            Budget: {data.Budget}
+            {data.Cost !== undefined && (
+              <span className="ml-1 text-gray-500">(funds: {data.Cost})</span>
+            )}
+          </div>
+        )}
       </div>
 
       {isHovered && data.Description && (
