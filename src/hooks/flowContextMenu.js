@@ -20,7 +20,8 @@ import {
     api_build_chain_beam,
     getContainerBudgetApi,
     convertToBudgetContainerApi,
-    addFinanceContainerApi
+    addFinanceContainerApi,
+    joinSimilarContainers, // <-- add this import
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -62,6 +63,7 @@ export const menuItems = [
     { handler: "getContainerBudgetAction", label: "Get Container Budget" },
     { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container" },
     { handler: "addFinanceContainerAction", label: "Add Finance Container" },
+    { handler: "joinSimilar", label: "Join Top Similar" }, // <-- add to menuItems array
 ];
 /* eslint-disable no-unused-vars */
 
@@ -309,6 +311,25 @@ async function addSimilar({ nodeId, selectedIds, nodes }) {
     await new Promise(resolve => setTimeout(resolve, 300));
     requestRefreshChannel();
 }
+
+async function joinSimilar({ selectedIds, activeGroup }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    try {
+        const res = await joinSimilarContainers(selectedIds);
+        toast.success(res.message || "Joined similar containers.");
+        if (res.new_container_id && activeGroup) {
+            await addChildren(activeGroup, [res.new_container_id]);
+        }
+        requestRefreshChannel();
+    } catch (err) {
+        toast.error("Failed to join similar containers.");
+        console.error(err);
+    }
+}
+
 
 async function buildChainBeam({ nodes, nodeId, selectedIds }) {
     const end_node = nodeId;

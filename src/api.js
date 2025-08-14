@@ -746,3 +746,10 @@ export const addFinanceContainerApi = async (containerIds) => {
     const response = await apiClient.post(`${getApiUrl()}/add_finance_container`, { container_ids: containerIds });
     return response.data;
 };
+
+export async function joinSimilarContainers(containerIds) {
+    const res = await apiClient.post(`${getApiUrl()}/join_similar`, { container_ids: containerIds });
+    console.log("joinSimilarContainers response:", res);
+    if (res.status !== 200) throw new Error("Failed to join similar containers");
+    return res.data;
+}
