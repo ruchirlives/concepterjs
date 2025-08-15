@@ -22,6 +22,8 @@ import {
     convertToBudgetContainerApi,
     addFinanceContainerApi,
     joinSimilarContainers, // <-- add this import
+    embedPositions,
+    findSimilarPositions,
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -64,6 +66,8 @@ export const menuItems = [
     { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container" },
     { handler: "addFinanceContainerAction", label: "Add Finance Container" },
     { handler: "joinSimilar", label: "Join Top Similar" }, // <-- add to menuItems array
+    { handler: "embedPositionsAction", label: "Embed Positions" },
+    { handler: "findSimilarPositionsAction", label: "Find Similar Positions" },
 ];
 /* eslint-disable no-unused-vars */
 
@@ -441,6 +445,53 @@ async function removeLayerTag({ selectedIds }, layer) {
     const ch = new BroadcastChannel("removeTagsChannel");
     ch.postMessage({ selectedIds, tags: layer });
     ch.close();
+}
+
+
+async function embedPositionsAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await embedPositions(selectedIds);
+    if (res?.message) toast.success(res.message);
+    else toast.error("Failed to embed positions.");
+}
+
+async function findSimilarPositionsAction({ nodes }) {
+    const positionText = prompt("Enter position text to find similar:");
+    if (!positionText) return;
+    const res = await findSimilarPositions(positionText);
+    console.log("Similar positions response:", res);
+
+    // Build a map of id -> Name for quick lookup
+    const idToName = {};
+    nodes.forEach(n => {
+        idToName[n.data.id] = n.data.Name;
+    });
+
+    if (res?.similar_positions?.length) {
+        // Sort by score descending
+        const sorted = [...res.similar_positions].sort((a, b) => b.score - a.score);
+        const msg = sorted
+            .map(pos => {
+                const containerName = idToName[pos.container_id] || pos.container_id;
+                const childName = idToName[pos.child_id] || pos.child_id;
+                const label = pos.position_label || "";
+                return `Container: ${containerName}\nLabel: ${label}\nChild: ${childName}\nScore: ${pos.score.toFixed(3)}`;
+            })
+            .join('\n\n');
+        toast.success(
+            <div style={{ whiteSpace: "pre-wrap" }}>
+                <b>Similar positions found:</b>
+                <br />
+                {msg}
+            </div>,
+            { duration: 10000 }
+        );
+    } else {
+        toast.error(res?.message || "No similar positions found.");
+    }
 }
 
 

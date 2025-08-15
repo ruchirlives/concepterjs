@@ -753,3 +753,37 @@ export async function joinSimilarContainers(containerIds) {
     if (res.status !== 200) throw new Error("Failed to join similar containers");
     return res.data;
 }
+
+/**
+ * Generate embeddings for relationship positions.
+ * @param {string[]} containerIds
+ * @returns {Promise<Object>} API response
+ */
+export const embedPositions = async (containerIds) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/embed_positions`, {
+            container_ids: containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error embedding positions:", error);
+        return null;
+    }
+};
+
+/**
+ * Find similar positions based on embeddings.
+ * @param {string} positionText
+ * @returns {Promise<Object>} API response
+ */
+export const findSimilarPositions = async (positionText) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/find_similar_positions`, {
+            position_text: positionText,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error finding similar positions:", error);
+        return null;
+    }
+};
