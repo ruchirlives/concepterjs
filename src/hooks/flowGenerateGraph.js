@@ -44,7 +44,6 @@ export function generateNodesAndEdges(params) {
                 Description: item.Description || '',
                 Budget: item.Budget || undefined,
                 Cost: item.Cost || undefined,
-                Horizon: item.Horizon || '',
                 Tags: item.Tags || '',
                 // Add scoring data
                 isHighestScoring: highestScoringId === item.id?.toString(),
