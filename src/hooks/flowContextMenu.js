@@ -24,6 +24,7 @@ import {
     joinSimilarContainers, // <-- add this import
     embedPositions,
     findSimilarPositions,
+    exportBranch
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -48,6 +49,7 @@ export const menuItems = [
     { handler: "exportGantt", label: "Export to Gantt" },
     { handler: "exportDocx", label: "Export to Docx" },
     { handler: "exportSelected", label: "Export Selected" },
+    { handler: "exportBranchSelected", label: "Export Branch" },
     { handler: "mergeSelected", label: "Merge Selected" },
     { handler: "joinSelected", label: "Join Selected" },
     { handler: "addSelected", label: "Add Selected" },
@@ -262,6 +264,15 @@ async function exportDocx({ selectedIds }) {
 
 async function exportSelected({ selectedIds }) {
     exportSelectedContainers(selectedIds);
+}
+
+async function exportBranchSelected({ selectedIds }) {
+    const data = await exportBranch(selectedIds);
+    if (data) {
+        alert("Branch exported successfully.");
+    } else {
+        alert("Failed to export branch.");
+    }
 }
 
 async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, setRowData }) {

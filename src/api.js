@@ -371,6 +371,19 @@ export const exportSelectedContainers = async (containerIds) => {
     }
 }
 
+export const exportBranch = async (containerIds) => {
+    try {
+        console.log("Exporting branch for containers:", containerIds);
+        const response = await apiClient.post(`${getApiUrl()}/export_branch`, {
+            "containers": containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error exporting branch:", error);
+        return null;
+    }
+};
+
 // Function to merge containers
 export const mergeContainers = async (containerIds) => {
     try {
