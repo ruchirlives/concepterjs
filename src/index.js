@@ -6,7 +6,6 @@ import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppMermaid from './AppMermaid';
 import AppMatrix from './AppMatrix';
-import AppPrioritiser from './AppPrioritiser';
 import AppLayers from './AppLayers';
 import AppState from './AppState';
 import CreateFromContentModal from './components/CreateFromContentModal';
@@ -60,10 +59,6 @@ const MemoizedStaticContent = React.memo(() => (
 
     <section id="matrix">
       <AppMatrix />
-    </section>
-
-    <section id="prioritiser">
-      <AppPrioritiser />
     </section>
 
     <section id="states">

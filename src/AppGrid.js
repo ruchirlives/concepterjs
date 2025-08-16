@@ -80,25 +80,6 @@ const App = () => {
     },
     // onRowSelected: (event) => onRowSelected(event), // Row selection handler
     onCellContextMenu: (event) => handleContextMenu(event), // Context menu handler
-    // Apply row style based on Horizon field value
-    getRowStyle: (params) => {
-      const horizonValue = params.data.Horizon; // Get the Horizon field value
-      if (params.data.hidden) {
-        return { color: 'DarkGrey' };  // Hides the row
-      }
-      if (horizonValue === "short") {
-        return { color: "white" }; // Green for high horizon
-      } else if (horizonValue === "medium") {
-        return { color: "LightGrey" }; // Yellow for medium horizon
-      } else if (horizonValue === "long") {
-        return { color: "SlateGrey" }; // Red for low horizon
-      }
-      else if (horizonValue === "completed") {
-        return { color: "green" }; // Green for completed
-      }
-      return {}; // Default style
-    },
-
   };
 
   // Function to save data with the provided name

@@ -23,20 +23,7 @@ const columnDefs = [
     },
     { field: "StartDate", headerName: "Start Date", filter: "agTextColumnFilter", sortable: true, editable: true, flex: 1 },
     { field: "EndDate", headerName: "End Date", filter: "agTextColumnFilter", sortable: true, editable: true, flex: 1 },
-    {
-        field: "Horizon",
-        headerName: "Horizon",
-        filter: "agTextColumnFilter",
-        sortable: true,
-        editable: true,
-        flex: 1,
-        cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: ["short", "medium", "long", "completed"] },
-    },
     { field: "TimeRequired", headerName: "Time Required", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
-    // Impact and Effort
-    { field: "Impact", headerName: "Impact", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
-    { field: "Effort", headerName: "Effort", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
     // cost
     { field: "Cost", headerName: "Cost", cellDataType: "number", filter: "agNumberColumnFilter", sortable: true, editable: true, flex: 1 },
     // Budget

@@ -26,14 +26,6 @@ const FlowNode = ({ data, style, selected }) => {
     channel.close();
   };
 
-  const getTextColor = () => {
-    if (data.Horizon === 'short') return 'text-black';
-    if (data.Horizon === 'medium') return 'text-gray-600';
-    if (data.Horizon === 'long') return 'text-gray-400';
-    if (data.Horizon === 'completed') return 'text-gray-200';
-    return 'text-gray-800';
-  };
-
   const getBgColorClassShade = () => {
     // based on the number of children, return a class for the background color
     const childCount = data.parents ? data.parents.length : 0;
@@ -83,7 +75,7 @@ const FlowNode = ({ data, style, selected }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg shadow-md border transition-colors 
-        ${selected ? 'border-red-600 border-4' : 'border-gray-300'} ${getTextColor()}
+        ${selected ? 'border-red-600 border-4' : 'border-gray-300'}
         ${data.highlighted ? 'bg-gray-400' : getBgColorClass()}`}
     >
       <Handle

@@ -60,7 +60,6 @@ export default function useCreateNewRow() {
                 EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
                     .toISOString()
                     .split("T")[0],
-                Horizon: "short",
                 TimeRequired: 1,
             });
 

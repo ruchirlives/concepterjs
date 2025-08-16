@@ -55,7 +55,7 @@ npm start
 
 ## Usage
 
-* Use the **Grid View** to create, edit, and delete containers with details like ID, Name, Description, Tags, Dates, and Horizon.
+* Use the **Grid View** to create, edit, and delete containers with details like ID, Name, Description, Tags, Dates.
 * Right-click rows or nodes to access **Context Menus** with options for adding/removing children, merging, exporting diagrams, and more.
 * Visualize container relationships using the **Flow Visualization** panel with drag-and-drop and edge editing.
 * View live Mermaid diagrams in the **Mermaid Panel**.
