@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Modal from "react-modal";
 import { useAppContext } from "../AppContext";
-import { createContainer } from "../api";
+import { createContainer, writeBackData } from "../api";
 
 Modal.setAppElement("#app");
 
@@ -35,7 +35,15 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
         .split("T")[0],
       TimeRequired: 1,
     };
-    setRowData((prev) => [...prev, newRow]);
+    // setRowData((prev) => [...prev, newRow]);
+
+    // Write back data
+    setRowData((prev) => {
+      const updated = [...prev, newRow];
+      writeBackData(updated);
+      return updated;
+    });
+
     await onSelect(newRow);
     onClose();
   };
