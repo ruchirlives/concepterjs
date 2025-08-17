@@ -405,7 +405,7 @@ export const useMatrixLogic = () => {
           activeState,       // targetState (current state)
           containerIds
         );
-        console.log("Difference results:", differenceResults);
+        // console.log("Difference results:", differenceResults);
 
         const differencesMap = {};
 

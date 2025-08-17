@@ -12,7 +12,7 @@ export const useLayerDropdown = () => {
 
   // Toggle layer visibility
   const toggleLayerVisibility = useCallback((layer) => {
-    console.log('Toggling layer:', layer);
+    // console.log('Toggling layer:', layer);
     setHiddenLayers(prev => {
       const newSet = new Set(prev);
       if (newSet.has(layer)) {
@@ -22,7 +22,7 @@ export const useLayerDropdown = () => {
         newSet.add(layer);
         console.log('Hiding layer:', layer);
       }
-      console.log('Hidden layers:', [...newSet]);
+      // console.log('Hidden layers:', [...newSet]);
       return newSet;
     });
   }, [setHiddenLayers]);
