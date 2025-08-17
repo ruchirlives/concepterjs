@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
+import { useAppContext } from "./AppContext";
+import { addChildren, removeChildren } from "./api";
 
 const AppKanban = () => {
   const {
@@ -17,6 +19,7 @@ const AppKanban = () => {
     selectedToLayer,
     setSelectedToLayer,
   } = useMatrixLogic();
+  const { setChildrenMap } = useAppContext();
 
   const getCommonChildren = useCallback((sourceId, targetId) => {
     const sourceChildren = childrenMap[sourceId] || [];
@@ -42,16 +45,55 @@ const AppKanban = () => {
     setCellContents(initial);
   }, [filteredSources, filteredTargets, childrenMap, getCommonChildren]);
 
-  const handleDrop = (toKey) => {
+  const handleDrop = async (toKey) => {
     if (!dragItem || dragItem.fromKey === toKey) return;
+
     setCellContents((prev) => {
       const next = { ...prev };
       next[dragItem.fromKey] = next[dragItem.fromKey].filter(
         (id) => id !== dragItem.cid
       );
-      next[toKey] = [...(next[toKey] || []), dragItem.cid];
+      const dest = next[toKey] || [];
+      if (!dest.includes(dragItem.cid)) {
+        dest.push(dragItem.cid);
+      }
+      next[toKey] = dest;
       return next;
     });
+
+    const cid = dragItem.cid;
+    const [fromSource, fromTarget] = dragItem.fromKey.split("-");
+    const [toSource, toTarget] = toKey.split("-");
+
+    const oldParents = [fromSource, fromTarget];
+    const newParents = [toSource, toTarget];
+
+    const parentsToRemove = oldParents.filter(p => !newParents.includes(p));
+    const parentsToAdd = newParents.filter(p => !oldParents.includes(p));
+
+    try {
+      await Promise.all([
+        ...parentsToRemove.map((pid) => removeChildren(Number(pid), [cid])),
+        ...parentsToAdd.map((pid) => addChildren(Number(pid), [cid])),
+      ]);
+
+      setChildrenMap((prev) => {
+        const next = { ...prev };
+        parentsToRemove.forEach((pid) => {
+          const arr = next[pid] || [];
+          next[pid] = arr.filter((id) => id !== cid);
+        });
+        parentsToAdd.forEach((pid) => {
+          const arr = next[pid] || [];
+          if (!arr.includes(cid)) arr.push(cid);
+          next[pid] = arr;
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error("Error updating parents:", error);
+    }
+
     setDragItem(null);
   };
 
