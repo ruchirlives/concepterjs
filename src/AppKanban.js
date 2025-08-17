@@ -352,7 +352,7 @@ const AppKanban = () => {
         <ModalAddRow
           isOpen={!!editingKey}
           onClose={() => setEditingKey(null)}
-          onSelect={(row) => handleAddItem(editingKey, row)}
+          onSelect={(rows) => rows.forEach((row) => handleAddItem(editingKey, row))}
         />
       )}
       {contextMenu && (
