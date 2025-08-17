@@ -19,7 +19,6 @@ const AppKanban = () => {
     setSelectedFromLayer,
     selectedToLayer,
     setSelectedToLayer,
-    handleExportExcel, // <-- Add this from useMatrixLogic
   } = useMatrixLogic();
   const { setChildrenMap } = useAppContext();
 
@@ -33,6 +32,36 @@ const AppKanban = () => {
   const [dragItem, setDragItem] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+
+  const handleExportExcel = useCallback(() => {
+    // Build headers: first column is blank, then target names
+    const headers = ["", ...filteredTargets.map((c) => c.Name)];
+    // Build rows: each row is a source, each cell is a comma-separated list of child names
+    const rows = filteredSources.map((source) => {
+      const values = [source.Name];
+      filteredTargets.forEach((target) => {
+        const key = `${source.id}--${target.id}`;
+        if (source.id === target.id) {
+          values.push(""); // skip diagonal
+        } else {
+          const items = cellContents[key] || [];
+          const names = items.map((cid) => nameById[cid] || cid).join(", ");
+          values.push(names);
+        }
+      });
+      return values.join("\t");
+    });
+    const tsv = [headers.join("\t"), ...rows].join("\n");
+
+    // Show a toast or copy to clipboard (replace with your preferred UX)
+    if (navigator && navigator.clipboard) {
+      navigator.clipboard.writeText(tsv);
+      alert("Kanban matrix copied to clipboard as TSV!");
+    } else {
+      alert(tsv);
+    }
+  }, [filteredSources, filteredTargets, cellContents, nameById]);
+
 
   useEffect(() => {
     const initial = {};
@@ -319,34 +348,34 @@ const AppKanban = () => {
           </table>
         )}
       </div>
-        {editingKey && (
-          <ModalAddRow
-            isOpen={!!editingKey}
-            onClose={() => setEditingKey(null)}
-            onSelect={(row) => handleAddItem(editingKey, row)}
-          />
-        )}
-        {contextMenu && (
-          <div
-            className="fixed z-50 bg-white border border-gray-300 rounded shadow"
-            style={{ top: contextMenu.y, left: contextMenu.x }}
-            onContextMenu={(e) => e.preventDefault()}
+      {editingKey && (
+        <ModalAddRow
+          isOpen={!!editingKey}
+          onClose={() => setEditingKey(null)}
+          onSelect={(row) => handleAddItem(editingKey, row)}
+        />
+      )}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-300 rounded shadow"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemove(contextMenu.key, contextMenu.cid);
+              setContextMenu(null);
+            }}
           >
-            <button
-              className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemove(contextMenu.key, contextMenu.cid);
-                setContextMenu(null);
-              }}
-            >
-              Remove
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
+            Remove
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default AppKanban;
 
