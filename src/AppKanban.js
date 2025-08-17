@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
+import ModalAddRow from "./components/ModalAddRow";
 
 const AppKanban = () => {
   const {
@@ -29,6 +30,7 @@ const AppKanban = () => {
 
   const [cellContents, setCellContents] = useState({});
   const [dragItem, setDragItem] = useState(null);
+  const [editingKey, setEditingKey] = useState(null);
 
   useEffect(() => {
     const initial = {};
@@ -96,6 +98,36 @@ const AppKanban = () => {
     }
 
     setDragItem(null);
+  };
+
+  const handleAddItem = async (key, row) => {
+    const cid = row.id.toString();
+    setCellContents((prev) => {
+      const next = { ...prev };
+      const arr = next[key] || [];
+      if (!arr.includes(cid)) arr.push(cid);
+      next[key] = arr;
+      return next;
+    });
+
+    const [sourceId, targetId] = key.split("--");
+    try {
+      await Promise.all([
+        addChildren(sourceId, [cid]),
+        addChildren(targetId, [cid]),
+      ]);
+      setChildrenMap((prev) => {
+        const next = { ...prev };
+        [sourceId, targetId].forEach((pid) => {
+          const arr = next[pid] || [];
+          if (!arr.includes(cid)) arr.push(cid);
+          next[pid] = arr;
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error("Error adding child:", error);
+    }
   };
 
   return (
@@ -205,6 +237,7 @@ const AppKanban = () => {
                         onDrop={() => {
                           if (!dropDisabled) handleDrop(key);
                         }}
+                        onDoubleClick={() => setEditingKey(key)}
                       >
                         {items.length > 0 ? (
                           <ul className="text-xs space-y-1">
@@ -230,6 +263,13 @@ const AppKanban = () => {
           </table>
         )}
       </div>
+      {editingKey && (
+        <ModalAddRow
+          isOpen={!!editingKey}
+          onClose={() => setEditingKey(null)}
+          onSelect={(row) => handleAddItem(editingKey, row)}
+        />
+      )}
     </div>
   );
 };
