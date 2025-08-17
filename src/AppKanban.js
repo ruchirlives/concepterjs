@@ -102,6 +102,13 @@ const AppKanban = () => {
 
   const handleAddItem = async (key, row) => {
     const cid = row.id.toString();
+    const [sourceId, targetId] = key.split("--");
+
+    // Guard: block if cid matches source or target
+    if (cid === sourceId || cid === targetId) {
+      return;
+    }
+
     setCellContents((prev) => {
       const next = { ...prev };
       const arr = next[key] || [];
@@ -110,7 +117,6 @@ const AppKanban = () => {
       return next;
     });
 
-    const [sourceId, targetId] = key.split("--");
     try {
       await Promise.all([
         addChildren(sourceId, [cid]),
