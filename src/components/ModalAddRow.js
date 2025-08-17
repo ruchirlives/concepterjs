@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Modal from "react-modal";
 import { useAppContext } from "../AppContext";
 import { createContainer, writeBackData } from "../api";
@@ -8,14 +8,30 @@ Modal.setAppElement("#app");
 const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
   const { rowData, setRowData, activeLayers } = useAppContext();
   const [query, setQuery] = useState("");
+  const [filtered, setFiltered] = useState([]);
+  const [selected, setSelected] = useState([]);
 
-  const filtered = useMemo(() => {
+  useEffect(() => {
+    if (isOpen) {
+      setFiltered(rowData);
+      setSelected([]);
+      setQuery("");
+    }
+  }, [isOpen, rowData]);
+
+  const handleSearch = () => {
     const q = query.toLowerCase();
-    return rowData.filter((r) => r.Name.toLowerCase().includes(q));
-  }, [query, rowData]);
+    setFiltered(rowData.filter((r) => r.Name.toLowerCase().includes(q)));
+  };
+
+  const toggleSelect = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const handleSelect = async (row) => {
-    await onSelect(row);
+    await onSelect([row]);
     onClose();
   };
 
@@ -44,7 +60,13 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
       return updated;
     });
 
-    await onSelect(newRow);
+    await onSelect([newRow]);
+    onClose();
+  };
+
+  const handleOk = async () => {
+    const rows = rowData.filter((r) => selected.includes(r.id));
+    await onSelect(rows);
     onClose();
   };
 
@@ -66,6 +88,12 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
           autoFocus
         />
         <button
+          onClick={handleSearch}
+          className="px-3 py-1 bg-gray-300 hover:bg-gray-400 text-sm font-medium rounded"
+        >
+          Search
+        </button>
+        <button
           onClick={handleAddNew}
           className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded"
         >
@@ -79,10 +107,26 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
             onDoubleClick={() => handleSelect(row)}
             className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer"
           >
-            {row.Name}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.includes(row.id)}
+                onChange={() => toggleSelect(row.id)}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <span>{row.Name}</span>
+            </label>
           </li>
         ))}
       </ul>
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={handleOk}
+          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded"
+        >
+          OK
+        </button>
+      </div>
     </Modal>
   );
 };
