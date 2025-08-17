@@ -286,6 +286,8 @@ export const addChildren = async (parentId, children) => {
         return response.data;
     } catch (error) {
         console.error("Error adding children:", error);
+        console.log("Parent ID:", parentId);
+        console.log("Children IDs:", children);
         return null;
     }
 };

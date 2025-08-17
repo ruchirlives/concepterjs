@@ -34,7 +34,7 @@ const AppKanban = () => {
     const initial = {};
     filteredSources.forEach((source) => {
       filteredTargets.forEach((target) => {
-        const key = `${source.id}-${target.id}`;
+        const key = `${source.id}--${target.id}`;
         if (source.id === target.id) return;
         initial[key] = getCommonChildren(
           source.id.toString(),
@@ -62,8 +62,9 @@ const AppKanban = () => {
     });
 
     const cid = dragItem.cid;
-    const [fromSource, fromTarget] = dragItem.fromKey.split("-");
-    const [toSource, toTarget] = toKey.split("-");
+    console.log("Moving item:", cid, "from", dragItem.fromKey, "to", toKey);
+    const [fromSource, fromTarget] = dragItem.fromKey.split("--");
+    const [toSource, toTarget] = toKey.split("--");
 
     const oldParents = [fromSource, fromTarget];
     const newParents = [toSource, toTarget];
@@ -73,8 +74,8 @@ const AppKanban = () => {
 
     try {
       await Promise.all([
-        ...parentsToRemove.map((pid) => removeChildren(Number(pid), [cid])),
-        ...parentsToAdd.map((pid) => addChildren(Number(pid), [cid])),
+        ...parentsToRemove.map((pid) => removeChildren(pid, [cid])),
+        ...parentsToAdd.map((pid) => addChildren(pid, [cid])),
       ]);
 
       setChildrenMap((prev) => {
@@ -178,7 +179,7 @@ const AppKanban = () => {
                     {source.Name}
                   </th>
                   {filteredTargets.map((target) => {
-                    const key = `${source.id}-${target.id}`;
+                    const key = `${source.id}--${target.id}`;
                     if (source.id === target.id) {
                       return (
                         <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-left">
@@ -189,12 +190,21 @@ const AppKanban = () => {
 
                     const items = cellContents[key] || [];
 
+                    // Disallow drop if dragItem exists and its cid matches source or target
+                    const dropDisabled =
+                      dragItem &&
+                      (dragItem.cid === source.id.toString() || dragItem.cid === target.id.toString());
+
                     return (
                       <td
                         key={key}
-                        className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDrop(key)}
+                        className={`p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 ${dropDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                        onDragOver={(e) => {
+                          if (!dropDisabled) e.preventDefault();
+                        }}
+                        onDrop={() => {
+                          if (!dropDisabled) handleDrop(key);
+                        }}
                       >
                         {items.length > 0 ? (
                           <ul className="text-xs space-y-1">
