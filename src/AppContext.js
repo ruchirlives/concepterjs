@@ -19,6 +19,25 @@ export const AppProvider = ({ children }) => {
   const [comparatorState, setComparatorState] = useState("base");
   const [diffDict, setDiffDict] = useState({});
 
+  // Matrix management
+  const [relationships, setRelationships] = useState({});
+  const [forwardExists, setForwardExists] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [editingCell, setEditingCell] = useState(null);
+  const [hideEmpty, setHideEmpty] = useState(true);
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const [childrenMap, setChildrenMap] = useState({});
+  const [hoveredFrom, setHoveredFrom] = useState(null);
+  const [hoveredRowId, setHoveredRowId] = useState(null);
+  const [flipped, setFlipped] = useState(false);
+  const [selectedFromLayer, setSelectedFromLayer] = useState("");
+  const [selectedToLayer, setSelectedToLayer] = useState("");
+  const [differences, setDifferences] = useState({});
+  const [loadingDifferences, setLoadingDifferences] = useState(false);
+  const [differencesTrigger, setDifferencesTrigger] = useState(0);
+  const [showDropdowns, setShowDropdowns] = useState({});
+  const [rawDifferences, setRawDifferences] = useState({});
+
   // Add Tiptap content state only
   const [tiptapContent, setTiptapContent] = useState({
     type: "doc",
@@ -155,6 +174,41 @@ export const AppProvider = ({ children }) => {
     setLayerDropdownOpen,
     hiddenLayers,
     setHiddenLayers,
+    // Matrix management
+    relationships,
+    setRelationships,
+    forwardExists,
+    setForwardExists,
+    loading,
+    setLoading,
+    editingCell,
+    setEditingCell,
+    hideEmpty,
+    setHideEmpty,
+    hoveredCell,
+    setHoveredCell,
+    childrenMap,
+    setChildrenMap,
+    hoveredFrom,
+    setHoveredFrom,
+    hoveredRowId,
+    setHoveredRowId,
+    flipped,
+    setFlipped,
+    selectedFromLayer,
+    setSelectedFromLayer,
+    selectedToLayer,
+    setSelectedToLayer,
+    differences,
+    setDifferences,
+    loadingDifferences,
+    setLoadingDifferences,
+    differencesTrigger,
+    setDifferencesTrigger,
+    showDropdowns,
+    setShowDropdowns,
+    rawDifferences,
+    setRawDifferences
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { manyChildren, setPosition, compareStates, revertDifferences } from '../api';
 import { useAppContext } from '../AppContext';
 import { useEdgeMenu } from './flowEdgeMenu';
@@ -6,26 +6,45 @@ import { useStateScores } from './useStateScores';
 import toast from 'react-hot-toast';
 
 export const useMatrixLogic = () => {
-  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState, hiddenLayers } = useAppContext();
-  const [relationships, setRelationships] = useState({});
-  const [forwardExists, setForwardExists] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [editingCell, setEditingCell] = useState(null);
-  const [collapsed, setCollapsed] = useState(true);
-  const [hideEmpty, setHideEmpty] = useState(true);
-  const [hoveredCell, setHoveredCell] = useState(null);
-  const [childrenMap, setChildrenMap] = useState({});
-  const [hoveredFrom, setHoveredFrom] = useState(null);
-  const [hoveredRowId, setHoveredRowId] = useState(null);
-  const [flipped, setFlipped] = useState(false);
-  const [selectedFromLayer, setSelectedFromLayer] = useState("");
-  const [selectedToLayer, setSelectedToLayer] = useState("");
-  const [differences, setDifferences] = useState({});
-  const [loadingDifferences, setLoadingDifferences] = useState(false);
-  const [differencesTrigger, setDifferencesTrigger] = useState(0);
-  const [showDropdowns, setShowDropdowns] = useState({});
-  const [rawDifferences, setRawDifferences] = useState({});
+  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState, hiddenLayers,
+    relationships,
+    setRelationships,
+    forwardExists,
+    setForwardExists,
+    loading,
+    setLoading,
+    editingCell,
+    setEditingCell,
+    hideEmpty,
+    setHideEmpty,
+    hoveredCell,
+    setHoveredCell,
+    childrenMap,
+    setChildrenMap,
+    hoveredFrom,
+    setHoveredFrom,
+    hoveredRowId,
+    setHoveredRowId,
+    flipped,
+    setFlipped,
+    selectedFromLayer,
+    setSelectedFromLayer,
+    selectedToLayer,
+    setSelectedToLayer,
+    differences,
+    setDifferences,
+    loadingDifferences,
+    setLoadingDifferences,
+    differencesTrigger,
+    setDifferencesTrigger,
+    showDropdowns,
+    setShowDropdowns,
+    rawDifferences,
+    setRawDifferences
 
+  } = useAppContext();
+
+  const [collapsed, setCollapsed] = useState(true);
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
 
@@ -139,13 +158,13 @@ export const useMatrixLogic = () => {
     console.log(`Matrix state changed to: ${newState}`);
     setDifferences({});
     setLoadingDifferences(true);
-  }, []);
+  }, [setDifferences, setLoadingDifferences]);
 
   const handleCellClick = useCallback((sourceId, targetId) => {
     if (sourceId === targetId) return;
     const key = `${sourceId}-${targetId}`;
     setEditingCell({ sourceId, targetId, key });
-  }, []);
+  }, [setEditingCell]);
 
   const handleCellSubmit = useCallback(
     async (value) => {
@@ -170,7 +189,7 @@ export const useMatrixLogic = () => {
         setEditingCell(null);
       }
     },
-    [editingCell]
+    [editingCell, setEditingCell, setRelationships, setForwardExists, setDifferencesTrigger]
   );
 
   const handleKeyDown = useCallback(
@@ -181,7 +200,7 @@ export const useMatrixLogic = () => {
         setEditingCell(null);
       }
     },
-    [handleCellSubmit]
+    [handleCellSubmit, setEditingCell]
   );
 
   const handleBlur = useCallback(
@@ -293,13 +312,13 @@ export const useMatrixLogic = () => {
 
       parentChildMap.forEach(({ container_id, children }) => {
         const parentId = container_id.toString();
-        
+
         // Add null check for children
         if (!children || !Array.isArray(children)) {
           newChildrenMap[parentId] = [];
           return;
         }
-        
+
         newChildrenMap[parentId] = children.map((c) => c.id.toString());
 
         children.forEach((child) => {
@@ -352,7 +371,7 @@ export const useMatrixLogic = () => {
     }
 
     setLoading(false);
-  }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed]);
+  }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed, setRelationships, setForwardExists, setChildrenMap, setLoading]);
 
   // Effects
   useEffect(() => {
@@ -427,7 +446,10 @@ export const useMatrixLogic = () => {
     filteredSources,
     nameById,
     containerIdsString,
-    activeState
+    activeState,
+    setDifferences,
+    setLoadingDifferences,
+    setRawDifferences
   ]);
 
   useEffect(() => {
