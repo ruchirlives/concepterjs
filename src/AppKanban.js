@@ -19,6 +19,7 @@ const AppKanban = () => {
     setSelectedFromLayer,
     selectedToLayer,
     setSelectedToLayer,
+    handleExportExcel, // <-- Add this from useMatrixLogic
   } = useMatrixLogic();
   const { setChildrenMap } = useAppContext();
 
@@ -215,13 +216,23 @@ const AppKanban = () => {
             </select>
           </div>
         </div>
-        <button
-          className="text-lg font-bold"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand Kanban" : "Collapse Kanban"}
-        >
-          {collapsed ? "▼" : "▲"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Export to Excel Button */}
+          <button
+            className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
+            onClick={handleExportExcel}
+            title="Export current view to Excel"
+          >
+            Export to Excel
+          </button>
+          <button
+            className="text-lg font-bold"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expand Kanban" : "Collapse Kanban"}
+          >
+            {collapsed ? "▼" : "▲"}
+          </button>
+        </div>
       </div>
 
       {/* Matrix Table */}
