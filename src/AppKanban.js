@@ -8,7 +8,16 @@ const AppKanban = () => {
     childrenMap,
     nameById,
     flowWrapperRef,
+    collapsed,
+    setCollapsed,
   } = useMatrixLogic();
+
+  // Ensure relationships are loaded so filteredSources/Targets populate
+  useEffect(() => {
+    if (collapsed) {
+      setCollapsed(false);
+    }
+  }, [collapsed, setCollapsed]);
 
   const getCommonChildren = (sourceId, targetId) => {
     const sourceChildren = childrenMap[sourceId] || [];
