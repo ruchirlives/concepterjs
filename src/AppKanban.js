@@ -31,6 +31,7 @@ const AppKanban = () => {
   const [cellContents, setCellContents] = useState({});
   const [dragItem, setDragItem] = useState(null);
   const [editingKey, setEditingKey] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
 
   useEffect(() => {
     const initial = {};
@@ -46,6 +47,12 @@ const AppKanban = () => {
     });
     setCellContents(initial);
   }, [filteredSources, filteredTargets, childrenMap, getCommonChildren]);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
 
   const handleDrop = async (toKey) => {
     if (!dragItem || dragItem.fromKey === toKey) return;
@@ -133,6 +140,33 @@ const AppKanban = () => {
       });
     } catch (error) {
       console.error("Error adding child:", error);
+    }
+  };
+
+  const handleRemove = async (key, cid) => {
+    setCellContents((prev) => {
+      const next = { ...prev };
+      next[key] = (next[key] || []).filter((id) => id !== cid);
+      return next;
+    });
+
+    const [sourceId, targetId] = key.split("--");
+
+    try {
+      await Promise.all([
+        removeChildren(sourceId, [cid]),
+        removeChildren(targetId, [cid]),
+      ]);
+      setChildrenMap((prev) => {
+        const next = { ...prev };
+        [sourceId, targetId].forEach((pid) => {
+          const arr = next[pid] || [];
+          next[pid] = arr.filter((id) => id !== cid);
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error("Error removing child:", error);
     }
   };
 
@@ -252,6 +286,10 @@ const AppKanban = () => {
                                 key={cid}
                                 draggable
                                 onDragStart={() => setDragItem({ cid, fromKey: key })}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setContextMenu({ x: e.clientX, y: e.clientY, key, cid });
+                                }}
                               >
                                 {nameById[cid] || cid}
                               </li>
@@ -269,16 +307,34 @@ const AppKanban = () => {
           </table>
         )}
       </div>
-      {editingKey && (
-        <ModalAddRow
-          isOpen={!!editingKey}
-          onClose={() => setEditingKey(null)}
-          onSelect={(row) => handleAddItem(editingKey, row)}
-        />
-      )}
-    </div>
-  );
-};
+        {editingKey && (
+          <ModalAddRow
+            isOpen={!!editingKey}
+            onClose={() => setEditingKey(null)}
+            onSelect={(row) => handleAddItem(editingKey, row)}
+          />
+        )}
+        {contextMenu && (
+          <div
+            className="fixed z-50 bg-white border border-gray-300 rounded shadow"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <button
+              className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemove(contextMenu.key, contextMenu.cid);
+                setContextMenu(null);
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
 export default AppKanban;
 
