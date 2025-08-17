@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 
 const AppKanban = () => {
@@ -19,11 +19,11 @@ const AppKanban = () => {
     }
   }, [collapsed, setCollapsed]);
 
-  const getCommonChildren = (sourceId, targetId) => {
+  const getCommonChildren = useCallback((sourceId, targetId) => {
     const sourceChildren = childrenMap[sourceId] || [];
     const targetChildren = childrenMap[targetId] || [];
     return sourceChildren.filter((cid) => targetChildren.includes(cid));
-  };
+  }, [childrenMap]);
 
   const [cellContents, setCellContents] = useState({});
   const [dragItem, setDragItem] = useState(null);
@@ -41,7 +41,7 @@ const AppKanban = () => {
       });
     });
     setCellContents(initial);
-  }, [filteredSources, filteredTargets, childrenMap]);
+  }, [filteredSources, filteredTargets, childrenMap, getCommonChildren]);
 
   const handleDrop = (toKey) => {
     if (!dragItem || dragItem.fromKey === toKey) return;
