@@ -116,9 +116,31 @@ const AppKanban = () => {
       return;
     }
 
+    // Determine existing parents of this child
+    const existingParents = Object.keys(childrenMap).filter(
+      (pid) => (childrenMap[pid] || []).includes(cid)
+    );
+
+    const desiredParents = [sourceId, targetId];
+    const parentsToRemove = existingParents.filter(
+      (pid) => !desiredParents.includes(pid)
+    );
+    const parentsToAdd = desiredParents.filter(
+      (pid) => !existingParents.includes(pid)
+    );
+
     setCellContents((prev) => {
       const next = { ...prev };
-      const arr = next[key] || [];
+      // Remove cid from cells involving parents being removed
+      Object.keys(next).forEach((cellKey) => {
+        const [s, t] = cellKey.split("--");
+        if (parentsToRemove.includes(s) || parentsToRemove.includes(t)) {
+          next[cellKey] = (next[cellKey] || []).filter((id) => id !== cid);
+        }
+      });
+
+      // Add cid to the selected cell
+      const arr = next[key] ? [...next[key]] : [];
       if (!arr.includes(cid)) arr.push(cid);
       next[key] = arr;
       return next;
@@ -126,12 +148,15 @@ const AppKanban = () => {
 
     try {
       await Promise.all([
-        addChildren(sourceId, [cid]),
-        addChildren(targetId, [cid]),
+        ...parentsToRemove.map((pid) => removeChildren(pid, [cid])),
+        ...parentsToAdd.map((pid) => addChildren(pid, [cid])),
       ]);
       setChildrenMap((prev) => {
         const next = { ...prev };
-        [sourceId, targetId].forEach((pid) => {
+        parentsToRemove.forEach((pid) => {
+          next[pid] = (next[pid] || []).filter((id) => id !== cid);
+        });
+        parentsToAdd.forEach((pid) => {
           const arr = next[pid] || [];
           if (!arr.includes(cid)) arr.push(cid);
           next[pid] = arr;
