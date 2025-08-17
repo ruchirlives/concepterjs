@@ -215,9 +215,8 @@ const AppKanban = () => {
               ))}
             </select>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Export to Excel Button */}
+
+          {/* Export to Excel Button (after dropdowns) */}
           <button
             className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
             onClick={handleExportExcel}
@@ -225,6 +224,8 @@ const AppKanban = () => {
           >
             Export to Excel
           </button>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             className="text-lg font-bold"
             onClick={() => setCollapsed((c) => !c)}
