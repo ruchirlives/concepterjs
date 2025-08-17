@@ -129,7 +129,10 @@ const AppKanban = () => {
             <tbody>
               {filteredSources.map((source) => (
                 <tr key={source.id}>
-                  <th className="sticky left-0 z-10 bg-gray-100 p-2 border border-gray-300 text-xs text-left">
+                  <th
+                    className="sticky left-0 z-10 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                    style={{ minWidth: 120, maxWidth: 200, width: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
                     {source.Name}
                   </th>
                   {filteredTargets.map((target) => {
