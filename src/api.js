@@ -802,3 +802,27 @@ export const findSimilarPositions = async (positionText) => {
         return null;
     }
 };
+
+/**
+ * Fetch a single node by its ID from the backend.
+ * @param {string} id - The node ID to load.
+ * @returns {Promise<Object|null>} The node object, or null if not found.
+ */
+export const loadNode = async (id) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/load_node`, { id: id });
+        requestRefreshChannel();
+        const containers = response.data.containers;
+        // Return the first container object, or null if none
+        return Array.isArray(containers) && containers.length > 0
+            ? containers[0]
+            : null;
+    } catch (error) {
+        if (error.response?.status === 404) {
+            console.warn(`Node with ID ${id} not found (404 error expected)`);
+            return null; // Return null for 404 errors
+        }
+        console.error("Error loading node:", error);
+        return null;
+    }
+};

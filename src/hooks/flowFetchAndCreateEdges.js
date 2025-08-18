@@ -204,12 +204,44 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     });
 
 
+    // Add a ghost node for each PendingEdge, using Name as the label
+    computedNodes.forEach(node => {
+        const pendingEdges = Array.isArray(node.data?.PendingEdges) ? node.data.PendingEdges : [];
+        pendingEdges.forEach((pending, idx) => {
+            if (!pending?.Name) return; // Skip if Name is missing
+
+            console.log(`Adding ghost node for pending edge: ${pending.Name} with ${pending.to} at index ${idx}`);
+
+            const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
+            const ghostNode = {
+                id: ghostNodeId,
+                type: 'ghost',
+                data: { label: pending.Name, parentId: node.id, id: pending.to || null },
+                position: {
+                    x: (node.position?.x || 0) + 150,
+                    y: (node.position?.y || 0) + 60 * (idx + 1)
+                },
+                selectable: false,
+                draggable: true, // <-- Make ghost node moveable
+                targetPosition: 'left'
+            };
+            computedNodes.push(ghostNode);
+
+            newEdges.push({
+                id: `pendingedge-${node.id}-${ghostNodeId}`,
+                source: node.id,
+                target: ghostNodeId,
+                type: 'customEdge',
+                data: { label: pending?.position?.label || '' },
+            });
+        });
+    });
+
     // Layout & set state
     await deployNodesEdges({
         setLayoutPositions: params.setLayoutPositions,
         layoutPositions: params.layoutPositions
     });
-
 
     async function deployNodesEdges(params) {
         const { setLayoutPositions, layoutPositions } = params;

@@ -10,6 +10,7 @@ import {
 } from './hooks/flowEffects';
 import FlowNode from './hooks/flowNode';
 import GroupNode from './hooks/flowGroupNodes';
+import GhostNode from './nodes/GhostNode';
 import ContextMenu from "./components/ContextMenu";
 import { useContextMenu, menuItems } from "./hooks/flowContextMenu";
 import EdgeMenu, { useEdgeMenu } from "./hooks/flowEdgeMenu";
@@ -149,7 +150,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onEdgesChange={onEdgesChange}
               onEdgeDoubleClick={onEdgeDoubleClick}
               onConnect={onEdgeConnect}
-              nodeTypes={{ custom: FlowNode, group: GroupNode }}
+              nodeTypes={{ custom: FlowNode, group: GroupNode, ghost: GhostNode }}
               edgeTypes={edgeTypes}
               defaultMarkerColor="#000000"
               onConnectEnd={onConnectEnd}

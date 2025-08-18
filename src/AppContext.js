@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates } from './api';
@@ -138,10 +138,10 @@ export const AppProvider = ({ children }) => {
     requestRefreshChannel();
   };
 
-  const clearLayers = () => {
+  const clearLayers = useCallback(() => {
     setLayerOptions([]);
     setActiveLayers([]);
-  };
+  }, []);
 
   const value = {
     rowData,

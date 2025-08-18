@@ -49,6 +49,7 @@ export function generateNodesAndEdges(params) {
                 isHighestScoring: highestScoringId === item.id?.toString(),
                 score: stateScores?.[item.id],
                 normalizedScore: normalizeScore(stateScores?.[item.id]),
+                PendingEdges: item.PendingEdges || [],
             },
             type: isGroup ? 'group' : 'custom',
             style: { width: GROUP_NODE_WIDTH },
