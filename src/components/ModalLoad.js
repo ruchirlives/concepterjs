@@ -8,7 +8,7 @@ Modal.setAppElement("#app");
 const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContainer, merge }) => {
     const [list, setList] = useState([]);
 
-    const { setLastLoadedFile } = useAppContext();
+    const { setLastLoadedFile, clearLayers } = useAppContext();
 
     const closeModal = () => {
         setIsOpen(false);
@@ -25,6 +25,7 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
             await loadContainers(item);
         }
         setLastLoadedFile(item);
+        clearLayers();
 
         const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });

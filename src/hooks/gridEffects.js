@@ -154,7 +154,7 @@ export const useDropDownEffect = () => {
 
 // Effect to load data from the server and attach listener to loadDataButton
 export const useReloadEffect = () => {
-    const { lastLoadedFile } = useAppContext();
+    const { lastLoadedFile, clearLayers } = useAppContext();
     useEffect(() => {
         console.log("Using ReLoad loadDataButton effect...");
         const loadDataButton = document.getElementById("loadDataButton");
@@ -164,6 +164,7 @@ export const useReloadEffect = () => {
             loadContainers(lastLoadedFile).then((data) => {
                 console.log("Loaded data:", data);
             });
+            clearLayers();
             // Broadcast a message to requestRefreshChannel
             setTimeout(() => {
                 const channel = new BroadcastChannel('requestRefreshChannel');
@@ -180,7 +181,7 @@ export const useReloadEffect = () => {
                 loadDataButton.removeEventListener("click", handleLoadData);
             }
         };
-    }, [lastLoadedFile]);
+    }, [lastLoadedFile, clearLayers]);
 };
 
 export const useRefreshEffect = (rowData, setRowData, fetchContainers, sendFilteredRows) => {
@@ -292,19 +293,22 @@ export const useRemoveTagsChannel = (gridApiRef, setRowData) => {
     useBroadcastChannel('removeTagsChannel', handleRemoveTags, [handleRemoveTags]);
 };
 
-export const useRequestRefreshChannel = (setRowData) => {
+export const useRequestRefreshChannel = (setRowData, clearLayers) => {
     useEffect(() => {
         const channel = new BroadcastChannel('requestRefreshChannel');
 
         channel.onmessage = async (event) => {
             console.log("Received requestRefresh message:", event.data);
+            if (event.data?.type === 'reload' || event.data?.type === 'refresh') {
+                clearLayers();
+            }
             asyncDataLoaderWithDateFormatting(fetchContainers, setRowData)();
         };
 
         return () => {
             channel.close();
         };
-    }, [setRowData]);
+    }, [setRowData, clearLayers]);
 }
 
 export const useRekeyButtonEffect = () => {

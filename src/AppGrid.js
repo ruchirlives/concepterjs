@@ -31,7 +31,7 @@ import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const App = () => {
-  const { rowData, setRowData, activeLayers, layerOptions } = useAppContext();
+  const { rowData, setRowData, activeLayers, layerOptions, clearLayers } = useAppContext();
   const displayRows = useMemo(
     () => rowData.filter((r) => rowInLayers(r, activeLayers)),
     [rowData, activeLayers]
@@ -243,7 +243,7 @@ const App = () => {
   // useModalButtonEffect(setModalOpen); // Pass modal state updater to the hook
   useRowSelectMessage(rowData, setRowData, gridApiRef);
   useAddChildChannel(gridApiRef, setRowData);
-  useRequestRefreshChannel(setRowData);
+  useRequestRefreshChannel(setRowData, clearLayers);
   useRekeyButtonEffect()
   useDedupButtonEffect()
   useAddTagsChannel(gridApiRef, setRowData);
