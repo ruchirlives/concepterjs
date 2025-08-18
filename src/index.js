@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { AppProvider } from './AppContext';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
-import AppMermaid from './AppMermaid';
-import AppMatrix from './AppMatrix';
-import AppKanban from './AppKanban';
 import AppLayers from './AppLayers';
-import AppState from './AppState';
 import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
-import AppTiptap from './AppTiptap';
 import { setPasscode } from './apiConfig';
 import { recopyValues } from './api';
+
+const AppTiptap = React.lazy(() => import('./AppTiptap'));
+const AppMatrix = React.lazy(() => import('./AppMatrix'));
+const AppKanban = React.lazy(() => import('./AppKanban'));
+const AppState = React.lazy(() => import('./AppState'));
+const AppMermaid = React.lazy(() => import('./AppMermaid'));
 
 // Suppress ResizeObserver error that doesn't affect functionality
 const suppressResizeObserverError = (e) => {
@@ -55,23 +56,33 @@ console.error = (...args) => {
 const MemoizedStaticContent = React.memo(() => (
   <>
     <section id="tiptap">
-      <AppTiptap />
+      <Suspense fallback={<div>Loading editor...</div>}>
+        <AppTiptap />
+      </Suspense>
     </section>
 
     <section id="matrix">
-      <AppMatrix />
+      <Suspense fallback={<div>Loading matrix...</div>}>
+        <AppMatrix />
+      </Suspense>
     </section>
 
     <section id="kanban">
-      <AppKanban />
+      <Suspense fallback={<div>Loading kanban...</div>}>
+        <AppKanban />
+      </Suspense>
     </section>
 
     <section id="states">
-      <AppState />
+      <Suspense fallback={<div>Loading states...</div>}>
+        <AppState />
+      </Suspense>
     </section>
 
     <section id="mermaid" className="mb-28">
-      <AppMermaid />
+      <Suspense fallback={<div>Loading diagram...</div>}>
+        <AppMermaid />
+      </Suspense>
     </section>
   </>
 ));
