@@ -293,22 +293,19 @@ export const useRemoveTagsChannel = (gridApiRef, setRowData) => {
     useBroadcastChannel('removeTagsChannel', handleRemoveTags, [handleRemoveTags]);
 };
 
-export const useRequestRefreshChannel = (setRowData, clearLayers) => {
+export const useRequestRefreshChannel = (setRowData) => {
     useEffect(() => {
         const channel = new BroadcastChannel('requestRefreshChannel');
 
         channel.onmessage = async (event) => {
             console.log("Received requestRefresh message:", event.data);
-            if (event.data?.type === 'reload' || event.data?.type === 'refresh') {
-                clearLayers();
-            }
             asyncDataLoaderWithDateFormatting(fetchContainers, setRowData)();
         };
 
         return () => {
             channel.close();
         };
-    }, [setRowData, clearLayers]);
+    }, [setRowData]);
 }
 
 export const useRekeyButtonEffect = () => {
