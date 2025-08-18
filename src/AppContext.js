@@ -138,6 +138,11 @@ export const AppProvider = ({ children }) => {
     requestRefreshChannel();
   };
 
+  const clearLayers = () => {
+    setLayerOptions([]);
+    setActiveLayers([]);
+  };
+
   const value = {
     rowData,
     setRowData,
@@ -149,6 +154,7 @@ export const AppProvider = ({ children }) => {
     activeLayers,
     setActiveLayers,
     toggleLayer,
+    clearLayers,
     nodes,
     setNodes,
     edges,
