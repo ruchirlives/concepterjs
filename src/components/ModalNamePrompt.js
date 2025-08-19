@@ -153,6 +153,7 @@ export default function NamePromptModal() {
                   handleSearch(e);
                 }
               }}
+              onBlur={handleSearch} // <-- Activate search on blur as well
             />
             <button type="button" onClick={handleSearch} disabled={searchLoading || !searchTerm}>
               {searchLoading ? "Searching..." : "Search"}
