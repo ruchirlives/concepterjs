@@ -831,10 +831,11 @@ export const loadNode = async (id) => {
  * @param {string} searchTerm - The term to search for.
  * @returns {Promise<Array>} Array of matching node results.
  */
-export const searchNodes = async (searchTerm) => {
+export const searchNodes = async (searchTerm, tags) => {
     try {
         const response = await apiClient.post(`${getApiUrl()}/search_nodes`, {
             search_term: searchTerm,
+            tags: tags
         });
         return response.data.results || [];
     } catch (error) {

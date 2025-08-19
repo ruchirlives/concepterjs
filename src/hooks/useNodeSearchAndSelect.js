@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { searchNodes, loadNode } from "../api";
 
-export function useNodeSearchAndSelect() {
+export function useNodeSearchAndSelect(selectedIds,
+  setSelectedIds) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [tagsSearchTerm, setTagsSearchTerm] = useState([]);
+  const [otherTag, setOtherTag] = useState(""); // <-- Add this
 
   const handleSearch = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     setSearchLoading(true);
     setSearchError("");
     try {
-      const results = await searchNodes(searchTerm);
+      const results = await searchNodes(searchTerm, tagsSearchTerm);
       setSearchResults(results);
     } catch (err) {
       setSearchError("Error searching nodes.");
@@ -55,5 +57,9 @@ export function useNodeSearchAndSelect() {
     handleSearch,
     handleCheckboxChange,
     loadCheckedNodes,
+    tagsSearchTerm,
+    setTagsSearchTerm,
+    otherTag,        // <-- Add this
+    setOtherTag,     // <-- Add this
   };
 }

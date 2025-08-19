@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import Modal from "react-modal";
+import NodeSearchBox from "./NodeSearchBox";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
-import { useAppContext } from "../AppContext"; // <-- Add this import
+import { useAppContext } from "../AppContext";
 
 Modal.setAppElement("#app");
 
@@ -14,44 +15,32 @@ export function openNamePrompt() {
   });
 }
 
-let setModalVisible = () => { }; // Will be updated by the modal component
+let setModalVisible = () => { };
 
 export default function NamePromptModal() {
   const [visible, setVisible] = useState(false);
   const [namesInput, setNamesInput] = useState("");
   const [splitByComma, setSplitByComma] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  // Use the shared hook for search and selection
   const {
-    searchTerm,
     setSearchTerm,
-    searchResults,
-    searchLoading,
-    searchError,
-    selectedIds,
-    setSelectedIds,
-    handleSearch,
-    handleCheckboxChange,
     loadCheckedNodes,
-  } = useNodeSearchAndSelect();
+  } = useNodeSearchAndSelect(selectedIds, setSelectedIds);
 
-  const { rowData } = useAppContext(); // <-- Get rowData from context
+  const { rowData, layerOptions } = useAppContext();
 
   setModalVisible = setVisible;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!namesInput.trim() && selectedIds.length === 0) {
-      // Optionally show a warning or just return
       return;
     }
-
-    // Load node data for all checked items
     let loadedNodes = [];
     if (selectedIds.length > 0) {
       loadedNodes = await loadCheckedNodes();
     }
-
     resolveNamePromise({
       namesInput: namesInput.trim(),
       splitByComma,
@@ -73,20 +62,6 @@ export default function NamePromptModal() {
     setSelectedIds([]);
     setVisible(false);
   };
-
-  // Helper to get child summary string
-  const getChildSummary = (children) => {
-    if (!Array.isArray(children) || children.length === 0) return "";
-    return children
-      .map(
-        (child) =>
-          `${child.position?.Name || child.position?.name || ""} - ${child.Name || child.name || ""}`
-      )
-      .join(", ");
-  };
-
-  // Create a Set of existing row IDs for fast lookup
-  const existingIds = new Set((rowData || []).map(row => row.id));
 
   return (
     <Modal isOpen={visible} onRequestClose={handleCancel} contentLabel="Enter Container Names">
@@ -112,63 +87,17 @@ export default function NamePromptModal() {
             Also split by commas
           </label>
         </div>
-        <div style={{ margin: "1rem 0", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
-          <label htmlFor="search-nodes"><b>Search Nodes</b></label>
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-            <input
-              id="search-nodes"
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Type to search nodes..."
-              style={{ flex: 1, padding: "6px" }}
-              onKeyDown={e => {
-                if (e.key === "Enter") {
-                  handleSearch(e);
-                }
-              }}
-              onBlur={handleSearch}
-            />
-            <button type="button" onClick={handleSearch} disabled={searchLoading || !searchTerm}>
-              {searchLoading ? "Searching..." : "Search"}
-            </button>
-          </div>
-          {searchError && <div style={{ color: "red", marginTop: "0.5rem" }}>{searchError}</div>}
-          <ul style={{ margin: "0.5rem 0 0 0", padding: 0, maxHeight: 150, overflowY: "auto", listStyle: "none" }}>
-            {searchResults.map((result, idx) => {
-              const id = result.id || result._id || idx;
-              const name = result.Name || result.name || "(no name)";
-              const childSummary = getChildSummary(result.children);
-              const isExisting = existingIds.has(id); // <-- Check if already in rowData
-              return (
-                <li key={id} style={{ padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(id)}
-                    onChange={() => handleCheckboxChange(id)}
-                    style={{ marginRight: 8 }}
-                  />
-                  <span style={{ fontWeight: 500 }}>
-                    {name}
-                    {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
-                  </span>
-                  {childSummary && (
-                    <span style={{ color: "#666", marginLeft: 12, fontSize: "0.95em" }}>
-                      {childSummary}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-            {searchResults.length === 0 && searchTerm && !searchLoading && !searchError && (
-              <li style={{ color: "#888" }}>No results found.</li>
-            )}
-          </ul>
-        </div>
         <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
           <button type="button" onClick={handleCancel}>Cancel</button>
           <button type="submit">Create</button>
         </div>
+        <NodeSearchBox
+          layerOptions={layerOptions}
+          rowData={rowData}
+          showTags={true}
+          selectedIds={selectedIds}
+          setSelectedIds={setSelectedIds}
+        />
       </form>
     </Modal>
   );
