@@ -8,7 +8,7 @@ import { requestRefreshChannel } from "hooks/effectsShared";
 Modal.setAppElement("#app");
 
 const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
-  const { setRowData, activeLayers } = useAppContext();
+  const { setRowData, activeLayers, rowData } = useAppContext();
 
   // Use the shared hook for backend search and selection
   const {
@@ -71,6 +71,9 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
     onClose();
   };
 
+  // Create a Set of existing row IDs for fast lookup
+  const existingIds = new Set((rowData || []).map((row) => row.id));
+
   return (
     <Modal
       isOpen={isOpen}
@@ -80,7 +83,9 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50"
     >
       <div className="mb-4">
-        <label htmlFor="search-nodes"><b>Search Nodes</b></label>
+        <label htmlFor="search-nodes">
+          <b>Search Nodes</b>
+        </label>
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
           <input
             id="search-nodes"
@@ -115,22 +120,30 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
             marginTop: 8,
           }}
         >
-          {searchResults.map((row) => (
-            <li
-              key={row.id}
-              className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer"
-            >
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(row.id)}
-                  onChange={() => handleCheckboxChange(row.id)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <span>{row.Name}</span>
-              </label>
-            </li>
-          ))}
+          {searchResults.map((row) => {
+            const isExisting = existingIds.has(row.id);
+            return (
+              <li
+                key={row.id}
+                className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer"
+              >
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => handleCheckboxChange(row.id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span>
+                    {row.Name}
+                    {isExisting && (
+                      <span style={{ color: "#d00", marginLeft: 4 }}>*</span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
           {searchResults.length === 0 &&
             searchTerm &&
             !searchLoading &&

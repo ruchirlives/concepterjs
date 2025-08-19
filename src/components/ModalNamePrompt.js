@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Modal from "react-modal";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
+import { useAppContext } from "../AppContext"; // <-- Add this import
 
 Modal.setAppElement("#app");
 
@@ -33,6 +34,8 @@ export default function NamePromptModal() {
     handleCheckboxChange,
     loadCheckedNodes,
   } = useNodeSearchAndSelect();
+
+  const { rowData } = useAppContext(); // <-- Get rowData from context
 
   setModalVisible = setVisible;
 
@@ -81,6 +84,9 @@ export default function NamePromptModal() {
       )
       .join(", ");
   };
+
+  // Create a Set of existing row IDs for fast lookup
+  const existingIds = new Set((rowData || []).map(row => row.id));
 
   return (
     <Modal isOpen={visible} onRequestClose={handleCancel} contentLabel="Enter Container Names">
@@ -133,6 +139,7 @@ export default function NamePromptModal() {
               const id = result.id || result._id || idx;
               const name = result.Name || result.name || "(no name)";
               const childSummary = getChildSummary(result.children);
+              const isExisting = existingIds.has(id); // <-- Check if already in rowData
               return (
                 <li key={id} style={{ padding: "4px 0", borderBottom: "1px solid #eee", display: "flex", alignItems: "center" }}>
                   <input
@@ -141,7 +148,10 @@ export default function NamePromptModal() {
                     onChange={() => handleCheckboxChange(id)}
                     style={{ marginRight: 8 }}
                   />
-                  <span style={{ fontWeight: 500 }}>{name}</span>
+                  <span style={{ fontWeight: 500 }}>
+                    {name}
+                    {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
+                  </span>
                   {childSummary && (
                     <span style={{ color: "#666", marginLeft: 12, fontSize: "0.95em" }}>
                       {childSummary}
