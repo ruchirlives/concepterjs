@@ -826,3 +826,20 @@ export const loadNode = async (id) => {
         return null;
     }
 };
+
+/**
+ * Search nodes by a search term.
+ * @param {string} searchTerm - The term to search for.
+ * @returns {Promise<Array>} Array of matching node results.
+ */
+export const searchNodes = async (searchTerm) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/search_nodes`, {
+            search_term: searchTerm,
+        });
+        return response.data.results || [];
+    } catch (error) {
+        console.error("Error searching nodes:", error);
+        return [];
+    }
+};
