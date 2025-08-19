@@ -11,22 +11,23 @@ export default function useCreateNewRow() {
         const result = await openNamePrompt();
         if (result === null) return null;
 
-        const { namesInput, splitByComma } = result;
+        const { namesInput, splitByComma, loadedNodes = [] } = result;
         let names = [];
-        if (splitByComma) {
+        if (splitByComma && namesInput) {
             names = namesInput
                 .split(/\r?\n|,/)
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
-        } else {
+        } else if (namesInput) {
             names = namesInput
                 .split(/\r?\n/)
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
         }
 
-        if (names.length === 0) {
-            console.log("No valid entries.");
+        // Only return null if BOTH are empty
+        if (names.length === 0 && loadedNodes.length === 0) {
+            console.log("No valid entries or checked items.");
             return null;
         }
 
@@ -42,8 +43,8 @@ export default function useCreateNewRow() {
             return true;
         });
 
-        if (uniqueNames.length === 0) {
-            console.log("All entries are duplicates.");
+        if (uniqueNames.length === 0 && loadedNodes.length === 0) {
+            console.log("All entries are duplicates and no checked items.");
             return null;
         }
 
@@ -68,12 +69,17 @@ export default function useCreateNewRow() {
             await addChildren(activeGroup, newRows.map((row) => row.id));
         }
 
-        setRowData((prev) => {
-            const updated = [...prev, ...newRows];
-            writeBackData(updated);
-            return updated;
-        });
+        if (newRows.length > 0) {
+            setRowData((prev) => {
+                const updated = [...prev, ...newRows];
+                writeBackData(updated);
+                return updated;
+            });
+        }
 
-        return newRows;
+        return {
+            newRows,
+            loadedNodes
+        };
     };
 }

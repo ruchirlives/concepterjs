@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { loadNode } from '../api';
+import { requestRefreshChannel } from "hooks/effectsShared";
 
 const GhostNode = ({ data }) => {
     // Double click handler
@@ -12,6 +13,7 @@ const GhostNode = ({ data }) => {
                 const node = await loadNode(data.id);
                 // You can handle the loaded node here, e.g., show a modal or update state
                 console.log('Loaded node:', node);
+                requestRefreshChannel();
             } catch (err) {
                 console.error('Failed to load node:', err);
             }

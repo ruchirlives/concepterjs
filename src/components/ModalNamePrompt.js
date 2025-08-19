@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Modal from "react-modal";
-import { searchNodes } from "../api";
+import { searchNodes, loadNode } from "../api";
 
 Modal.setAppElement("#app");
 
@@ -27,7 +27,7 @@ export default function NamePromptModal() {
 
   setModalVisible = setVisible;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     // Collect all checked ids from the results list
     const checkedIds = searchResults
@@ -42,10 +42,28 @@ export default function NamePromptModal() {
       return;
     }
 
+    // Load node data for all checked items
+    let loadedNodes = [];
+    if (allSelectedIds.length > 0) {
+      loadedNodes = await Promise.all(
+        allSelectedIds.map(async (id) => {
+          try {
+            return await loadNode(id);
+          } catch (err) {
+            console.error(`Failed to load node ${id}:`, err);
+            return null;
+          }
+        })
+      );
+      // Filter out any failed loads
+      loadedNodes = loadedNodes.filter(Boolean);
+    }
+
     resolveNamePromise({
-      namesInput: namesInput.trim(), // always a string
+      namesInput: namesInput.trim(),
       splitByComma,
-      selectedIds: allSelectedIds
+      selectedIds: allSelectedIds,
+      loadedNodes
     });
     setNamesInput("");
     setSplitByComma(false);

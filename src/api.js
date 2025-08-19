@@ -811,7 +811,6 @@ export const findSimilarPositions = async (positionText) => {
 export const loadNode = async (id) => {
     try {
         const response = await apiClient.post(`${getApiUrl()}/load_node`, { id: id });
-        requestRefreshChannel();
         const containers = response.data.containers;
         // Return the first container object, or null if none
         return Array.isArray(containers) && containers.length > 0

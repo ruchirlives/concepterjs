@@ -15,31 +15,58 @@ export const useOnConnectEnd = (params) => {
         (event, connectionState) => {
 
             const createNode = async (event) => {
-                const newRows = await newRowFunc(); // returns array or null
+                const { clientX, clientY } =
+                    "changedTouches" in event ? event.changedTouches[0] : event;
+                const basePosition = screenToFlowPosition({ x: clientX, y: clientY });
 
-                if (!Array.isArray(newRows) || newRows.length === 0) {
+                const result = await newRowFunc();
+                if (!result) {
                     console.log("Node creation cancelled or failed");
                     return null;
                 }
 
-                const { clientX, clientY } =
-                    "changedTouches" in event ? event.changedTouches[0] : event;
+                const { newRows = [], loadedNodes = [] } = result;
 
-                const basePosition = screenToFlowPosition({ x: clientX, y: clientY });
+                let nodesToAdd = [];
 
-                const newNodes = newRows.map((row, index) => ({
-                    id: row.id,
-                    position: {
-                        x: basePosition.x,
-                        y: basePosition.y + index * 80, // stack vertically with spacing
-                    },
-                    data: { Name: row.Name },
-                    origin: [0.5, 0.0],
-                }));
+                // 1. Add nodes from loadedNodes (checked search results)
+                console.log("Loaded nodes:", loadedNodes);
+                if (Array.isArray(loadedNodes) && loadedNodes.length > 0) {
+                    nodesToAdd = nodesToAdd.concat(
+                        loadedNodes.map((row, index) => ({
+                            id: row.id,
+                            position: {
+                                x: basePosition.x,
+                                y: basePosition.y + index * 80,
+                            },
+                            data: { Name: row.Name },
+                            origin: [0.5, 0.0],
+                        }))
+                    );
+                }
 
-                setNodes((nds) => nds.concat(newNodes));
+                // 2. Add nodes from textarea input (if any)
+                if (Array.isArray(newRows) && newRows.length > 0) {
+                    nodesToAdd = nodesToAdd.concat(
+                        newRows.map((row, index) => ({
+                            id: row.id,
+                            position: {
+                                x: basePosition.x,
+                                y: basePosition.y + (nodesToAdd.length + index) * 80,
+                            },
+                            data: { Name: row.Name },
+                            origin: [0.5, 0.0],
+                        }))
+                    );
+                }
 
-                return newNodes;
+                if (nodesToAdd.length === 0) {
+                    console.log("No nodes to add");
+                    return null;
+                }
+
+                setNodes((nds) => nds.concat(nodesToAdd));
+                return nodesToAdd;
             };
 
 
