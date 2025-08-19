@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Modal from "react-modal";
-import { searchNodes, loadNode } from "../api";
+import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
 
 Modal.setAppElement("#app");
 
@@ -19,56 +19,45 @@ export default function NamePromptModal() {
   const [visible, setVisible] = useState(false);
   const [namesInput, setNamesInput] = useState("");
   const [splitByComma, setSplitByComma] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const [selectedIds, setSelectedIds] = useState([]);
+
+  // Use the shared hook for search and selection
+  const {
+    searchTerm,
+    setSearchTerm,
+    searchResults,
+    searchLoading,
+    searchError,
+    selectedIds,
+    setSelectedIds,
+    handleSearch,
+    handleCheckboxChange,
+    loadCheckedNodes,
+  } = useNodeSearchAndSelect();
 
   setModalVisible = setVisible;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Collect all checked ids from the results list
-    const checkedIds = searchResults
-      .map(result => result.id || result._id)
-      .filter(id => selectedIds.includes(id));
-    // Merge with any existing selectedIds (avoid duplicates)
-    const allSelectedIds = Array.from(new Set([...selectedIds, ...checkedIds]));
-
-    // If nothing entered in the main textbox and no checked items, do nothing
-    if (!namesInput.trim() && allSelectedIds.length === 0) {
+    if (!namesInput.trim() && selectedIds.length === 0) {
       // Optionally show a warning or just return
       return;
     }
 
     // Load node data for all checked items
     let loadedNodes = [];
-    if (allSelectedIds.length > 0) {
-      loadedNodes = await Promise.all(
-        allSelectedIds.map(async (id) => {
-          try {
-            return await loadNode(id);
-          } catch (err) {
-            console.error(`Failed to load node ${id}:`, err);
-            return null;
-          }
-        })
-      );
-      // Filter out any failed loads
-      loadedNodes = loadedNodes.filter(Boolean);
+    if (selectedIds.length > 0) {
+      loadedNodes = await loadCheckedNodes();
     }
 
     resolveNamePromise({
       namesInput: namesInput.trim(),
       splitByComma,
-      selectedIds: allSelectedIds,
+      selectedIds,
       loadedNodes
     });
     setNamesInput("");
     setSplitByComma(false);
     setSearchTerm("");
-    setSearchResults([]);
     setSelectedIds([]);
     setVisible(false);
   };
@@ -78,29 +67,8 @@ export default function NamePromptModal() {
     setNamesInput("");
     setSplitByComma(false);
     setSearchTerm("");
-    setSearchResults([]);
     setSelectedIds([]);
     setVisible(false);
-  };
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    setSearchLoading(true);
-    setSearchError("");
-    try {
-      const results = await searchNodes(searchTerm);
-      setSearchResults(results);
-    } catch (err) {
-      setSearchError("Error searching nodes.");
-      setSearchResults([]);
-    }
-    setSearchLoading(false);
-  };
-
-  const handleCheckboxChange = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
-    );
   };
 
   // Helper to get child summary string
@@ -153,7 +121,7 @@ export default function NamePromptModal() {
                   handleSearch(e);
                 }
               }}
-              onBlur={handleSearch} // <-- Activate search on blur as well
+              onBlur={handleSearch}
             />
             <button type="button" onClick={handleSearch} disabled={searchLoading || !searchTerm}>
               {searchLoading ? "Searching..." : "Search"}
