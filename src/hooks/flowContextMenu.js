@@ -41,7 +41,7 @@ export const menuItems = [
     // copy to clipboard
     { handler: "copyToClipboard", label: "Copy to Clipboard" },
     { handler: "deleteAction", label: "Delete" },
-    { handler: "removeContainers", label: "Remove Containers from Project" },
+    { handler: "removeAction", label: "Remove Containers from Project" },
     { handler: "hideUnselected", label: "Hide Unselected" },
     { handler: "hideChildren", label: "Hide Children" },
     { handler: "showChildren", label: "Show Children" },
@@ -147,6 +147,11 @@ async function deleteAction({ selectedIds }) {
     else alert("Failed to delete containers.");
 }
 
+async function removeAction({ selectedIds }) {
+    const ok = await removeContainers(selectedIds);
+    if (ok) requestRefreshChannel();
+    else alert("Failed to remove containers.");
+}
 
 async function copyToClipboard({ selectedNodes }) {
     if (!selectedNodes || selectedNodes.length === 0) {

@@ -361,7 +361,7 @@ export const removeContainers = async (containerIds) => {
     }
 };
 
-export const embedContainers = async (containerIds) => {
+export const embed_containers = async (containerIds) => {
     try {
         console.log("Embedding containers:", containerIds);
         const response = await apiClient.post(`${getApiUrl()}/embed_containers`, {
