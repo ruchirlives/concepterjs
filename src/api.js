@@ -347,7 +347,21 @@ export const deleteContainers = async (containerIds) => {
     }
 };
 
-export const embed_containers = async (containerIds) => {
+// remove_containers
+export const removeContainers = async (containerIds) => {
+    try {
+        console.log("Removing containers:", containerIds);
+        const response = await apiClient.post(`${getApiUrl()}/remove_containers`, {
+            "containers": containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error removing containers:", error);
+        return null;
+    }
+};
+
+export const embedContainers = async (containerIds) => {
     try {
         console.log("Embedding containers:", containerIds);
         const response = await apiClient.post(`${getApiUrl()}/embed_containers`, {

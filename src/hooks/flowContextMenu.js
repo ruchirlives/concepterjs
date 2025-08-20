@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
 import {
     deleteContainers,
+    removeContainers,
     renameContainer,
     removeChildren,
     fetchChildren,
@@ -40,6 +41,7 @@ export const menuItems = [
     // copy to clipboard
     { handler: "copyToClipboard", label: "Copy to Clipboard" },
     { handler: "deleteAction", label: "Delete" },
+    { handler: "removeContainers", label: "Remove Containers from Project" },
     { handler: "hideUnselected", label: "Hide Unselected" },
     { handler: "hideChildren", label: "Hide Children" },
     { handler: "showChildren", label: "Show Children" },
