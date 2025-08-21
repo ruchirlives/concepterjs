@@ -27,6 +27,7 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
 
   const handleAddNew = async () => {
     const name = searchTerm.trim();
+    console.log("Adding new row with name:", name);
     if (!name) return;
     const id = await createContainer();
     if (!id) return;
@@ -77,6 +78,8 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
           showTags={true}
           selectedIds={selectedIds}
           setSelectedIds={setSelectedIds}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
         />
         <button
           onClick={handleAddNew}

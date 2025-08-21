@@ -8,10 +8,10 @@ export default function NodeSearchBox({
     showSearchButton = true,
     selectedIds,
     setSelectedIds,
+    searchTerm,
+    setSearchTerm
 }) {
     const {
-        searchTerm,
-        setSearchTerm,
         searchResults,
         searchLoading,
         searchError,
