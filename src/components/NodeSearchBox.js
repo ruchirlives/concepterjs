@@ -162,10 +162,7 @@ export default function NodeSearchBox({
                     const isExisting = existingIds.has(id);
                     // Limit name and children string to 50 chars
                     const displayName = (row.Name || row.name || "(no name)");
-                    const truncatedName =
-                        displayName.length > 50
-                            ? displayName.slice(0, 50) + "..."
-                            : displayName;
+                    const truncatedName = displayName;
                     let childrenStr = "";
                     if (row.children && row.children.length > 0) {
                         childrenStr = row.children
