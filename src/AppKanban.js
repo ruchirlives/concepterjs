@@ -7,8 +7,8 @@ import ModalAddRow from "./components/ModalAddRow";
 const AppKanban = () => {
   const { rowData } = useAppContext();
   const {
-    filteredSources,
-    filteredTargets,
+    kanbanFilteredSources: filteredSources,
+    kanbanFilteredTargets: filteredTargets,
     childrenMap,
     nameById,
     flowWrapperRef,
@@ -49,7 +49,8 @@ const AppKanban = () => {
           values.push(""); // skip diagonal
         } else {
           const items = cellContents[key] || [];
-          const names = items.map((cid) => nameById[cid] || cid).join(", ");
+          const namesRaw = items.map((cid) => nameById[cid] || cid).join("\n");
+          const names = namesRaw.includes("\n") ? `"${namesRaw}"` : namesRaw;
           values.push(names);
         }
       });

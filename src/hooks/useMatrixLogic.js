@@ -122,6 +122,40 @@ export const useMatrixLogic = () => {
     };
   }, [fromLayerFilteredData, toLayerFilteredData, forwardExists, hideEmpty, flipped]);
 
+  // Kanban-specific filtered sources/targets
+  const { kanbanFilteredSources, kanbanFilteredTargets } = useMemo(() => {
+    if (!hideEmpty) {
+      return {
+        kanbanFilteredSources: fromLayerFilteredData,
+        kanbanFilteredTargets: toLayerFilteredData,
+      };
+    }
+
+    // Build childrenMap if not already present
+    // childrenMap: { [parentId]: [childId, ...] }
+    const hasCommonChildren = (sourceId, targetId) => {
+      if (sourceId === targetId) return false;
+      const sourceChildren = childrenMap[sourceId] || [];
+      const targetChildren = childrenMap[targetId] || [];
+      return sourceChildren.some(cid => targetChildren.includes(cid));
+    };
+
+    // Filter sources: keep if any target shares a child
+    const filteredSources = fromLayerFilteredData.filter(source =>
+      toLayerFilteredData.some(target => hasCommonChildren(source.id.toString(), target.id.toString()))
+    );
+
+    // Filter targets: keep if any source shares a child
+    const filteredTargets = toLayerFilteredData.filter(target =>
+      fromLayerFilteredData.some(source => hasCommonChildren(source.id.toString(), target.id.toString()))
+    );
+
+    return {
+      kanbanFilteredSources: filteredSources,
+      kanbanFilteredTargets: filteredTargets,
+    };
+  }, [fromLayerFilteredData, toLayerFilteredData, childrenMap, hideEmpty]);
+
   // Container IDs string for dependency tracking
   const containerIdsString = useMemo(() => {
     return filteredSources.map((c) => c.id).join(",");
@@ -529,6 +563,8 @@ export const useMatrixLogic = () => {
     layerOptions: availableLayerOptions,
     comparatorState,
     contentLayerOptions, // <-- add this line
+    kanbanFilteredSources,
+    kanbanFilteredTargets,
 
     // Actions
     handleStateChange,
