@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
 
 export default function NodeSearchBox({
@@ -9,7 +9,8 @@ export default function NodeSearchBox({
     selectedIds,
     setSelectedIds,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    selectedContentLayer = null
 }) {
     const {
         searchResults,
@@ -23,6 +24,22 @@ export default function NodeSearchBox({
         setOtherTag,
     } = useNodeSearchAndSelect(selectedIds,
         setSelectedIds, searchTerm, setSearchTerm);
+
+    // Ensure selectedContentLayer is checked by default
+    useEffect(() => {
+        if (
+            selectedContentLayer &&
+            !tagsSearchTerm.includes(selectedContentLayer)
+        ) {
+            setTagsSearchTerm((prev) =>
+                prev.includes(selectedContentLayer)
+                    ? prev
+                    : [...prev, selectedContentLayer]
+            );
+        }
+        // Only run when selectedContentLayer changes
+        // eslint-disable-next-line
+    }, [selectedContentLayer]);
 
     // For asterisk display
     const existingIds = new Set((rowData || []).map((row) => row.id));
@@ -143,6 +160,24 @@ export default function NodeSearchBox({
                 {searchResults.map((row, idx) => {
                     const id = row.id || row._id || idx;
                     const isExisting = existingIds.has(id);
+                    // Limit name and children string to 50 chars
+                    const displayName = (row.Name || row.name || "(no name)");
+                    const truncatedName =
+                        displayName.length > 50
+                            ? displayName.slice(0, 50) + "..."
+                            : displayName;
+                    let childrenStr = "";
+                    if (row.children && row.children.length > 0) {
+                        childrenStr = row.children
+                            .map(
+                                (child) =>
+                                    `${child.position?.Name || child.position?.name || ""} - ${child.Name || child.name || ""}`
+                            )
+                            .join(", ");
+                        if (childrenStr.length > 50) {
+                            childrenStr = childrenStr.slice(0, 50) + "...";
+                        }
+                    }
                     return (
                         <li
                             key={id}
@@ -156,17 +191,12 @@ export default function NodeSearchBox({
                                 style={{ marginRight: 8 }}
                             />
                             <span style={{ fontWeight: 500 }}>
-                                {row.Name || row.name || "(no name)"}
+                                {truncatedName}
                                 {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
                             </span>
-                            {row.children && row.children.length > 0 && (
+                            {childrenStr && (
                                 <span style={{ color: "#666", marginLeft: 12, fontSize: "0.95em" }}>
-                                    {row.children
-                                        .map(
-                                            (child) =>
-                                                `${child.position?.Name || child.position?.name || ""} - ${child.Name || child.name || ""}`
-                                        )
-                                        .join(", ")}
+                                    {childrenStr}
                                 </span>
                             )}
                         </li>

@@ -40,7 +40,9 @@ export const useMatrixLogic = () => {
     showDropdowns,
     setShowDropdowns,
     rawDifferences,
-    setRawDifferences
+    setRawDifferences,
+    selectedContentLayer,
+    setSelectedContentLayer
 
   } = useAppContext();
 
@@ -470,6 +472,19 @@ export const useMatrixLogic = () => {
     return layerOptions.filter(layer => !hiddenLayers.has(layer));
   }, [layerOptions, hiddenLayers]);
 
+  // Compute unique content layers from rowData
+  const contentLayerOptions = useMemo(() => {
+    const layers = new Set();
+    rowData.forEach(row => {
+      if (row.Tags) {
+        row.Tags.split(",").map(t => t.trim()).forEach(t => {
+          if (t) layers.add(t);
+        });
+      }
+    });
+    return Array.from(layers).sort();
+  }, [rowData]);
+
   return {
     // State
     relationships,
@@ -498,6 +513,8 @@ export const useMatrixLogic = () => {
     showDropdowns,
     setShowDropdowns,
     rawDifferences,
+    selectedContentLayer,
+    setSelectedContentLayer,
 
     // Refs
     inputRef,
@@ -511,6 +528,7 @@ export const useMatrixLogic = () => {
     edgeMap,
     layerOptions: availableLayerOptions,
     comparatorState,
+    contentLayerOptions, // <-- add this line
 
     // Actions
     handleStateChange,

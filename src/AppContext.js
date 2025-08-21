@@ -52,6 +52,9 @@ export const AppProvider = ({ children }) => {
   const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
   const [hiddenLayers, setHiddenLayers] = useState(new Set());
 
+  // Content layer filter state (add this)
+  const [selectedContentLayer, setSelectedContentLayer] = useState("");
+
 
   // State management functions
   const handleStateSwitch = async (stateName) => {
@@ -180,6 +183,9 @@ export const AppProvider = ({ children }) => {
     setLayerDropdownOpen,
     hiddenLayers,
     setHiddenLayers,
+    // Content layer filter (add these)
+    selectedContentLayer,
+    setSelectedContentLayer,
     // Matrix management
     relationships,
     setRelationships,

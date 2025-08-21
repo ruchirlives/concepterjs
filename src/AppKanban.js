@@ -5,6 +5,7 @@ import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 
 const AppKanban = () => {
+  const { rowData } = useAppContext();
   const {
     filteredSources,
     filteredTargets,
@@ -19,6 +20,9 @@ const AppKanban = () => {
     setSelectedFromLayer,
     selectedToLayer,
     setSelectedToLayer,
+    selectedContentLayer,
+    setSelectedContentLayer,
+    contentLayerOptions = [],
   } = useMatrixLogic();
   const { setChildrenMap } = useAppContext();
 
@@ -200,6 +204,23 @@ const AppKanban = () => {
     }
   };
 
+  // Filter cell contents by Content layer
+  const getFilteredCellContents = useCallback(() => {
+    if (!selectedContentLayer) return cellContents;
+    const filtered = {};
+    Object.entries(cellContents).forEach(([key, cids]) => {
+      filtered[key] = cids.filter(cid => {
+        // Find the rowData item for this cid
+        const row = rowData.find(r => r.id.toString() === cid);
+        if (!row) return false;
+        const tags = (row.Tags || "").split(",").map(t => t.trim());
+        return tags.includes(selectedContentLayer);
+      });
+    });
+    return filtered;
+  }, [cellContents, selectedContentLayer, rowData]);
+  const filteredCellContents = getFilteredCellContents();
+
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
@@ -238,6 +259,24 @@ const AppKanban = () => {
             >
               <option value="">All Layers</option>
               {layerOptions.map((layer) => (
+                <option key={layer} value={layer}>
+                  {layer}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Add Content Layer Dropdown */}
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-600">Content:</label>
+            <select
+              value={selectedContentLayer}
+              onChange={e => setSelectedContentLayer(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+              title="Filter content layer"
+            >
+              <option value="">All Layers</option>
+              {contentLayerOptions.map((layer) => (
                 <option key={layer} value={layer}>
                   {layer}
                 </option>
@@ -301,7 +340,7 @@ const AppKanban = () => {
                       );
                     }
 
-                    const items = cellContents[key] || [];
+                    const items = filteredCellContents[key] || [];
 
                     // Disallow drop if dragItem exists and its cid matches source or target
                     const dropDisabled =
@@ -353,6 +392,7 @@ const AppKanban = () => {
           isOpen={!!editingKey}
           onClose={() => setEditingKey(null)}
           onSelect={(rows) => rows.forEach((row) => handleAddItem(editingKey, row))}
+          selectedContentLayer={selectedContentLayer} // <-- pass as prop
         />
       )}
       {contextMenu && (
