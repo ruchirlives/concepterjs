@@ -30,11 +30,16 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null })
     if (!name) return;
     const id = await createContainer();
     if (!id) return;
+    // Combine activeLayers and selectedContentLayer for Tags
+    const tagsArr = [...activeLayers];
+    if (selectedContentLayer && !tagsArr.includes(selectedContentLayer)) {
+      tagsArr.push(selectedContentLayer);
+    }
     const newRow = {
       id,
       Name: name,
       Description: name,
-      Tags: activeLayers.join(", "),
+      Tags: tagsArr.join(", "),
       StartDate: new Date().toISOString().split("T")[0],
       EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
         .toISOString()
