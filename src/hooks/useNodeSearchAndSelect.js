@@ -2,8 +2,8 @@ import { useState } from "react";
 import { searchNodes, loadNode } from "../api";
 
 export function useNodeSearchAndSelect(selectedIds,
-  setSelectedIds) {
-  const [searchTerm, setSearchTerm] = useState("");
+  setSelectedIds, searchTerm, setSearchTerm) {
+  // const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
@@ -15,6 +15,7 @@ export function useNodeSearchAndSelect(selectedIds,
     setSearchLoading(true);
     setSearchError("");
     try {
+      console.log("Searching nodes with term:", searchTerm, "and tags:", tagsSearchTerm);
       const results = await searchNodes(searchTerm, tagsSearchTerm);
       setSearchResults(results);
     } catch (err) {

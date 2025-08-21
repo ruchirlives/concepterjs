@@ -11,12 +11,11 @@ Modal.setAppElement("#app");
 const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
   const { setRowData, activeLayers, rowData, layerOptions } = useAppContext();
   const [selectedIds, setSelectedIds] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const {
-    searchTerm,
-    setSearchTerm,
     loadCheckedNodes,
-  } = useNodeSearchAndSelect(selectedIds, setSelectedIds);
+  } = useNodeSearchAndSelect(selectedIds, setSelectedIds, searchTerm, setSearchTerm);
 
   useEffect(() => {
     if (isOpen) {
@@ -68,7 +67,7 @@ const ModalAddRow = ({ isOpen, onClose, onSelect }) => {
       isOpen={isOpen}
       onRequestClose={onClose}
       contentLabel="Add Row"
-      className="bg-white w-full max-w-md h-96 overflow-auto p-6 rounded-lg shadow-lg outline-none"
+      className="bg-white w-full max-w-md h-[40rem] overflow-auto p-6 rounded-lg shadow-lg outline-none" // Increased height to h-[40rem]
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50"
     >
       <div className="mb-4">

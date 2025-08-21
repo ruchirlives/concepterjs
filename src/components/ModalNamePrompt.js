@@ -22,11 +22,11 @@ export default function NamePromptModal() {
   const [namesInput, setNamesInput] = useState("");
   const [splitByComma, setSplitByComma] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const {
-    setSearchTerm,
     loadCheckedNodes,
-  } = useNodeSearchAndSelect(selectedIds, setSelectedIds);
+  } = useNodeSearchAndSelect(selectedIds, setSelectedIds, searchTerm, setSearchTerm);
 
   const { rowData, layerOptions } = useAppContext();
 
@@ -91,13 +91,32 @@ export default function NamePromptModal() {
           <button type="button" onClick={handleCancel}>Cancel</button>
           <button type="submit">Create</button>
         </div>
-        <NodeSearchBox
-          layerOptions={layerOptions}
-          rowData={rowData}
-          showTags={true}
-          selectedIds={selectedIds}
-          setSelectedIds={setSelectedIds}
-        />
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+          <NodeSearchBox
+            layerOptions={layerOptions}
+            rowData={rowData}
+            showTags={true}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+          />
+          <button
+            type="button"
+            style={{ height: 36, marginTop: 8 }}
+            onClick={() => {
+              if (searchTerm.trim()) {
+                setNamesInput(
+                  namesInput
+                    ? namesInput.trimEnd() + "\n" + searchTerm.trim()
+                    : searchTerm.trim()
+                );
+              }
+            }}
+          >
+            Add New
+          </button>
+        </div>
       </form>
     </Modal>
   );

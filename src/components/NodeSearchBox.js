@@ -22,7 +22,7 @@ export default function NodeSearchBox({
         otherTag,
         setOtherTag,
     } = useNodeSearchAndSelect(selectedIds,
-        setSelectedIds);
+        setSelectedIds, searchTerm, setSearchTerm);
 
     // For asterisk display
     const existingIds = new Set((rowData || []).map((row) => row.id));
