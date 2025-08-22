@@ -466,7 +466,7 @@ async function removeLayerTag({ selectedIds }, layer) {
     ch.close();
 }
 
-async function createLayerFromVisible({ nodes, addLayer }) {
+async function createLayerFromVisible({ rowData, addLayer }) {
     const layer = prompt("Enter new layer name:");
     if (!layer) return;
 
@@ -474,20 +474,23 @@ async function createLayerFromVisible({ nodes, addLayer }) {
         addLayer(layer);
     }
 
-    const selectedIds = nodes
+    console.log("rowData", rowData)
+    const selectedIds = rowData
         .filter(n => {
-            const tags = (n.data.Tags || '').split(',').map(t => t.trim());
+            const tags = (n.Tags || '').split(',').map(t => t.trim());
             return !tags.includes(layer);
         })
-        .map(n => n.data.id);
+        .map(n => n.id);
 
     if (!selectedIds.length) {
         toast.success(`All visible nodes already contain "${layer}".`);
         return;
     }
 
+    console.log("Adding layer", layer, "to visible nodes:", selectedIds);
+
     const ch = new BroadcastChannel("addTagsChannel");
-    ch.postMessage({ selectedIds, tags: layer });
+    ch.postMessage({ selectedIds, tags: [layer] });
     ch.close();
     toast.success(`Layer "${layer}" added to visible nodes.`);
 }

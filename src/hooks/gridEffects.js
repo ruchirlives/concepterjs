@@ -246,6 +246,7 @@ export const useAddChildChannel = (gridApiRef, setRowData) => {
 
 export const useAddTagsChannel = (gridApiRef, setRowData) => {
     const handleAddTags = useCallback(async (event) => {
+        console.log(event)
         const { selectedIds, tags } = event.data;
         console.log("Received addTags request:", tags);
 
