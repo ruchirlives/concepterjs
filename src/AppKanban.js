@@ -11,8 +11,6 @@ function ExcelButton(props) {
   </button>);
 }
 
-
-
 function ContextMenu(props) {
   return (<div className="fixed z-50 bg-white border border-gray-300 rounded shadow" style={{
     top: props.contextMenu.y,
@@ -27,8 +25,6 @@ function ContextMenu(props) {
     </button>
   </div>);
 }
-
-
 
 function Table(props) {
   return (<table className="table-auto border-collapse border border-gray-300 w-full">
@@ -92,6 +88,64 @@ function Table(props) {
   </table>);
 }
 
+function Header(props) {
+  return (<div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
+    <div className="flex items-center gap-4">
+      <span className="font-semibold">
+        Kanban Matrix ({props.length}×{props._length})
+      </span>
+
+      {
+        /* From Layer Filter Dropdown */
+      }
+      <div className="flex items-center gap-1">
+        <label className="text-xs text-gray-600">{props.flipped ? "To:" : "From:"}</label>
+        <select value={props.flipped ? props.selectedToLayer : props.selectedFromLayer} onChange={e => props.flipped ? props.setSelectedToLayer(e.target.value) : props.setSelectedFromLayer(e.target.value)} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white" title={`Filter ${props.flipped ? "to" : "from"} layer`}>
+          <option value="">All Layers</option>
+          {props.layerOptions.map(layer => <option key={layer} value={layer}>
+            {layer}
+          </option>)}
+        </select>
+      </div>
+
+      {
+        /* To Layer Filter Dropdown */
+      }
+      <div className="flex items-center gap-1">
+        <label className="text-xs text-gray-600">{props.flipped ? "From:" : "To:"}</label>
+        <select value={props.flipped ? props.selectedFromLayer : props.selectedToLayer} onChange={e => props.flipped ? props.setSelectedFromLayer(e.target.value) : props.setSelectedToLayer(e.target.value)} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white" title={`Filter ${props.flipped ? "from" : "to"} layer`}>
+          <option value="">All Layers</option>
+          {props.layerOptions.map(layer => <option key={layer} value={layer}>
+            {layer}
+          </option>)}
+        </select>
+      </div>
+
+      {
+        /* Add Content Layer Dropdown */
+      }
+      <div className="flex items-center gap-1">
+        <label className="text-xs text-gray-600">Content:</label>
+        <select value={props.selectedContentLayer} onChange={e => props.setSelectedContentLayer(e.target.value)} className="px-2 py-1 text-xs border border-gray-300 rounded bg-white" title="Filter content layer">
+          <option value="">All Layers</option>
+          {props.contentLayerOptions.map(layer => <option key={layer} value={layer}>
+            {layer}
+          </option>)}
+        </select>
+      </div>
+
+      {
+        /* Export to Excel Button (after dropdowns) */
+      }
+      <ExcelButton handleExportExcel={props.handleExportExcel}></ExcelButton>
+    </div>
+    <div className="flex items-center gap-2">
+      <button className="text-lg font-bold" onClick={() => props.setCollapsed(c => !c)} aria-label={props.collapsed ? "Expand Kanban" : "Collapse Kanban"}>
+        {props.collapsed ? "▼" : "▲"}
+      </button>
+    </div>
+  </div>);
+}
 
 const AppKanban = () => {
   const { rowData } = useAppContext();
@@ -314,79 +368,7 @@ const AppKanban = () => {
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold">
-            Kanban Matrix ({filteredSources.length}×{filteredTargets.length})
-          </span>
-
-          {/* From Layer Filter Dropdown */}
-          <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">{flipped ? "To:" : "From:"}</label>
-            <select
-              value={flipped ? selectedToLayer : selectedFromLayer}
-              onChange={(e) => (flipped ? setSelectedToLayer(e.target.value) : setSelectedFromLayer(e.target.value))}
-              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title={`Filter ${flipped ? "to" : "from"} layer`}
-            >
-              <option value="">All Layers</option>
-              {layerOptions.map((layer) => (
-                <option key={layer} value={layer}>
-                  {layer}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* To Layer Filter Dropdown */}
-          <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">{flipped ? "From:" : "To:"}</label>
-            <select
-              value={flipped ? selectedFromLayer : selectedToLayer}
-              onChange={(e) => (flipped ? setSelectedFromLayer(e.target.value) : setSelectedToLayer(e.target.value))}
-              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title={`Filter ${flipped ? "from" : "to"} layer`}
-            >
-              <option value="">All Layers</option>
-              {layerOptions.map((layer) => (
-                <option key={layer} value={layer}>
-                  {layer}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Add Content Layer Dropdown */}
-          <div className="flex items-center gap-1">
-            <label className="text-xs text-gray-600">Content:</label>
-            <select
-              value={selectedContentLayer}
-              onChange={e => setSelectedContentLayer(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
-              title="Filter content layer"
-            >
-              <option value="">All Layers</option>
-              {contentLayerOptions.map((layer) => (
-                <option key={layer} value={layer}>
-                  {layer}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Export to Excel Button (after dropdowns) */}
-          <ExcelButton handleExportExcel={handleExportExcel}></ExcelButton>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="text-lg font-bold"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expand Kanban" : "Collapse Kanban"}
-          >
-            {collapsed ? "▼" : "▲"}
-          </button>
-        </div>
-      </div>
+      <Header contentLayerOptions={contentLayerOptions} length={filteredSources.length} _length={filteredTargets.length} collapsed={collapsed} setCollapsed={setCollapsed} layerOptions={layerOptions} flipped={flipped} selectedFromLayer={selectedFromLayer} setSelectedFromLayer={setSelectedFromLayer} selectedToLayer={selectedToLayer} setSelectedToLayer={setSelectedToLayer} selectedContentLayer={selectedContentLayer} setSelectedContentLayer={setSelectedContentLayer} handleExportExcel={handleExportExcel}></Header>
 
       {/* Matrix Table */}
       <div className={`overflow-auto transition-all duration-300`} style={{ height: collapsed ? 0 : "auto" }}>
@@ -394,6 +376,8 @@ const AppKanban = () => {
           <Table nameById={nameById} filteredSources={filteredSources} filteredTargets={filteredTargets} cellContents={filteredCellContents} dragItem={dragItem} setDragItem={setDragItem} setEditingKey={setEditingKey} setContextMenu={setContextMenu} handleDrop={handleDrop}></Table>
         )}
       </div>
+
+      {/* Modal for adding rows */}
       {editingKey && (
         <ModalAddRow
           isOpen={!!editingKey}
@@ -402,6 +386,8 @@ const AppKanban = () => {
           selectedContentLayer={selectedContentLayer} // <-- pass as prop
         />
       )}
+
+      {/* Context menu for cell actions */}
       {contextMenu && (
         <ContextMenu contextMenu={contextMenu} setContextMenu={setContextMenu} handleRemove={handleRemove}></ContextMenu>
       )}
