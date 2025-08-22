@@ -11,7 +11,7 @@ export const getLayoutedElements = (
     nodes,
     edges,
     direction = 'LR',
-    nodesep = 75,
+    nodesep = 35,
     ranksep = 100
 ) => {
     const dagreGraph = new dagre.graphlib.Graph();
@@ -53,7 +53,7 @@ export const getLayoutedElements = (
 
     const gridSpacingX = 360;
     const gridSpacingY = 140;
-    const columns = 4;
+    const columns = 8;
     const gridYOffset = maxY + 200; // Push grid below Dagre layout
     let gridIndex = 0;
 
