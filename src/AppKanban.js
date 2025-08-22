@@ -4,6 +4,95 @@ import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 
+
+function ExcelButton(props) {
+  return (<button className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600" onClick={props.handleExportExcel} title="Export current view to Excel">
+    Export to Excel
+  </button>);
+}
+
+
+
+function ContextMenu(props) {
+  return (<div className="fixed z-50 bg-white border border-gray-300 rounded shadow" style={{
+    top: props.contextMenu.y,
+    left: props.contextMenu.x
+  }} onContextMenu={e => e.preventDefault()}>
+    <button className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100" onClick={e => {
+      e.stopPropagation();
+      props.handleRemove(props.contextMenu.key, props.contextMenu.cid);
+      props.setContextMenu(null);
+    }}>
+      Remove
+    </button>
+  </div>);
+}
+
+
+
+function Table(props) {
+  return (<table className="table-auto border-collapse border border-gray-300 w-full">
+    <thead>
+      <tr>
+        <th className="sticky top-0 left-0 z-10 bg-gray-100 p-2 border border-gray-300" />
+        {props.filteredTargets.map(target => <th key={target.id} className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left">
+          {target.Name}
+        </th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {props.filteredSources.map(source => <tr key={source.id}>
+        <th className="sticky left-0 z-10 bg-gray-100 p-2 border border-gray-300 text-xs text-left" style={{
+          minWidth: 120,
+          maxWidth: 200,
+          width: 150,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis"
+        }}>
+          {source.Name}
+        </th>
+        {props.filteredTargets.map(target => {
+          const key = `${source.id}--${target.id}`;
+
+          if (source.id === target.id) {
+            return <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-left">
+              —
+            </td>;
+          }
+
+          const items = props.cellContents[key] || []; // Disallow drop if dragItem exists and its cid matches source or target
+
+          const dropDisabled = props.dragItem && (props.dragItem.cid === source.id.toString() || props.dragItem.cid === target.id.toString());
+          return <td key={key} className={`p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 ${dropDisabled ? "opacity-50 cursor-not-allowed" : ""}`} onDragOver={e => {
+            if (!dropDisabled) e.preventDefault();
+          }} onDrop={() => {
+            if (!dropDisabled) props.handleDrop(key);
+          }} onDoubleClick={() => props.setEditingKey(key)}>
+            {items.length > 0 ? <ul className="text-xs space-y-1">
+              {items.map(cid => <li key={cid} draggable onDragStart={() => props.setDragItem({
+                cid,
+                fromKey: key
+              })} onContextMenu={e => {
+                e.preventDefault();
+                props.setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  key,
+                  cid
+                });
+              }}>
+                {props.nameById[cid] || cid}
+              </li>)}
+            </ul> : <span className="text-xs text-gray-400">—</span>}
+          </td>;
+        })}
+      </tr>)}
+    </tbody>
+  </table>);
+}
+
+
 const AppKanban = () => {
   const { rowData } = useAppContext();
   const {
@@ -285,13 +374,7 @@ const AppKanban = () => {
           </div>
 
           {/* Export to Excel Button (after dropdowns) */}
-          <button
-            className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600"
-            onClick={handleExportExcel}
-            title="Export current view to Excel"
-          >
-            Export to Excel
-          </button>
+          <ExcelButton handleExportExcel={handleExportExcel}></ExcelButton>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -307,84 +390,7 @@ const AppKanban = () => {
       {/* Matrix Table */}
       <div className={`overflow-auto transition-all duration-300`} style={{ height: collapsed ? 0 : "auto" }}>
         {!collapsed && (
-          <table className="table-auto border-collapse border border-gray-300 w-full">
-            <thead>
-              <tr>
-                <th className="sticky top-0 left-0 z-10 bg-gray-100 p-2 border border-gray-300" />
-                {filteredTargets.map((target) => (
-                  <th
-                    key={target.id}
-                    className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
-                  >
-                    {target.Name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSources.map((source) => (
-                <tr key={source.id}>
-                  <th
-                    className="sticky left-0 z-10 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
-                    style={{ minWidth: 120, maxWidth: 200, width: 150, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    {source.Name}
-                  </th>
-                  {filteredTargets.map((target) => {
-                    const key = `${source.id}--${target.id}`;
-                    if (source.id === target.id) {
-                      return (
-                        <td key={key} className="p-2 bg-gray-200 border border-gray-300 text-left">
-                          —
-                        </td>
-                      );
-                    }
-
-                    const items = filteredCellContents[key] || [];
-
-                    // Disallow drop if dragItem exists and its cid matches source or target
-                    const dropDisabled =
-                      dragItem &&
-                      (dragItem.cid === source.id.toString() || dragItem.cid === target.id.toString());
-
-                    return (
-                      <td
-                        key={key}
-                        className={`p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 ${dropDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                        onDragOver={(e) => {
-                          if (!dropDisabled) e.preventDefault();
-                        }}
-                        onDrop={() => {
-                          if (!dropDisabled) handleDrop(key);
-                        }}
-                        onDoubleClick={() => setEditingKey(key)}
-                      >
-                        {items.length > 0 ? (
-                          <ul className="text-xs space-y-1">
-                            {items.map((cid) => (
-                              <li
-                                key={cid}
-                                draggable
-                                onDragStart={() => setDragItem({ cid, fromKey: key })}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  setContextMenu({ x: e.clientX, y: e.clientY, key, cid });
-                                }}
-                              >
-                                {nameById[cid] || cid}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table nameById={nameById} filteredSources={filteredSources} filteredTargets={filteredTargets} cellContents={filteredCellContents} dragItem={dragItem} setDragItem={setDragItem} setEditingKey={setEditingKey} setContextMenu={setContextMenu} handleDrop={handleDrop}></Table>
         )}
       </div>
       {editingKey && (
@@ -396,22 +402,7 @@ const AppKanban = () => {
         />
       )}
       {contextMenu && (
-        <div
-          className="fixed z-50 bg-white border border-gray-300 rounded shadow"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRemove(contextMenu.key, contextMenu.cid);
-              setContextMenu(null);
-            }}
-          >
-            Remove
-          </button>
-        </div>
+        <ContextMenu contextMenu={contextMenu} setContextMenu={setContextMenu} handleRemove={handleRemove}></ContextMenu>
       )}
     </div>
   );
