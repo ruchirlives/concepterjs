@@ -45,6 +45,7 @@ export const menuItems = [
     { handler: "hideUnselected", label: "Hide Unselected" },
     { handler: "hideChildren", label: "Hide Children" },
     { handler: "showChildren", label: "Show Children" },
+    { handler: "createLayerFromVisible", label: "Create Layer from Visible Nodes" },
     { handler: "categorize", label: "Categorize Containers" },
     { handler: "buildRelationships", label: "Build Relationships" },
     { handler: "exportMermaid", label: "Export to Mermaid" },
@@ -465,6 +466,32 @@ async function removeLayerTag({ selectedIds }, layer) {
     ch.close();
 }
 
+async function createLayerFromVisible({ nodes, addLayer }) {
+    const layer = prompt("Enter new layer name:");
+    if (!layer) return;
+
+    if (typeof addLayer === 'function') {
+        addLayer(layer);
+    }
+
+    const selectedIds = nodes
+        .filter(n => {
+            const tags = (n.data.Tags || '').split(',').map(t => t.trim());
+            return !tags.includes(layer);
+        })
+        .map(n => n.data.id);
+
+    if (!selectedIds.length) {
+        toast.success(`All visible nodes already contain "${layer}".`);
+        return;
+    }
+
+    const ch = new BroadcastChannel("addTagsChannel");
+    ch.postMessage({ selectedIds, tags: layer });
+    ch.close();
+    toast.success(`Layer "${layer}" added to visible nodes.`);
+}
+
 
 async function embedPositionsAction({ selectedIds }) {
     if (!selectedIds.length) {
@@ -536,7 +563,7 @@ function getDynamicHandler(action) {
 
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
-    const { layerOptions } = useAppContext();
+    const { layerOptions, activeLayers, addLayer } = useAppContext();
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
         { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
@@ -561,7 +588,6 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
         );
     };
 
-    const { activeLayers } = useAppContext();
     const onMenuItemClick = async (action) => {
         const m = menuRef.current;
         const nodeId = m?.dataset.nodeId;
@@ -573,7 +599,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer };
         const handler = handlersByName[action] || getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
