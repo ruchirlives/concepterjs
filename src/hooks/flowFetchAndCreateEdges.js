@@ -212,7 +212,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         pendingEdges.forEach((pending, idx) => {
             if (!pending?.Name) return; // Skip if Name is missing
 
-            console.log(`Adding ghost node for pending edge: ${pending.Name} with ${pending.to} at index ${idx}`);
+            // console.log(`Adding ghost node for pending edge: ${pending.Name} with ${pending.to} at index ${idx}`);
 
             const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
             const ghostNode = {
@@ -248,8 +248,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
 
     async function deployNodesEdges(params) {
         const { setLayoutPositions, layoutPositions, keepLayout } = params;
-        console.log('Deploying nodes and edges with keepLayout:', keepLayout);
-        console.log('Layout positions:', layoutPositions);
+        // console.log('Deploying nodes and edges with keepLayout:', keepLayout);
+        // console.log('Layout positions:', layoutPositions);
         if (keepLayout) {
             const restored = computedNodes.map(node => ({
                 ...node,

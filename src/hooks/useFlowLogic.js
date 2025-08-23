@@ -15,9 +15,9 @@ export const useFlowLogic = () => {
 
   // Filter rowData based on hidden layers for Flow only
   const flowFilteredRowData = useMemo(() => {
-    console.log('Original rowData count:', rowData.length);
-    console.log('Hidden layers:', [...hiddenLayers]);
-    console.log('Available layer options:', layerOptions);
+    // console.log('Original rowData count:', rowData.length);
+    // console.log('Hidden layers:', [...hiddenLayers]);
+    // console.log('Available layer options:', layerOptions);
 
     if (hiddenLayers.size === 0) return rowData;
 

@@ -191,7 +191,7 @@ export const useRefreshEffect = (rowData, setRowData, fetchContainers, sendFilte
         const refreshButton = document.getElementById("refreshButton");
         const handleRefreshClick = async () => {
             await fetchContainers().then((data) => {
-                console.log("Data refreshed:", data);
+                // console.log("Data refreshed:", data);
                 formatDateFields(data);
                 setRowData(data);
                 // Remove sendFilteredRows() from here

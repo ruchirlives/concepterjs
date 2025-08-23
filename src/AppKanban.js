@@ -348,11 +348,6 @@ const AppKanban = () => {
     [filteredTargets, relationships]
   );
 
-  useEffect(() => {
-    console.log('Filtered Targets before sort:', filteredTargets);
-    console.log('Filtered Targets after sort:', sortedTargets);
-  }, [filteredTargets, sortedTargets]);
-
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}

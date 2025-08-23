@@ -43,7 +43,7 @@ export const fetchContainers = async () => {
     try {
         const response = await apiClient.get(`${getApiUrl()}/get_containers`);
         let containers = response.data.containers;
-        console.log("Fetched containers:", containers);
+        console.log("Fetched containers:", containers.length);
 
         // Duplicate check (warn)
         if (Array.isArray(containers)) {

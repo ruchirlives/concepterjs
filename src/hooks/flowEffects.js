@@ -364,7 +364,7 @@ export const useCreateNodesAndEdges = (params) => {
         }
 
         const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
-        console.log("Generating nodes and edges with filtered rows:", filtered.length);
+        // console.log("Generating nodes and edges with filtered rows:", filtered.length);
         (async () => {
             await generateNodesAndEdges({
                 ...params,
@@ -400,8 +400,6 @@ export const useTagsChange = (rowData, setRowData, keepLayout) => {
     }, [rowData]);
 
     useEffect(() => {
-        console.log('Tag filter changed:');
-        console.log("Keep node setting:", keepLayout);
         let filteredTagFilter = [];
         if (keepLayout) {
             filteredTagFilter = tagFilter.filter((row) =>
@@ -409,7 +407,7 @@ export const useTagsChange = (rowData, setRowData, keepLayout) => {
             );
         } else {
             filteredTagFilter = tagFilter;
-            console.log('Keeping all rows in tagFilter');
+            // console.log('Keeping all rows in tagFilter');
         }
         filteredTagFilter = filteredTagFilter.filter(r => rowInLayers(r, activeLayers));
 
