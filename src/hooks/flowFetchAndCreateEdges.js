@@ -8,7 +8,6 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     const originalIdSet = new Set(computedNodes.map(n => n.id));
 
     // Fetch parent→children relationships
-    await new Promise(res => setTimeout(res, 500)); // Artificial delay for testing
     if (!parentChildMap) return;
 
     // Filter parentChildMap by originalIDSet

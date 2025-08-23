@@ -365,14 +365,16 @@ export const useCreateNodesAndEdges = (params) => {
 
         const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
         console.log("Generating nodes and edges with filtered rows:", filtered.length);
-        generateNodesAndEdges({
-            ...params,
-            rowData: filtered,
-            stateScores,
-            getHighestScoringContainer,
-            parentChildMap,
-            setParentChildMap
-        });
+        (async () => {
+            await generateNodesAndEdges({
+                ...params,
+                rowData: filtered,
+                stateScores,
+                getHighestScoringContainer,
+                parentChildMap,
+                setParentChildMap
+            });
+        })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         // Only include values that should trigger regeneration

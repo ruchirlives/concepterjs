@@ -2,12 +2,11 @@ import { fetchAndCreateEdges } from './flowFetchAndCreateEdges';
 import { fitViewToFlow } from './flowFunctions';
 export const GROUP_NODE_WIDTH = 300;
 
-export function generateNodesAndEdges(params) {
-    const { 
-        rowData, 
-        setNodes, 
-        stateScores, 
-        getHighestScoringContainer 
+export async function generateNodesAndEdges(params) {
+    const {
+        rowData,
+        stateScores,
+        getHighestScoringContainer
     } = params;
     
     if (!rowData || rowData.length === 0) return;
@@ -56,9 +55,8 @@ export function generateNodesAndEdges(params) {
         };
     });
 
-    fetchAndCreateEdges(computedNodes, params);
+    await fetchAndCreateEdges(computedNodes, params);
     fitViewToFlow();
-    setNodes(computedNodes);
 }
 
 
