@@ -75,7 +75,7 @@ export const useMatrixLogic = () => {
       childArr.forEach(child => {
         const childId = child.id.toString();
         children[parentId].push(childId);
-        const key = `${parentId}-${childId}`;
+        const key = `${parentId}--${childId}`;
         let relationship = "";
         if (child.position) {
           if (typeof child.position === "object") {
@@ -94,7 +94,7 @@ export const useMatrixLogic = () => {
       for (let j = 0; j < toLayerFilteredData.length; j++) {
         const sourceId = fromLayerFilteredData[i].id;
         const targetId = toLayerFilteredData[j].id;
-        const key = `${sourceId}-${targetId}`;
+        const key = `${sourceId}--${targetId}`;
         if (!(key in rels)) rels[key] = "";
       }
     }
@@ -185,7 +185,7 @@ export const useMatrixLogic = () => {
     // Add null check for edges array
     if (edges && Array.isArray(edges)) {
       edges.forEach((e) => {
-        existing[`${e.source}-${e.target}`] = e;
+        existing[`${e.source}--${e.target}`] = e;
       });
     }
 
@@ -195,7 +195,7 @@ export const useMatrixLogic = () => {
         if (source.id === target.id) return;
         const sourceId = flipped ? target.id : source.id;
         const targetId = flipped ? source.id : target.id;
-        const key = `${sourceId}-${targetId}`;
+        const key = `${sourceId}--${targetId}`;
         map[key] =
           existing[key] || {
             source: String(sourceId),
@@ -216,7 +216,7 @@ export const useMatrixLogic = () => {
 
   const handleCellClick = useCallback((sourceId, targetId) => {
     if (sourceId === targetId) return;
-    const key = `${sourceId}-${targetId}`;
+    const key = `${sourceId}--${targetId}`;
     setEditingCell({ sourceId, targetId, key });
   }, [setEditingCell]);
 

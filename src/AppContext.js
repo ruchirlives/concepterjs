@@ -251,11 +251,14 @@ export const rowInLayers = (rowData, layers = []) => {
 /**
  * Topologically sorts items based on "successor" relationships.
  * @param {string[]} items - Array of item IDs to sort.
- * @param {Object} relationships - Map of "parentId-childId" -> relationship object.
+ * @param {Object} relationships - Map of "parentId--childId" -> relationship object.
  * @returns {string[]} Sorted array of item IDs.
  */
 export function sortBySuccessor(items, relationships) {
-  // console.log("Sorting items with relationships:", relationships);
+  // console.log("Relationships", relationships);
+  // console.log("Pre-sort", items);
+  const REL_KEY_SEPARATOR = '--'; // match your useMatrixLogic.js
+
   const graph = {};
   const inDegree = {};
   items.forEach(id => {
@@ -263,15 +266,14 @@ export function sortBySuccessor(items, relationships) {
     inDegree[id] = 0;
   });
 
-  // Debug: log all found successor relationships
+
   items.forEach(parentId => {
     items.forEach(childId => {
       if (parentId === childId) return;
-      const relKey = `${parentId}-${childId}`;
+      const relKey = `${parentId}${REL_KEY_SEPARATOR}${childId}`;
       const rel = relationships[relKey];
-      if (rel && rel.label === "successor") {
-        console.log(`Found successor: ${parentId} -> ${childId}`);
-        graph[parentId].push(childId);
+      if (rel === "successor" || (rel && rel.label === "successor")) {
+        graph[parentId].push(childId); // parentId -> childId
         inDegree[childId]++;
       }
     });
@@ -295,6 +297,8 @@ export function sortBySuccessor(items, relationships) {
 
   // If cycle, fallback to original order
   if (result.length !== items.length) return items;
+
+  // console.log("Post-sort", result);
   return result;
 }
 

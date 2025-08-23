@@ -60,6 +60,7 @@ function Table(props) {
           // Sort items by successor relationship
           const rawItems = props.cellContents[key] || [];
           const items = sortBySuccessor(rawItems, props.relationships);
+          // const items = props.cellContents[key] || [];
 
           const dropDisabled = props.dragItem && (props.dragItem.cid === source.id.toString() || props.dragItem.cid === target.id.toString());
           return <td key={key} className={`p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 ${dropDisabled ? "opacity-50 cursor-not-allowed" : ""}`} onDragOver={e => {
@@ -334,12 +335,17 @@ const AppKanban = () => {
   }, [cellContents, selectedContentLayer, rowData]);
   const filteredCellContents = getFilteredCellContents();
 
+  // console.log("Filtered sources", filteredSources);
+  // console.log("Relationships", relationships);
+
   const sortedSources = React.useMemo(() =>
     sortBySuccessor(filteredSources.map(s => s.id.toString()), relationships)
       .map(id => filteredSources.find(s => s.id.toString() === id))
       .filter(Boolean),
     [filteredSources, relationships]
   );
+
+  console.log("Sorted sources", sortedSources);
 
   const sortedTargets = React.useMemo(() =>
     sortBySuccessor(filteredTargets.map(t => t.id.toString()), relationships)
