@@ -7,8 +7,9 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 const AppMatrix = () => {
   const {
     // State
-    relationships,
-    forwardExists,
+    relationships,      // derived from parentChildMap
+    forwardExists,      // derived from parentChildMap
+    childrenMap,        // derived from parentChildMap
     loading,
     editingCell,
     collapsed,
@@ -17,7 +18,6 @@ const AppMatrix = () => {
     setHideEmpty,
     hoveredCell,
     setHoveredCell,
-    childrenMap,
     hoveredFrom,
     setHoveredFrom,
     hoveredRowId,

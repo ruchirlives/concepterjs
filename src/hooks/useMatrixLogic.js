@@ -1,49 +1,29 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
-import { manyChildren, setPosition, compareStates, revertDifferences } from '../api';
+import { setPosition, compareStates, revertDifferences } from '../api';
 import { useAppContext } from '../AppContext';
 import { useEdgeMenu } from './flowEdgeMenu';
 import { useStateScores } from './useStateScores';
 import toast from 'react-hot-toast';
 
 export const useMatrixLogic = () => {
-  const { rowData, edges, layerOptions, comparatorState, setDiffDict, activeState, hiddenLayers,
-    relationships,
-    setRelationships,
-    forwardExists,
-    setForwardExists,
+  const {
+    rowData, edges, layerOptions, comparatorState, setDiffDict, activeState, hiddenLayers,
     loading,
-    setLoading,
-    editingCell,
-    setEditingCell,
-    hideEmpty,
-    setHideEmpty,
-    hoveredCell,
-    setHoveredCell,
-    childrenMap,
-    setChildrenMap,
-    hoveredFrom,
-    setHoveredFrom,
-    hoveredRowId,
-    setHoveredRowId,
-    flipped,
-    setFlipped,
-    selectedFromLayer,
-    setSelectedFromLayer,
-    selectedToLayer,
-    setSelectedToLayer,
-    differences,
-    setDifferences,
-    loadingDifferences,
-    setLoadingDifferences,
-    differencesTrigger,
-    setDifferencesTrigger,
-    showDropdowns,
-    setShowDropdowns,
-    rawDifferences,
-    setRawDifferences,
-    selectedContentLayer,
-    setSelectedContentLayer
-
+    editingCell, setEditingCell,
+    hideEmpty, setHideEmpty,
+    hoveredCell, setHoveredCell,
+    hoveredFrom, setHoveredFrom,
+    hoveredRowId, setHoveredRowId,
+    flipped, setFlipped,
+    selectedFromLayer, setSelectedFromLayer,
+    selectedToLayer, setSelectedToLayer,
+    differences, setDifferences,
+    loadingDifferences, setLoadingDifferences,
+    differencesTrigger, setDifferencesTrigger,
+    showDropdowns, setShowDropdowns,
+    rawDifferences, setRawDifferences,
+    selectedContentLayer, setSelectedContentLayer,
+    parentChildMap, setParentChildMap // <-- only these for relationships
   } = useAppContext();
 
   const [collapsed, setCollapsed] = useState(true);
@@ -53,7 +33,15 @@ export const useMatrixLogic = () => {
   const { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu } = useEdgeMenu(flowWrapperRef, null);
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
-  // Filter data by layers (including global hidden layers)
+  // Compute a lookup map of container ID to Name
+  const nameById = useMemo(() => {
+    const map = {};
+    rowData.forEach(row => {
+      map[row.id] = row.Name;
+    });
+    return map;
+  }, [rowData]);
+  // 1. Filter data by layers (including global hidden layers)
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
     const filterByLayer = (data, layer) => {
       return data.filter((container) => {
@@ -70,21 +58,51 @@ export const useMatrixLogic = () => {
     };
   }, [rowData, selectedFromLayer, selectedToLayer, hiddenLayers]);
 
-  // Combined filtered data
-  const combinedFilteredData = useMemo(() => {
-    const combinedIds = new Set([...fromLayerFilteredData.map((c) => c.id), ...toLayerFilteredData.map((c) => c.id)]);
-    return rowData.filter((c) => combinedIds.has(c.id));
-  }, [rowData, fromLayerFilteredData, toLayerFilteredData]);
+  // 2. DERIVE relationships, forwardExists, childrenMap FIRST!
+  const { relationships, forwardExists, childrenMap } = useMemo(() => {
+    const rels = {};
+    const fwds = {};
+    const children = {};
 
-  // Name lookup map
-  const nameById = useMemo(() => {
-    const map = {};
-    rowData.forEach((c) => {
-      map[c.id] = c.Name;
+    if (!parentChildMap || !Array.isArray(parentChildMap)) {
+      return { relationships: rels, forwardExists: fwds, childrenMap: children };
+    }
+
+    parentChildMap.forEach(({ container_id, children: childArr }) => {
+      const parentId = container_id.toString();
+      children[parentId] = [];
+      if (!childArr || !Array.isArray(childArr)) return;
+      childArr.forEach(child => {
+        const childId = child.id.toString();
+        children[parentId].push(childId);
+        const key = `${parentId}-${childId}`;
+        let relationship = "";
+        if (child.position) {
+          if (typeof child.position === "object") {
+            relationship = child.position.label || "";
+          } else {
+            relationship = child.position.toString();
+          }
+        }
+        rels[key] = relationship;
+        fwds[key] = true;
+      });
     });
-    return map;
-  }, [rowData]);
 
+    // Fill in empty relationships for all visible pairs
+    for (let i = 0; i < fromLayerFilteredData.length; i++) {
+      for (let j = 0; j < toLayerFilteredData.length; j++) {
+        const sourceId = fromLayerFilteredData[i].id;
+        const targetId = toLayerFilteredData[j].id;
+        const key = `${sourceId}-${targetId}`;
+        if (!(key in rels)) rels[key] = "";
+      }
+    }
+
+    return { relationships: rels, forwardExists: fwds, childrenMap: children };
+  }, [parentChildMap, fromLayerFilteredData, toLayerFilteredData]);
+
+  // 3. Now you can use forwardExists, relationships, childrenMap in other hooks
   // Filtered sources and targets
   const { filteredSources, filteredTargets } = useMemo(() => {
     const baseSourceData = flipped ? toLayerFilteredData : fromLayerFilteredData;
@@ -205,27 +223,21 @@ export const useMatrixLogic = () => {
   const handleCellSubmit = useCallback(
     async (value) => {
       if (!editingCell) return;
-      const { sourceId, targetId, key } = editingCell;
+      const { sourceId, targetId } = editingCell;
 
       try {
         await setPosition(sourceId, targetId, value);
-        setRelationships((prev) => ({
-          ...prev,
-          [key]: value,
-        }));
-        setForwardExists((prev) => ({
-          ...prev,
-          [key]: true,
-        }));
-
         setEditingCell(null);
         setDifferencesTrigger((prev) => prev + 1);
+
+        // Refresh parentChildMap (triggers useEffect in AppContext)
+        // Optionally, you can call setParentChildMap here if you want to force a reload
       } catch (error) {
         console.error("Error saving relationship:", error);
         setEditingCell(null);
       }
     },
-    [editingCell, setEditingCell, setRelationships, setForwardExists, setDifferencesTrigger]
+    [editingCell, setEditingCell, setDifferencesTrigger]
   );
 
   const handleKeyDown = useCallback(
@@ -326,99 +338,10 @@ export const useMatrixLogic = () => {
     return "bg-yellow-50";
   };
 
-  // Load relationships
-  const loadRelationships = useCallback(async () => {
-    if (combinedFilteredData.length === 0 || collapsed) return;
-
-    setLoading(true);
-
-    try {
-      const containerIds = combinedFilteredData.map((container) => container.id);
-      const parentChildMap = await manyChildren(containerIds);
-
-      if (!parentChildMap) {
-        setRelationships({});
-        setLoading(false);
-        return;
-      }
-
-      const newRelationships = {};
-      const newForwardMap = {};
-      const newChildrenMap = {};
-
-      parentChildMap.forEach(({ container_id, children }) => {
-        const parentId = container_id.toString();
-
-        // Add null check for children
-        if (!children || !Array.isArray(children)) {
-          newChildrenMap[parentId] = [];
-          return;
-        }
-
-        newChildrenMap[parentId] = children.map((c) => c.id.toString());
-
-        children.forEach((child) => {
-          const childId = child.id.toString();
-          const key = `${parentId}-${childId}`;
-
-          let relationship = "";
-          if (child.position) {
-            if (typeof child.position === "object") {
-              relationship = child.position.label || "";
-            } else {
-              relationship = child.position.toString();
-            }
-          }
-
-          newRelationships[key] = relationship;
-          newForwardMap[key] = true;
-        });
-      });
-
-      for (let i = 0; i < fromLayerFilteredData.length; i++) {
-        for (let j = 0; j < toLayerFilteredData.length; j++) {
-          const sourceId = fromLayerFilteredData[i].id;
-          const targetId = toLayerFilteredData[j].id;
-          const key = `${sourceId}-${targetId}`;
-
-          if (!(key in newRelationships)) {
-            newRelationships[key] = "";
-          }
-        }
-      }
-
-      setRelationships(newRelationships);
-      setForwardExists(newForwardMap);
-      setChildrenMap(newChildrenMap);
-    } catch (error) {
-      console.error("Error loading relationships:", error);
-      const newRelationships = {};
-      for (let i = 0; i < fromLayerFilteredData.length; i++) {
-        for (let j = 0; j < toLayerFilteredData.length; j++) {
-          const sourceId = fromLayerFilteredData[i].id;
-          const targetId = toLayerFilteredData[j].id;
-          const key = `${sourceId}-${targetId}`;
-          newRelationships[key] = "";
-        }
-      }
-      setRelationships(newRelationships);
-      setForwardExists({});
-      setChildrenMap({});
-    }
-
-    setLoading(false);
-  }, [combinedFilteredData, fromLayerFilteredData, toLayerFilteredData, collapsed, setRelationships, setForwardExists, setChildrenMap, setLoading]);
-
   // Effects
   useEffect(() => {
-    loadRelationships();
-  }, [loadRelationships]);
-
-  useEffect(() => {
-    if (combinedFilteredData.length > 0 && !collapsed && Object.keys(relationships).length === 0) {
-      loadRelationships();
-    }
-  }, [collapsed, combinedFilteredData.length, relationships, loadRelationships]);
+    // Optionally, you can call setParentChildMap here if you want to force a reload
+  }, [setParentChildMap]);
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -519,10 +442,12 @@ export const useMatrixLogic = () => {
     return Array.from(layers).sort();
   }, [rowData]);
 
+
   return {
     // State
     relationships,
     forwardExists,
+    childrenMap, // only once!
     loading,
     editingCell,
     collapsed,
@@ -531,7 +456,6 @@ export const useMatrixLogic = () => {
     setHideEmpty,
     hoveredCell,
     setHoveredCell,
-    childrenMap,
     hoveredFrom,
     setHoveredFrom,
     hoveredRowId,
@@ -562,7 +486,7 @@ export const useMatrixLogic = () => {
     edgeMap,
     layerOptions: availableLayerOptions,
     comparatorState,
-    contentLayerOptions, // <-- add this line
+    contentLayerOptions,
     kanbanFilteredSources,
     kanbanFilteredTargets,
 

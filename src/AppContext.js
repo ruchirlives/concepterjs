@@ -20,13 +20,10 @@ export const AppProvider = ({ children }) => {
   const [diffDict, setDiffDict] = useState({});
 
   // Matrix management
-  const [relationships, setRelationships] = useState({});
-  const [forwardExists, setForwardExists] = useState({});
   const [loading, setLoading] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [hideEmpty, setHideEmpty] = useState(true);
   const [hoveredCell, setHoveredCell] = useState(null);
-  const [childrenMap, setChildrenMap] = useState({});
   const [hoveredFrom, setHoveredFrom] = useState(null);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [flipped, setFlipped] = useState(false);
@@ -60,8 +57,6 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     async function fetchParentChildMap() {
-      console.log("FetchParentChildMap RUNNING")
-      // You may want to use all IDs or filtered IDs depending on your app logic
       const allIds = rowData.map(r => r.id);
       if (allIds.length === 0) return;
       const result = await manyChildren(allIds);
@@ -202,10 +197,6 @@ export const AppProvider = ({ children }) => {
     selectedContentLayer,
     setSelectedContentLayer,
     // Matrix management
-    relationships,
-    setRelationships,
-    forwardExists,
-    setForwardExists,
     loading,
     setLoading,
     editingCell,
@@ -214,8 +205,6 @@ export const AppProvider = ({ children }) => {
     setHideEmpty,
     hoveredCell,
     setHoveredCell,
-    childrenMap,
-    setChildrenMap,
     hoveredFrom,
     setHoveredFrom,
     hoveredRowId,

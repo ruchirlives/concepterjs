@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
-import { useAppContext, sortBySuccessor } from "./AppContext"; // <-- import here
+import { useAppContext, sortBySuccessor } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 
@@ -150,7 +150,7 @@ function Header(props) {
 }
 
 const AppKanban = () => {
-  const { rowData, relationships } = useAppContext(); // <-- get relationships from context
+  const { rowData } = useAppContext();
   const {
     kanbanFilteredSources: filteredSources,
     kanbanFilteredTargets: filteredTargets,
@@ -168,8 +168,8 @@ const AppKanban = () => {
     selectedContentLayer,
     setSelectedContentLayer,
     contentLayerOptions = [],
+    relationships, // <-- use derived relationships
   } = useMatrixLogic();
-  const { setChildrenMap } = useAppContext();
 
   const getCommonChildren = useCallback((sourceId, targetId) => {
     const sourceChildren = childrenMap[sourceId] || [];
@@ -214,6 +214,8 @@ const AppKanban = () => {
 
 
   useEffect(() => {
+    // Only run if childrenMap is not empty
+    if (!childrenMap || Object.keys(childrenMap).length === 0) return;
     const initial = {};
     filteredSources.forEach((source) => {
       filteredTargets.forEach((target) => {
@@ -261,15 +263,7 @@ const AppKanban = () => {
         addChildren(toSource, [cid]),
         addChildren(toTarget, [cid]),
       ]);
-      setChildrenMap((prev) => {
-        const next = { ...prev };
-        [toSource, toTarget].forEach((pid) => {
-          const arr = next[pid] || [];
-          if (!arr.includes(cid)) arr.push(cid);
-          next[pid] = arr;
-        });
-        return next;
-      });
+      // REMOVE setChildrenMap here
     } catch (error) {
       console.error("Error updating parents:", error);
     }
@@ -299,15 +293,6 @@ const AppKanban = () => {
         addChildren(sourceId, [cid]),
         addChildren(targetId, [cid]),
       ]);
-      setChildrenMap((prev) => {
-        const next = { ...prev };
-        [sourceId, targetId].forEach((pid) => {
-          const arr = next[pid] || [];
-          if (!arr.includes(cid)) arr.push(cid);
-          next[pid] = arr;
-        });
-        return next;
-      });
     } catch (error) {
       console.error("Error adding child:", error);
     }
@@ -327,14 +312,6 @@ const AppKanban = () => {
         removeChildren(sourceId, [cid]),
         removeChildren(targetId, [cid]),
       ]);
-      setChildrenMap((prev) => {
-        const next = { ...prev };
-        [sourceId, targetId].forEach((pid) => {
-          const arr = next[pid] || [];
-          next[pid] = arr.filter((id) => id !== cid);
-        });
-        return next;
-      });
     } catch (error) {
       console.error("Error removing child:", error);
     }
@@ -371,10 +348,10 @@ const AppKanban = () => {
     [filteredTargets, relationships]
   );
 
-  // useEffect(() => {
-  //   console.log('Filtered Targets before sort:', filteredTargets);
-  //   console.log('Filtered Targets after sort:', sortedTargets);
-  // }, [filteredTargets, sortedTargets]);
+  useEffect(() => {
+    console.log('Filtered Targets before sort:', filteredTargets);
+    console.log('Filtered Targets after sort:', sortedTargets);
+  }, [filteredTargets, sortedTargets]);
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">

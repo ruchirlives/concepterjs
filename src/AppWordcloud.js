@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { WordCloud } from "@ant-design/plots";
 import { useAppContext } from "./AppContext";
+import { useMatrixLogic } from "./hooks/useMatrixLogic"; // <-- add this
 
 function getWords(rowData, childrenMap) {
     return rowData
@@ -12,7 +13,8 @@ function getWords(rowData, childrenMap) {
 }
 
 const AppWordcloud = () => {
-    const { rowData, childrenMap } = useAppContext();
+    const { rowData } = useAppContext();
+    const { childrenMap } = useMatrixLogic(); // <-- get childrenMap from useMatrixLogic
     const [collapsed, setCollapsed] = useState(false);
     const [wordData, setWordData] = useState([]);
 
