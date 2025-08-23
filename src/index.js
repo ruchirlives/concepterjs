@@ -16,7 +16,6 @@ const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
 const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
-const AppLayerAssign = React.lazy(() => import('./AppLayerAssign'));
 
 // Suppress ResizeObserver error that doesn't affect functionality
 const suppressResizeObserverError = (e) => {
@@ -45,9 +44,9 @@ const originalError = console.error;
 console.error = (...args) => {
   const message = args[0];
   if (
-    typeof message === 'string' && 
-    (message.includes('ResizeObserver') || 
-     message.includes('loop completed with undelivered notifications'))
+    typeof message === 'string' &&
+    (message.includes('ResizeObserver') ||
+      message.includes('loop completed with undelivered notifications'))
   ) {
     return;
   }
@@ -57,12 +56,6 @@ console.error = (...args) => {
 // Memoize the components that don't depend on state
 const MemoizedStaticContent = React.memo(() => (
   <>
-    <section id="tiptap">
-      <Suspense fallback={<div>Loading editor...</div>}>
-        <AppTiptap />
-      </Suspense>
-    </section>
-
     <section id="matrix">
       <Suspense fallback={<div>Loading matrix...</div>}>
         <AppMatrix />
@@ -72,12 +65,6 @@ const MemoizedStaticContent = React.memo(() => (
     <section id="kanban">
       <Suspense fallback={<div>Loading kanban...</div>}>
         <AppKanban />
-      </Suspense>
-    </section>
-
-    <section id="layerassign">
-      <Suspense fallback={<div>Loading layer assign...</div>}>
-        <AppLayerAssign />
       </Suspense>
     </section>
 
@@ -93,11 +80,18 @@ const MemoizedStaticContent = React.memo(() => (
       </Suspense>
     </section>
 
+    <section id="tiptap">
+      <Suspense fallback={<div>Loading editor...</div>}>
+        <AppTiptap />
+      </Suspense>
+    </section>
+
     <section id="mermaid" className="mb-28">
       <Suspense fallback={<div>Loading diagram...</div>}>
         <AppMermaid />
       </Suspense>
     </section>
+
   </>
 ));
 

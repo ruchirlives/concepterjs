@@ -232,14 +232,16 @@ const AppKanban = () => {
     return () => window.removeEventListener("click", handleClick);
   }, []);
 
+  // --- Change: Dragging should copy, not move ---
   const handleDrop = async (toKey) => {
-    if (!dragItem || dragItem.fromKey === toKey) return;
+    if (!dragItem) return;
+
+    // Prevent dropping onto the same cell or onto a cell where the item already exists
+    if (dragItem.fromKey === toKey) return;
 
     setCellContents((prev) => {
       const next = { ...prev };
-      next[dragItem.fromKey] = next[dragItem.fromKey].filter(
-        (id) => id !== dragItem.cid
-      );
+      // Do NOT remove from source cell (copy, not move)
       const dest = next[toKey] || [];
       if (!dest.includes(dragItem.cid)) {
         dest.push(dragItem.cid);
@@ -249,29 +251,17 @@ const AppKanban = () => {
     });
 
     const cid = dragItem.cid;
-    console.log("Moving item:", cid, "from", dragItem.fromKey, "to", toKey);
-    const [fromSource, fromTarget] = dragItem.fromKey.split("--");
     const [toSource, toTarget] = toKey.split("--");
 
-    const oldParents = [fromSource, fromTarget];
-    const newParents = [toSource, toTarget];
-
-    const parentsToRemove = oldParents.filter(p => !newParents.includes(p));
-    const parentsToAdd = newParents.filter(p => !oldParents.includes(p));
-
+    // Only add to new parents, do not remove from old parents
     try {
       await Promise.all([
-        ...parentsToRemove.map((pid) => removeChildren(pid, [cid])),
-        ...parentsToAdd.map((pid) => addChildren(pid, [cid])),
+        addChildren(toSource, [cid]),
+        addChildren(toTarget, [cid]),
       ]);
-
       setChildrenMap((prev) => {
         const next = { ...prev };
-        parentsToRemove.forEach((pid) => {
-          const arr = next[pid] || [];
-          next[pid] = arr.filter((id) => id !== cid);
-        });
-        parentsToAdd.forEach((pid) => {
+        [toSource, toTarget].forEach((pid) => {
           const arr = next[pid] || [];
           if (!arr.includes(cid)) arr.push(cid);
           next[pid] = arr;
