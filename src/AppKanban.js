@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
-import { useAppContext } from "./AppContext";
+import { useAppContext, sortBySuccessor } from "./AppContext"; // <-- import here
 import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 
@@ -57,7 +57,9 @@ function Table(props) {
             </td>;
           }
 
-          const items = props.cellContents[key] || []; // Disallow drop if dragItem exists and its cid matches source or target
+          // Sort items by successor relationship
+          const rawItems = props.cellContents[key] || [];
+          const items = sortBySuccessor(rawItems, props.relationships);
 
           const dropDisabled = props.dragItem && (props.dragItem.cid === source.id.toString() || props.dragItem.cid === target.id.toString());
           return <td key={key} className={`p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 ${dropDisabled ? "opacity-50 cursor-not-allowed" : ""}`} onDragOver={e => {
@@ -148,7 +150,7 @@ function Header(props) {
 }
 
 const AppKanban = () => {
-  const { rowData } = useAppContext();
+  const { rowData, relationships } = useAppContext(); // <-- get relationships from context
   const {
     kanbanFilteredSources: filteredSources,
     kanbanFilteredTargets: filteredTargets,
@@ -355,6 +357,25 @@ const AppKanban = () => {
   }, [cellContents, selectedContentLayer, rowData]);
   const filteredCellContents = getFilteredCellContents();
 
+  const sortedSources = React.useMemo(() =>
+    sortBySuccessor(filteredSources.map(s => s.id.toString()), relationships)
+      .map(id => filteredSources.find(s => s.id.toString() === id))
+      .filter(Boolean),
+    [filteredSources, relationships]
+  );
+
+  const sortedTargets = React.useMemo(() =>
+    sortBySuccessor(filteredTargets.map(t => t.id.toString()), relationships)
+      .map(id => filteredTargets.find(t => t.id.toString() === id))
+      .filter(Boolean),
+    [filteredTargets, relationships]
+  );
+
+  // useEffect(() => {
+  //   console.log('Filtered Targets before sort:', filteredTargets);
+  //   console.log('Filtered Targets after sort:', sortedTargets);
+  // }, [filteredTargets, sortedTargets]);
+
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
@@ -363,7 +384,18 @@ const AppKanban = () => {
       {/* Matrix Table */}
       <div className={`overflow-auto transition-all duration-300`} style={{ height: collapsed ? 0 : "auto" }}>
         {!collapsed && (
-          <Table nameById={nameById} filteredSources={filteredSources} filteredTargets={filteredTargets} cellContents={filteredCellContents} dragItem={dragItem} setDragItem={setDragItem} setEditingKey={setEditingKey} setContextMenu={setContextMenu} handleDrop={handleDrop}></Table>
+          <Table
+            nameById={nameById}
+            filteredSources={sortedSources}
+            filteredTargets={sortedTargets}
+            cellContents={filteredCellContents}
+            dragItem={dragItem}
+            setDragItem={setDragItem}
+            setEditingKey={setEditingKey}
+            setContextMenu={setContextMenu}
+            handleDrop={handleDrop}
+            relationships={relationships} // <-- pass relationships to Table
+          />
         )}
       </div>
 

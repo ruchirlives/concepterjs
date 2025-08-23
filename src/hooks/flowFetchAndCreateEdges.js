@@ -1,21 +1,24 @@
-import { manyChildren } from '../api';
 import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, activeGroup, keepLayout } = params;
+    const { setNodes, setEdges, activeGroup, parentChildMap } = params;
 
     // Build lookup of all original node IDs before hide
     const originalIdSet = new Set(computedNodes.map(n => n.id));
 
     // Fetch parent→children relationships
-    const parentChildMap = await manyChildren([...originalIdSet]);
-    // console.log('Parent-child map:', parentChildMap);
+    await new Promise(res => setTimeout(res, 500)); // Artificial delay for testing
     if (!parentChildMap) return;
+
+    // Filter parentChildMap by originalIDSet
+    const filteredParentChildMap = parentChildMap.filter(({ container_id, children }) =>
+        originalIdSet.has(container_id) || children.some(child => originalIdSet.has(child.id))
+    );
 
     // Build childMap: container_id → children objects
     const childMap = Object.fromEntries(
-        parentChildMap.map(({ container_id, children }) => [
+        filteredParentChildMap.map(({ container_id, children }) => [
             container_id.toString(),
             children
         ])
@@ -240,11 +243,14 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     // Layout & set state
     await deployNodesEdges({
         setLayoutPositions: params.setLayoutPositions,
-        layoutPositions: params.layoutPositions
+        layoutPositions: params.layoutPositions,
+        keepLayout: params.keepLayout // <-- add this line
     });
 
     async function deployNodesEdges(params) {
-        const { setLayoutPositions, layoutPositions } = params;
+        const { setLayoutPositions, layoutPositions, keepLayout } = params;
+        console.log('Deploying nodes and edges with keepLayout:', keepLayout);
+        console.log('Layout positions:', layoutPositions);
         if (keepLayout) {
             const restored = computedNodes.map(node => ({
                 ...node,

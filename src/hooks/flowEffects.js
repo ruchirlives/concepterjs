@@ -349,7 +349,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
     const { rowData, activeGroup, stateScores, getHighestScoringContainer } = params;
-    const { activeLayers, setEdges, setNodes } = useAppContext();
+    const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     useEffect(() => {
@@ -364,11 +364,14 @@ export const useCreateNodesAndEdges = (params) => {
         }
 
         const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
+        console.log("Generating nodes and edges with filtered rows:", filtered.length);
         generateNodesAndEdges({
             ...params,
             rowData: filtered,
             stateScores,
-            getHighestScoringContainer
+            getHighestScoringContainer,
+            parentChildMap,
+            setParentChildMap
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -377,6 +380,8 @@ export const useCreateNodesAndEdges = (params) => {
         activeGroup,
         activeLayers,
         stateScores,
+        parentChildMap,
+        setParentChildMap
         // Don't include getHighestScoringContainer as it's a function that changes
         // The scores themselves (stateScores) are sufficient to trigger updates
     ]);

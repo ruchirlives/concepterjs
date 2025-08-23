@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
-import { listStates, switchState, removeState, clearStates } from './api';
+import { listStates, switchState, removeState, clearStates, manyChildren } from './api';
 import toast from "react-hot-toast";
 
 const AppContext = createContext();
@@ -54,6 +54,21 @@ export const AppProvider = ({ children }) => {
 
   // Content layer filter state (add this)
   const [selectedContentLayer, setSelectedContentLayer] = useState("");
+
+  // Parent-child relationship map
+  const [parentChildMap, setParentChildMap] = useState([]);
+
+  useEffect(() => {
+    async function fetchParentChildMap() {
+      console.log("FetchParentChildMap RUNNING")
+      // You may want to use all IDs or filtered IDs depending on your app logic
+      const allIds = rowData.map(r => r.id);
+      if (allIds.length === 0) return;
+      const result = await manyChildren(allIds);
+      setParentChildMap(result || []);
+    }
+    fetchParentChildMap();
+  }, [rowData]); // or other dependencies as needed
 
 
   // State management functions
@@ -220,7 +235,10 @@ export const AppProvider = ({ children }) => {
     showDropdowns,
     setShowDropdowns,
     rawDifferences,
-    setRawDifferences
+    setRawDifferences,
+    // Parent-child relationship map
+    parentChildMap,
+    setParentChildMap,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -240,5 +258,55 @@ export const rowInLayers = (rowData, layers = []) => {
 
   return tagList.some((t) => layerList.includes(t));
 };
+
+/**
+ * Topologically sorts items based on "successor" relationships.
+ * @param {string[]} items - Array of item IDs to sort.
+ * @param {Object} relationships - Map of "parentId-childId" -> relationship object.
+ * @returns {string[]} Sorted array of item IDs.
+ */
+export function sortBySuccessor(items, relationships) {
+  // console.log("Sorting items with relationships:", relationships);
+  const graph = {};
+  const inDegree = {};
+  items.forEach(id => {
+    graph[id] = [];
+    inDegree[id] = 0;
+  });
+
+  // Debug: log all found successor relationships
+  items.forEach(parentId => {
+    items.forEach(childId => {
+      if (parentId === childId) return;
+      const relKey = `${parentId}-${childId}`;
+      const rel = relationships[relKey];
+      if (rel && rel.label === "successor") {
+        console.log(`Found successor: ${parentId} -> ${childId}`);
+        graph[parentId].push(childId);
+        inDegree[childId]++;
+      }
+    });
+  });
+
+  // Kahn's algorithm for topological sort
+  const queue = [];
+  Object.keys(inDegree).forEach(id => {
+    if (inDegree[id] === 0) queue.push(id);
+  });
+
+  const result = [];
+  while (queue.length) {
+    const id = queue.shift();
+    result.push(id);
+    graph[id].forEach(succ => {
+      inDegree[succ]--;
+      if (inDegree[succ] === 0) queue.push(succ);
+    });
+  }
+
+  // If cycle, fallback to original order
+  if (result.length !== items.length) return items;
+  return result;
+}
 
 export default AppContext;
