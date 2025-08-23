@@ -16,6 +16,7 @@ const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
 const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
+const AppLayerAssign = React.lazy(() => import('./AppLayerAssign'));
 
 // Suppress ResizeObserver error that doesn't affect functionality
 const suppressResizeObserverError = (e) => {
@@ -71,6 +72,12 @@ const MemoizedStaticContent = React.memo(() => (
     <section id="kanban">
       <Suspense fallback={<div>Loading kanban...</div>}>
         <AppKanban />
+      </Suspense>
+    </section>
+
+    <section id="layerassign">
+      <Suspense fallback={<div>Loading layer assign...</div>}>
+        <AppLayerAssign />
       </Suspense>
     </section>
 
