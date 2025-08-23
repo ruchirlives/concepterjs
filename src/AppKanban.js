@@ -345,7 +345,7 @@ const AppKanban = () => {
     [filteredSources, relationships]
   );
 
-  console.log("Sorted sources", sortedSources);
+  // console.log("Sorted sources", sortedSources);
 
   const sortedTargets = React.useMemo(() =>
     sortBySuccessor(filteredTargets.map(t => t.id.toString()), relationships)
