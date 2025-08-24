@@ -857,3 +857,22 @@ export const searchNodes = async (searchTerm, tags) => {
         return [];
     }
 };
+
+/**
+ * Search for position.z using vector search.
+ * @param {string} searchTerm - The search term for position.z.
+ * @param {number} [top_n=10] - Number of top results to return.
+ * @returns {Promise<Array>} Array of names matching the search.
+ */
+export const searchPositionZ = async (searchTerm, top_n = 5) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/search_position_z`, {
+            searchTerm,
+            top_n
+        });
+        return response.data.result || [];
+    } catch (error) {
+        console.error("Error searching position.z:", error);
+        return [];
+    }
+};

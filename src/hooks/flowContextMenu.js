@@ -25,7 +25,8 @@ import {
     joinSimilarContainers, // <-- add this import
     embedPositions,
     findSimilarPositions,
-    exportBranch
+    exportBranch,
+    searchPositionZ
 } from "../api";
 import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
 import {
@@ -73,6 +74,7 @@ export const menuItems = [
     { handler: "joinSimilar", label: "Join Top Similar" }, // <-- add to menuItems array
     { handler: "embedPositionsAction", label: "Embed Positions" },
     { handler: "findSimilarPositionsAction", label: "Find Similar Positions" },
+    { handler: "searchPositionZAction", label: "Search Position Z" },
 ];
 /* eslint-disable no-unused-vars */
 
@@ -542,6 +544,26 @@ async function findSimilarPositionsAction({ nodes }) {
     }
 }
 
+
+async function searchPositionZAction({ nodeId, selectedNodes }) {
+    const node = selectedNodes.find(n => n.data.id === nodeId) || selectedNodes[0];
+    const defaultValue = node?.data?.Name || "";
+    const searchTerm = prompt("Search Position Z for:", defaultValue);
+    if (!searchTerm) return;
+    const results = await searchPositionZ(searchTerm);
+    if (results.length) {
+        toast.success(
+            <div style={{ whiteSpace: "pre-wrap" }}>
+                <b>Results:</b>
+                <br />
+                {results.join('\n')}
+            </div>,
+            { duration: 10000 }
+        );
+    } else {
+        toast.error("No results found.");
+    }
+}
 
 const handlersByName = menuItems.reduce((map, { handler }) => {
     // eslint-disable-next-line
