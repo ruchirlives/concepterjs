@@ -327,7 +327,7 @@ const AppMatrix = () => {
                           {/* Data cells - only show filtered containers as columns */}
                           {filteredTargets.map((targetContainer) => {
                             // Flip the key if flipped
-                            const key = flipped ? `${targetContainer.id}-${sourceContainer.id}` : `${sourceContainer.id}-${targetContainer.id}`;
+                            const key = flipped ? `${targetContainer.id}--${sourceContainer.id}` : `${sourceContainer.id}--${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
                             const value = relationships[key] || "";
 
@@ -451,7 +451,7 @@ const AppMatrix = () => {
                     edges={filteredSources
                       .map((source) =>
                         filteredTargets.map((target) => ({
-                          id: `${source.id}-${target.id}`,
+                          id: `${source.id}--${target.id}`,
                           source: source.id,
                           target: target.id,
                         }))

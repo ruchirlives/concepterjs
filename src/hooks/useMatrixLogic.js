@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { setPosition, compareStates, revertDifferences } from '../api';
+import { requestRefreshChannel } from "hooks/effectsShared";
 import { useAppContext } from '../AppContext';
 import { useEdgeMenu } from './flowEdgeMenu';
 import { useStateScores } from './useStateScores';
@@ -123,8 +124,8 @@ export const useMatrixLogic = () => {
         if (source.id !== target.id) {
           // When flipped, we need to check the correct relationship direction
           const key = flipped
-            ? `${target.id}-${source.id}` // flipped: target becomes parent, source becomes child
-            : `${source.id}-${target.id}`; // normal: source is parent, target is child
+            ? `${target.id}--${source.id}` // flipped: target becomes parent, source becomes child
+            : `${source.id}--${target.id}`; // normal: source is parent, target is child
 
           if (forwardExists[key]) {
             sources.add(source.id);
@@ -229,9 +230,7 @@ export const useMatrixLogic = () => {
         await setPosition(sourceId, targetId, value);
         setEditingCell(null);
         setDifferencesTrigger((prev) => prev + 1);
-
-        // Refresh parentChildMap (triggers useEffect in AppContext)
-        // Optionally, you can call setParentChildMap here if you want to force a reload
+        requestRefreshChannel(); // <-- Add this line to trigger refresh
       } catch (error) {
         console.error("Error saving relationship:", error);
         setEditingCell(null);
@@ -263,7 +262,7 @@ export const useMatrixLogic = () => {
     const rows = filteredSources.map((source) => {
       const values = [source.Name];
       filteredTargets.forEach((target) => {
-        const key = `${source.id}-${target.id}`;
+        const key = `${source.id}--${target.id}`;
         values.push(relationships[key] || "");
       });
       values.push(differences[source.id] || "No difference");
@@ -321,6 +320,7 @@ export const useMatrixLogic = () => {
       await revertDifferences(containerIds, differenceResults, activeState);
       toast.success(`Reverted differences for container in ${activeState} state`);
       setDifferencesTrigger((prev) => prev + 1);
+      requestRefreshChannel(); // <-- Add this line to trigger refresh
     } catch (error) {
       console.error("Failed to revert diff:", error);
       toast.error("Failed to revert diff");
