@@ -10,7 +10,8 @@ export default function NodeSearchBox({
     setSelectedIds,
     searchTerm,
     setSearchTerm,
-    selectedContentLayer = null
+    selectedContentLayer = null,
+    initialResults = []
 }) {
     const {
         searchResults,
@@ -73,6 +74,19 @@ export default function NodeSearchBox({
         setSelectedIds(allIds);
     };
 
+    console.log("NodeSearchBox selectedIds:", selectedIds);
+
+    // Use initialResults if no search has been performed and searchTerm is empty
+    const hasActiveFilters = tagsSearchTerm.length > 0 || (otherTag && otherTag.trim().length > 0);
+
+    const displayResults = (
+        searchTerm.trim() === "" &&
+        initialResults.length > 0 &&
+        !hasActiveFilters
+    )
+        ? initialResults
+        : searchResults;
+
     return (
         <div style={{ margin: "1rem 0", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
             <label htmlFor="search-nodes"><b>Search Nodes</b></label>
@@ -129,7 +143,7 @@ export default function NodeSearchBox({
                     <button
                         type="button"
                         onClick={handleSearchWithTags}
-                        disabled={searchLoading || !searchTerm}
+                        disabled={searchLoading}
                         className="px-3 py-1 bg-gray-400 hover:bg-gray-500 text-white text-sm font-medium rounded"
                     >
                         {searchLoading ? "Searching..." : "Search"}
@@ -157,7 +171,7 @@ export default function NodeSearchBox({
                     padding: 0,
                 }}
             >
-                {searchResults.map((row, idx) => {
+                {displayResults.map((row, idx) => {
                     const id = row.id || row._id || idx;
                     const isExisting = existingIds.has(id);
                     // Limit name and children string to 50 chars
@@ -183,7 +197,7 @@ export default function NodeSearchBox({
                         >
                             <input
                                 type="checkbox"
-                                checked={selectedIds.includes(id)}
+                                checked={selectedIds.map(String).includes(String(id))}
                                 onChange={() => handleCheckboxChange(id)}
                                 style={{ marginRight: 8 }}
                             />
@@ -199,7 +213,7 @@ export default function NodeSearchBox({
                         </li>
                     );
                 })}
-                {searchResults.length === 0 &&
+                {displayResults.length === 0 &&
                     searchTerm &&
                     !searchLoading &&
                     !searchError && (

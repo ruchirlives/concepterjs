@@ -8,10 +8,11 @@ import NodeSearchBox from "./NodeSearchBox";
 
 Modal.setAppElement("#app");
 
-const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null }) => {
+const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null, initialSelectedIds = [] }) => {
   const { setRowData, rowData, layerOptions } = useAppContext();
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
   const [searchTerm, setSearchTerm] = useState("");
+
 
   const {
     loadCheckedNodes,
@@ -20,9 +21,9 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null })
   useEffect(() => {
     if (isOpen) {
       setSearchTerm("");
-      setSelectedIds([]);
+      setSelectedIds([]); // <-- Do NOT pre-select children
     }
-  }, [isOpen, setSearchTerm, setSelectedIds]);
+  }, [isOpen]);
 
   const handleAddNew = async () => {
     const name = searchTerm.trim();
@@ -84,7 +85,8 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null })
           setSelectedIds={setSelectedIds}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
-          selectedContentLayer={selectedContentLayer} // <-- add this line
+          selectedContentLayer={selectedContentLayer}
+          initialResults={rowData.filter(row => initialSelectedIds.includes(row.id))}
         />
         <button
           onClick={handleAddNew}

@@ -385,6 +385,12 @@ const AppKanban = () => {
           onClose={() => setEditingKey(null)}
           onSelect={(rows) => rows.forEach((row) => handleAddItem(editingKey, row))}
           selectedContentLayer={selectedContentLayer} // <-- pass as prop
+          initialSelectedIds={
+            (() => {
+              const [sourceId] = editingKey.split("--");
+              return childrenMap[sourceId] || [];
+            })()
+          }
         />
       )}
 
