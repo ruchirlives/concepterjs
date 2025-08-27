@@ -77,9 +77,21 @@ export default function useCreateNewRow() {
             });
         }
 
+        // Merge activeLayers into loadedNodes' Tags, preserving previous tags and avoiding duplicates
+        const updatedLoadedNodes = loadedNodes.map(node => {
+            const prevTags = node.Tags
+                ? node.Tags.split(',').map(tag => tag.trim()).filter(Boolean)
+                : [];
+            const mergedTagsSet = new Set([...prevTags, ...activeLayers]);
+            return {
+                ...node,
+                Tags: Array.from(mergedTagsSet).join(', ')
+            };
+        });
+
         return {
             newRows,
-            loadedNodes
+            loadedNodes: updatedLoadedNodes
         };
     };
 }
