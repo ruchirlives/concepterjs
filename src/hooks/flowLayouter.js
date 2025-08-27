@@ -7,17 +7,16 @@ function estimateNodeHeight(label, width, fontSize = 16, paddingY = 16) {
     return Math.max(48, lines * lineHeight + paddingY);
 }
 
-// Run dagre on a subset of nodes/edges and return nodes with updated positions
-function layoutSubset(nodes, edges, direction, nodesep, ranksep) {
+function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {}) {
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: direction, nodesep, ranksep });
 
-    const nodeWidth = 320;
     nodes.forEach((node) => {
-        const label = node.data?.Name || '';
-        const height = estimateNodeHeight(label, nodeWidth);
-        g.setNode(node.id, { width: nodeWidth, height });
+        const width = nodeSizes[node.id]?.width || node.style?.width || 320;
+        const height = nodeSizes[node.id]?.height || node.style?.height ||
+            estimateNodeHeight(node.data?.Name || '', width);
+        g.setNode(node.id, { width, height });
     });
     edges.forEach((edge) => g.setEdge(edge.source, edge.target));
     dagre.layout(g);
@@ -41,27 +40,61 @@ export const getLayoutedElements = (
     nodesep = 35,
     ranksep = 100
 ) => {
-    const nodeWidth = 320;
+    // 1. Compute group sizes based on their children
+    const nodeSizes = {};
+    const allNodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
 
-    // --- Layout top-level nodes (no parentId) ---
+    nodes.filter(n => n.type === 'group').forEach(group => {
+        const children = nodes.filter(n => n.parentId === group.id);
+        if (children.length === 0) {
+            nodeSizes[group.id] = {
+                width: group.style?.width || 320,
+                height: group.style?.height || 180
+            };
+            return;
+        }
+
+        // Layout children to get their positions
+        const childEdges = edges.filter(e => {
+            const sParent = allNodesById[e.source]?.parentId;
+            const tParent = allNodesById[e.target]?.parentId;
+            return sParent === group.id && tParent === group.id;
+        });
+        const laidOutChildren = layoutSubset(children, childEdges, direction, nodesep, ranksep);
+
+        // Bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        laidOutChildren.forEach(n => {
+            minX = Math.min(minX, n.position.x);
+            minY = Math.min(minY, n.position.y);
+            maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
+            const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
+            maxY = Math.max(maxY, n.position.y + h);
+        });
+
+        const padding = 40;
+        const width = maxX - minX + padding * 2;
+        const height = maxY - minY + padding * 2;
+
+        nodeSizes[group.id] = { width, height };
+    });
+
+    // 2. Layout top-level nodes using computed group sizes
     const topNodes = nodes.filter(n => !n.parentId);
     const topNodeIds = new Set(topNodes.map(n => n.id));
     const topEdges = edges.filter(e =>
         topNodeIds.has(e.source) && topNodeIds.has(e.target)
     );
-    let layoutedNodes = layoutSubset(topNodes, topEdges, direction, nodesep, ranksep);
+    let layoutedNodes = layoutSubset(topNodes, topEdges, direction, nodesep, ranksep, nodeSizes);
 
-    // --- Layout each group (subflow) individually ---
-    const allNodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
-    const childEdges = edges.slice(); // will be reused
-
+    // 3. Layout and position children inside their groups
     layoutedNodes
         .filter(n => n.type === 'group')
         .forEach(group => {
             const children = nodes.filter(n => n.parentId === group.id);
             if (children.length === 0) return;
 
-            const childEdgesForGroup = childEdges.filter(e => {
+            const childEdgesForGroup = edges.filter(e => {
                 const sParent = allNodesById[e.source]?.parentId;
                 const tParent = allNodesById[e.target]?.parentId;
                 return sParent === group.id && tParent === group.id;
@@ -69,13 +102,13 @@ export const getLayoutedElements = (
 
             const laidOutChildren = layoutSubset(children, childEdgesForGroup, direction, nodesep, ranksep);
 
-            // Determine bounding box of children
+            // Use the same bounding box logic as above
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             laidOutChildren.forEach(n => {
                 minX = Math.min(minX, n.position.x);
                 minY = Math.min(minY, n.position.y);
-                maxX = Math.max(maxX, n.position.x + nodeWidth);
-                const h = estimateNodeHeight(n.data?.Name || '', nodeWidth);
+                maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
+                const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
                 maxY = Math.max(maxY, n.position.y + h);
             });
 
@@ -83,9 +116,11 @@ export const getLayoutedElements = (
             const width = maxX - minX + padding * 2;
             const height = maxY - minY + padding * 2;
 
-            // Update group size
+            // Update group node's style in layoutedNodes
             layoutedNodes = layoutedNodes.map(n =>
-                n.id === group.id ? { ...n, style: { ...n.style, width, height } } : n
+                n.id === group.id
+                    ? { ...n, style: { ...n.style, width, height } }
+                    : n
             );
 
             // Shift children into group coordinate system

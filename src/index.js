@@ -17,41 +17,80 @@ const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
 const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
-// Suppress ResizeObserver error that doesn't affect functionality
-const suppressResizeObserverError = (e) => {
-  if (
-    e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
-    e.message === 'ResizeObserver loop limit exceeded' ||
-    e.message.includes('ResizeObserver')
-  ) {
-    e.stopImmediatePropagation();
-    e.preventDefault();
-    return true;
-  }
-  return false;
-};
 
-// Handle both error and unhandledrejection events
-window.addEventListener('error', suppressResizeObserverError);
-window.addEventListener('unhandledrejection', (e) => {
-  if (e.reason && typeof e.reason === 'string' && e.reason.includes('ResizeObserver')) {
-    e.preventDefault();
-  }
-});
+// Suppress ResizeObserver error overlay in development
+// if (process.env.NODE_ENV === 'development') {
+//   window.addEventListener('error', (e) => {
+//     if (
+//       e.message &&
+//       (e.message.includes('ResizeObserver') ||
+//         e.message.includes('loop completed with undelivered notifications'))
+//     ) {
+//       e.stopImmediatePropagation();
+//       e.preventDefault();
+//       return false;
+//     }
+//   });
+//   window.addEventListener('unhandledrejection', (e) => {
+//     if (
+//       e.reason &&
+//       typeof e.reason === 'string' &&
+//       e.reason.includes('ResizeObserver')
+//     ) {
+//       e.stopImmediatePropagation();
+//       e.preventDefault();
+//       return false;
+//     }
+//   });
+//   const originalError = console.error;
+//   console.error = (...args) => {
+//     const message = args[0];
+//     if (
+//       typeof message === 'string' &&
+//       (message.includes('ResizeObserver') ||
+//         message.includes('loop completed with undelivered notifications'))
+//     ) {
+//       return;
+//     }
+//     originalError.apply(console, args);
+//   };
+// }
 
-// Suppress console errors for ResizeObserver
-const originalError = console.error;
-console.error = (...args) => {
-  const message = args[0];
-  if (
-    typeof message === 'string' &&
-    (message.includes('ResizeObserver') ||
-      message.includes('loop completed with undelivered notifications'))
-  ) {
-    return;
-  }
-  originalError.apply(console, args);
-};
+// // Suppress ResizeObserver error that doesn't affect functionality
+// const suppressResizeObserverError = (e) => {
+//   if (
+//     e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+//     e.message === 'ResizeObserver loop limit exceeded' ||
+//     e.message.includes('ResizeObserver')
+//   ) {
+//     e.stopImmediatePropagation();
+//     e.preventDefault();
+//     return true;
+//   }
+//   return false;
+// };
+
+// // Handle both error and unhandledrejection events
+// window.addEventListener('error', suppressResizeObserverError);
+// window.addEventListener('unhandledrejection', (e) => {
+//   if (e.reason && typeof e.reason === 'string' && e.reason.includes('ResizeObserver')) {
+//     e.preventDefault();
+//   }
+// });
+
+// // Suppress console errors for ResizeObserver
+// const originalError = console.error;
+// console.error = (...args) => {
+//   const message = args[0];
+//   if (
+//     typeof message === 'string' &&
+//     (message.includes('ResizeObserver') ||
+//       message.includes('loop completed with undelivered notifications'))
+//   ) {
+//     return;
+//   }
+//   originalError.apply(console, args);
+// };
 
 // Memoize the components that don't depend on state
 const MemoizedStaticContent = React.memo(() => (
@@ -241,6 +280,7 @@ const App = () => {
     </div>
   );
 };
+
 
 const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(

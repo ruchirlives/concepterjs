@@ -14,32 +14,32 @@ const GroupNode = ({ data, selected }) => {
   const bgColor = selected ? 'bg-blue-200' : 'bg-blue-100';
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative" style={{ margin: 0, padding: 0 }}>
       {/* Allows the group to be resized by the user */}
-      <NodeResizer
+      {/* <NodeResizer
         color="#94a3b8"
         isVisible={selected}
         minWidth={200}
         minHeight={120}
-      />
+      /> */}
 
       {/* Inner wrapper for rounded background and content */}
       <div
-        className={`rounded-xl shadow-md ${bgColor} transition-all duration-150`}
+        className={`${bgColor} group-inner`}
         style={{
-          width: 'calc(100% - 8px)', // 4px margin on each side
-          height: 'calc(100% - 8px)',
-          margin: '4px',
+          width: '100%',
+          height: '100%',
+          margin: 0,
+          padding: 0,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-start',
-          padding: '18px 22px 14px 22px',
           boxSizing: 'border-box',
         }}
       >
         {/* Group label */}
-        <div className="font-semibold text-base text-gray-800 mb-1 truncate">{Name}</div>
-        <div className="mt-auto text-xs text-gray-500">
+        <div className="font-semibold text-base text-gray-800 truncate">{Name}</div>
+        <div className="text-xs text-gray-500">
           {children.length > 0 ? `${children.length} item${children.length > 1 ? 's' : ''}` : ''}
         </div>
       </div>

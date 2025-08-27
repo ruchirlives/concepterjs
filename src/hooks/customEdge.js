@@ -154,7 +154,9 @@ const CustomEdge = ({
         <>
             <BaseEdge id={id} path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
 
-            {data?.label && data.label !== 'successor' && (
+            {data?.label &&
+             data.label !== 'successor' &&
+             data.label.trim().toLowerCase() !== 'none' && (
                 <foreignObject
                     width={200}
                     height={75}

@@ -2,24 +2,22 @@ import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, parentChildMap } = params;
+    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout } = params;
+
+    if (!parentChildMap) return;
 
     // Build lookup of all original node IDs before hide
     const originalIdSet = new Set(computedNodes.map(n => n.id));
-
-    // Fetch parent→children relationships
-    if (!parentChildMap) return;
-
-    // Filter parentChildMap by originalIdSet and remove successors or group-type children
     const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
+
+    // Filter parentChildMap by originalIdSet and remove only 'successor' relations
     const filteredParentChildMap = parentChildMap
         .filter(({ container_id, children }) =>
             originalIdSet.has(container_id) || children.some(child => originalIdSet.has(child.id))
         )
         .map(({ container_id, children }) => ({
             container_id,
-            // Exclude successor relations and group nodes
-            children: children.filter(c => c.label !== 'successor' && !groupSet.has(c.id.toString()))
+            children: children.filter(c => c.label !== 'successor')
         }));
 
     // Build childMap: container_id → children objects
@@ -47,19 +45,15 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     computedNodes = computedNodes.map(node => {
         const rawChildren = childMap[node.id] || [];
         const rawParents = parentMap[node.id] || [];
-        const children = rawChildren.map(function (c) {
-            return {
-                id: c.id.toString(),
-                name: c.name,
-                position: c.position,
-                tags: c.tags,
-            };
-        });
+        const children = rawChildren.map(c => ({
+            id: c.id.toString(),
+            name: c.name,
+            position: c.position,
+            tags: c.tags,
+        }));
         const parents = rawParents.map(p => ({ id: p.id, name: p.name }));
         return { ...node, data: { ...node.data, children, parents } };
     });
-
-    const allNodes = computedNodes.slice();
 
     // Build childToGroup map for edge building
     const groupIds = computedNodes.filter(n => n.type === 'group').map(n => n.id);
@@ -70,9 +64,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         });
     });
 
-    // No filtering for activeGroup or visibility: just use all computedNodes
-    // React Flow will handle group visibility via parentId
-
+    // Build edges
+    const allNodes = computedNodes.slice();
     const newEdges = buildVisibleEdges({
         childMap,
         computedNodes,
@@ -81,12 +74,16 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         setEdges
     });
 
-    // Add a ghost node for each PendingEdge, using Name as the label
+    // Add ghost nodes for PendingEdges
     computedNodes.forEach(node => {
         const pendingEdges = Array.isArray(node.data?.PendingEdges) ? node.data.PendingEdges : [];
         pendingEdges.forEach((pending, idx) => {
             if (!pending?.Name) return;
             const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
+
+            // Determine parent group for this node, if any
+            const parentGroupId = node.parentId || childToGroup[node.id];
+
             const ghostNode = {
                 id: ghostNodeId,
                 type: 'ghost',
@@ -97,7 +94,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 },
                 selectable: false,
                 draggable: true,
-                targetPosition: 'left'
+                targetPosition: 'left',
+                ...(parentGroupId ? { parentId: parentGroupId, extent: 'parent' } : {})
             };
             computedNodes.push(ghostNode);
 
@@ -106,20 +104,16 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 source: node.id,
                 target: ghostNodeId,
                 type: 'customEdge',
-                data: { label: pending?.position?.label || '' },
+                // Only set label if it has text, otherwise undefined/empty
+                data: { label: pending.Name && pending.Name.trim() ? (pending.position?.label || '') : '' },
             });
         });
     });
 
     // Layout & set state
-    await deployNodesEdges({
-        setLayoutPositions: params.setLayoutPositions,
-        layoutPositions: params.layoutPositions,
-        keepLayout: params.keepLayout
-    });
+    await deployNodesEdges();
 
-    async function deployNodesEdges(params) {
-        const { setLayoutPositions, layoutPositions, keepLayout } = params;
+    async function deployNodesEdges() {
         if (keepLayout) {
             const restored = computedNodes.map(node => ({
                 ...node,
@@ -127,7 +121,6 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             }));
             setNodes(restored);
             setEdges(newEdges);
-            return;
         } else {
             const layouted = getLayoutedElements(computedNodes, newEdges, 'LR');
             setNodes(layouted.nodes);
@@ -138,7 +131,6 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 return acc;
             }, {});
             setLayoutPositions(newLayoutPositions);
-            return;
         }
     }
 };

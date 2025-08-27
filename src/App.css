@@ -37,9 +37,23 @@
   }
 }
 
-/* Remove the default React Flow group node outline */
+/* Remove margin and padding from all possible wrappers */
+.react-flow__node,
+.react-flow__node-group,
+.w-full,
+.h-full,
+.relative,
+.group-inner {
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.react-flow__node,
 .react-flow__node-group {
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: none !important;
 }
