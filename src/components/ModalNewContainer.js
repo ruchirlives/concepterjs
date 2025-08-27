@@ -1,6 +1,7 @@
 import { addChildren, createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
+import { handleWriteBack } from "hooks/effectsShared";
 
 export default function useCreateNewRow() {
     const { rowData, setRowData, activeLayers, activeGroup } = useAppContext();
@@ -89,6 +90,8 @@ export default function useCreateNewRow() {
             };
         });
 
+        handleWriteBack(updatedLoadedNodes);
+        console.log(updatedLoadedNodes);
         return {
             newRows,
             loadedNodes: updatedLoadedNodes
