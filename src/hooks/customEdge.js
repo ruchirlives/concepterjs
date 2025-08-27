@@ -174,7 +174,7 @@ const CustomEdge = ({
                         title={data?.description}
                         style={{
                             pointerEvents: 'auto',
-                            background: '#f9fafb',
+                            background: 'transparent', // changed from '#f9fafb' to transparent
                             padding: '6px 10px',
                             fontSize: 15,
                             fontWeight: 200,

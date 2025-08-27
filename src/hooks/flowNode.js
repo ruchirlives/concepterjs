@@ -27,14 +27,14 @@ const FlowNode = ({ data, style, selected }) => {
   };
 
   const getBgColorClassShade = () => {
-    // based on the number of children, return a class for the background color
+    // based on the number of parents, return a class for the background color
     const childCount = data.parents ? data.parents.length : 0;
     if (childCount === 0) return 'bg-gray-100';
-    if (childCount <= 1) return 'bg-blue-100';
-    if (childCount <= 2) return 'bg-blue-200';
-    if (childCount <= 3) return 'bg-blue-300';
-    if (childCount <= 4) return 'bg-blue-400';
-    return 'bg-blue-500';
+    if (childCount <= 1) return 'bg-yellow-100';
+    if (childCount <= 2) return 'bg-yellow-200';
+    if (childCount <= 3) return 'bg-yellow-300';
+    if (childCount <= 4) return 'bg-yellow-400';
+    return 'bg-yellow-500';
 
   };
 

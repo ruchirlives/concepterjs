@@ -25,7 +25,7 @@ const GroupNode = ({ data, selected }) => {
 
       {/* Inner wrapper for rounded background and content */}
       <div
-        className={`${bgColor} group-inner`}
+        className={`${bgColor} group-inner rounded-lg`}
         style={{
           width: '100%',
           height: '100%',
@@ -35,6 +35,7 @@ const GroupNode = ({ data, selected }) => {
           flexDirection: 'column',
           justifyContent: 'flex-start',
           boxSizing: 'border-box',
+          borderRadius: '0.75rem', // 12px, matches Tailwind's rounded-lg
         }}
       >
         {/* Group label */}
