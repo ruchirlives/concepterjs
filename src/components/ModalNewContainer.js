@@ -1,6 +1,7 @@
 import { addChildren, createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
+import { handleWriteBack } from "hooks/effectsShared";
 
 export default function useCreateNewRow() {
     const { rowData, setRowData, activeLayers, activeGroup } = useAppContext();
@@ -77,9 +78,23 @@ export default function useCreateNewRow() {
             });
         }
 
+        // Merge activeLayers into loadedNodes' Tags, preserving previous tags and avoiding duplicates
+        const updatedLoadedNodes = loadedNodes.map(node => {
+            const prevTags = node.Tags
+                ? node.Tags.split(',').map(tag => tag.trim()).filter(Boolean)
+                : [];
+            const mergedTagsSet = new Set([...prevTags, ...activeLayers]);
+            return {
+                ...node,
+                Tags: Array.from(mergedTagsSet).join(', ')
+            };
+        });
+
+        handleWriteBack(updatedLoadedNodes);
+        console.log(updatedLoadedNodes);
         return {
             newRows,
-            loadedNodes
+            loadedNodes: updatedLoadedNodes
         };
     };
 }
