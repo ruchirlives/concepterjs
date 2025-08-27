@@ -150,7 +150,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onEdgesChange={onEdgesChange}
               onEdgeDoubleClick={onEdgeDoubleClick}
               onConnect={onEdgeConnect}
-              nodeTypes={{ custom: FlowNode, group: GroupNode, ghost: GhostNode }}
+              nodeTypes={{ custom: FlowNode, ghost: GhostNode, group: GroupNode }} // <-- add group here
               edgeTypes={edgeTypes}
               defaultMarkerColor="#000000"
               onConnectEnd={onConnectEnd}

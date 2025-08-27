@@ -2,7 +2,7 @@ import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, activeGroup, parentChildMap } = params;
+    const { setNodes, setEdges, parentChildMap } = params;
 
     // Build lookup of all original node IDs before hide
     const originalIdSet = new Set(computedNodes.map(n => n.id));
@@ -36,29 +36,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         });
     }
 
-    // Build map of child node IDs to relationship labels for successor override
-    const childRelationshipLabels = {};
-    // Build map of successor child node IDs to their specific parent IDs
-    const successorChildToParent = {};
-    for (const [parentId, children] of Object.entries(childMap)) {
-        children.forEach(c => {
-            const cid = c.id.toString();
-            const label = c.position && typeof c.position === 'object' ? c.position.label : c.position;
-            if (!childRelationshipLabels[cid]) childRelationshipLabels[cid] = new Set();
-            childRelationshipLabels[cid].add(label);
-
-            // Track successor relationships specifically
-            if (label === 'successor') {
-                if (!successorChildToParent[cid]) successorChildToParent[cid] = [];
-                successorChildToParent[cid].push(parentId);
-            }
-        });
-    }
-
-    // Inject children & parents
-
-
-    // Add children and parents to each node and lower case the fields
+    // Add children and parents to each node
     computedNodes = computedNodes.map(node => {
         const rawChildren = childMap[node.id] || [];
         const rawParents = parentMap[node.id] || [];
@@ -70,23 +48,14 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 tags: c.tags,
             };
         });
-
-        // console.log('Raw children:', rawChildren);
-        // console.log('Children:', children);
-
-
         const parents = rawParents.map(p => ({ id: p.id, name: p.name }));
         return { ...node, data: { ...node.data, children, parents } };
     });
 
     const allNodes = computedNodes.slice();
-    // Note: this is a shallow copy of the original nodes, so we can still access the original data
 
-    // Identify groups and hidden children
+    // Build childToGroup map for edge building
     const groupIds = computedNodes.filter(n => n.type === 'group').map(n => n.id);
-    const hiddenChildIds = new Set(
-        groupIds.flatMap(gid => (childMap[gid] || []).map(c => c.id.toString()))
-    );
     const childToGroup = {};
     groupIds.forEach(gid => {
         (childMap[gid] || []).forEach(c => {
@@ -94,94 +63,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         });
     });
 
-    // Only show the *direct* children of the activeGroup (or root group otherwise)
-    if (activeGroup) {
-        const directKids = new Set(
-            (childMap[activeGroup] || []).map(c => c.id.toString())
-        );
-        // Show direct children of activeGroup (including successors now)
-        computedNodes = computedNodes.filter(n => directKids.has(n.id));
-    } else {
-        computedNodes = computedNodes.filter(n => {
-            const isGroup = n.type === 'group';
-            const isHiddenChild = hiddenChildIds.has(n.id);
-            const isSuccessor = childRelationshipLabels[n.id]?.has('successor');
-            const successorParents = successorChildToParent[n.id] || [];
-
-            // For successor nodes, check if parent is directly visible (not hidden)
-            const hasDirectlyVisibleParent = successorParents.some(pid => {
-                const parentExists = computedNodes.some(m => m.id === pid);
-                const parentNotHidden = !hiddenChildIds.has(pid);
-                return parentExists && parentNotHidden;
-            });
-
-            return isGroup || !isHiddenChild
-                || (isSuccessor && hasDirectlyVisibleParent);
-        });
-    }
-
-    computedNodes = computedNodes.filter(n => {
-        if (n.type === 'group') return true; // <-- Always show group nodes
-
-        const parents = n.data.parents || [];
-        const hasVisibleGroupParent = parents.some(p => {
-            const pid = p.id.toString();
-            return allNodes.some(m => m.id === pid && m.type === 'group');
-        });
-
-        if (activeGroup) {
-            // Hide the activeGroup node itself when we're inside it
-            if (n.id === activeGroup) {
-                return false;
-            }
-            // Show children if their group parent IS the activeGroup, hide if it's a different group
-            const hasActiveGroupAsParent = parents.some(p => p.id === activeGroup);
-            return hasActiveGroupAsParent || !hasVisibleGroupParent;
-        }
-
-        // For nodes outside activeGroup, check if they should be visible
-        const isDirectChild = !hasVisibleGroupParent;
-        const isSuccessorWithVisibleChain = childRelationshipLabels[n.id]?.has('successor') &&
-            hasVisibleSuccessorChain(n.id, successorChildToParent, allNodes, new Set());
-
-        return isDirectChild || isSuccessorWithVisibleChain;
-    });
-
-    // Helper function to check if a successor chain leads to a visible node
-    function hasVisibleSuccessorChain(nodeId, successorChildToParent, allNodes, visited) {
-        // Prevent infinite loops
-        if (visited.has(nodeId)) return false;
-        visited.add(nodeId);
-
-        const successorParents = successorChildToParent[nodeId] || [];
-
-        for (const parentId of successorParents) {
-            const parentNode = allNodes.find(n => n.id === parentId);
-            if (!parentNode) continue;
-
-            // Check if this parent is directly visible (not a child of a group)
-            const parentIsDirectlyVisible = !parentNode.data.parents?.some(p => {
-                const pid = p.id.toString();
-                return allNodes.some(m => m.id === pid && m.type === 'group');
-            });
-
-            if (parentIsDirectlyVisible) {
-                return true; // Found a visible node in the chain
-            }
-
-            // If parent is also a successor, recursively check its chain
-            if (childRelationshipLabels[parentId]?.has('successor')) {
-                if (hasVisibleSuccessorChain(parentId, successorChildToParent, allNodes, visited)) {
-                    return true;
-                }
-            }
-        }
-
-        return false; // No visible node found in any chain
-    }
-
-    // ──────────────────────────────────────────────────────────
-    // const visibleIds = new Set(computedNodes.map(n => n.id));
+    // No filtering for activeGroup or visibility: just use all computedNodes
+    // React Flow will handle group visibility via parentId
 
     const newEdges = buildVisibleEdges({
         childMap,
@@ -191,29 +74,11 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         setEdges
     });
 
-    // Check if any edges are missing sourcehandle or targethandle on their source or target nodes
-    newEdges.forEach(edge => {
-        const sourceNode = computedNodes.find(node => node.id === edge.source);
-        const targetNode = computedNodes.find(node => node.id === edge.target);
-        if (!sourceNode || !targetNode) {
-            console.warn(`Edge ${edge.id} has missing source or target node:`, {
-                edge,
-                sourceNode,
-                targetNode
-            });
-            return; // Skip if either node is not found
-        }
-    });
-
-
     // Add a ghost node for each PendingEdge, using Name as the label
     computedNodes.forEach(node => {
         const pendingEdges = Array.isArray(node.data?.PendingEdges) ? node.data.PendingEdges : [];
         pendingEdges.forEach((pending, idx) => {
-            if (!pending?.Name) return; // Skip if Name is missing
-
-            // console.log(`Adding ghost node for pending edge: ${pending.Name} with ${pending.to} at index ${idx}`);
-
+            if (!pending?.Name) return;
             const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
             const ghostNode = {
                 id: ghostNodeId,
@@ -224,7 +89,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                     y: (node.position?.y || 0) + 60 * (idx + 1)
                 },
                 selectable: false,
-                draggable: true, // <-- Make ghost node moveable
+                draggable: true,
                 targetPosition: 'left'
             };
             computedNodes.push(ghostNode);
@@ -243,13 +108,11 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     await deployNodesEdges({
         setLayoutPositions: params.setLayoutPositions,
         layoutPositions: params.layoutPositions,
-        keepLayout: params.keepLayout // <-- add this line
+        keepLayout: params.keepLayout
     });
 
     async function deployNodesEdges(params) {
         const { setLayoutPositions, layoutPositions, keepLayout } = params;
-        // console.log('Deploying nodes and edges with keepLayout:', keepLayout);
-        // console.log('Layout positions:', layoutPositions);
         if (keepLayout) {
             const restored = computedNodes.map(node => ({
                 ...node,
@@ -258,8 +121,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             setNodes(restored);
             setEdges(newEdges);
             return;
-        }
-        else {
+        } else {
             const layouted = getLayoutedElements(computedNodes, newEdges, 'LR');
             setNodes(layouted.nodes);
             setEdges(layouted.edges);

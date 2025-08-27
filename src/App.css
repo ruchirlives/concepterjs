@@ -36,3 +36,10 @@
     transform: rotate(360deg);
   }
 }
+
+/* Remove the default React Flow group node outline */
+.react-flow__node-group {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
