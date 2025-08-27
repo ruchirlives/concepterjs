@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
   addEdge, ControlButton
@@ -46,6 +46,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     screenToFlowPosition
   } = useFlowLogic();
 
+  const [groupByLayers, setGroupByLayers] = useState(false); // <-- Add this
+
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
     customEdge: (edgeProps) => (
@@ -57,7 +59,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
     if (!keepLayout) return;
     const storedPositions = {};
     nodes.forEach(node => {
-      storedPositions[node.id] = node.position;
+      storedPositions[node.id] = {
+        x: node.position.x,
+        y: node.position.y,
+        ...(node.style?.width && node.style?.height
+          ? { width: node.style.width, height: node.style.height }
+          : {}),
+      };
     });
     setLayoutPositions(storedPositions);
   }, [keepLayout, nodes, setLayoutPositions]);
@@ -76,7 +84,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
   useCreateNodesAndEdges({
     nodes, setNodes, setEdges, rowData: flowFilteredRowData, keepLayout,
     activeGroup, setLayoutPositions, layoutPositions, setRowData,
-    stateScores, getHighestScoringContainer
+    stateScores, getHighestScoringContainer,
+    groupByLayers,
   });
 
   const onEdgesChange = useOnEdgeChange(setEdges);
@@ -124,7 +133,29 @@ const App = ({ keepLayout, setKeepLayout }) => {
         clearStateScores={clearStateScores}
         comparatorState={comparatorState}
         stateScores={stateScores}
-      />
+      >
+        {/* Group By Layers tickbox */}
+        <div className="flex items-center gap-2 ml-4">
+          <input
+            type="checkbox"
+            id="groupByLayers"
+            checked={groupByLayers}
+            onChange={e => setGroupByLayers(e.target.checked)}
+          />
+          <label htmlFor="groupByLayers" className="text-sm">Group By Layers</label>
+        </div>
+        {/* Keep Layout toggle */}
+        <label className="inline-flex items-center space-x-2 text-sm ml-4">
+          <input
+            type="checkbox"
+            id="keepLayoutToggle"
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            checked={keepLayout}
+            onChange={e => setKeepLayout(e.target.checked)}
+          />
+          <span>Keep Layout</span>
+        </label>
+      </FlowHeader>
 
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
         <div
@@ -166,6 +197,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
                   }
                 }
               }}
+              minZoom={0.1} // <-- Add this line
             >
               <Controls position="top-left">
                 <ControlButton onClick={(e) => gearContextMenu(e)}>

@@ -17,81 +17,6 @@ const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
 const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
-
-// Suppress ResizeObserver error overlay in development
-// if (process.env.NODE_ENV === 'development') {
-//   window.addEventListener('error', (e) => {
-//     if (
-//       e.message &&
-//       (e.message.includes('ResizeObserver') ||
-//         e.message.includes('loop completed with undelivered notifications'))
-//     ) {
-//       e.stopImmediatePropagation();
-//       e.preventDefault();
-//       return false;
-//     }
-//   });
-//   window.addEventListener('unhandledrejection', (e) => {
-//     if (
-//       e.reason &&
-//       typeof e.reason === 'string' &&
-//       e.reason.includes('ResizeObserver')
-//     ) {
-//       e.stopImmediatePropagation();
-//       e.preventDefault();
-//       return false;
-//     }
-//   });
-//   const originalError = console.error;
-//   console.error = (...args) => {
-//     const message = args[0];
-//     if (
-//       typeof message === 'string' &&
-//       (message.includes('ResizeObserver') ||
-//         message.includes('loop completed with undelivered notifications'))
-//     ) {
-//       return;
-//     }
-//     originalError.apply(console, args);
-//   };
-// }
-
-// // Suppress ResizeObserver error that doesn't affect functionality
-// const suppressResizeObserverError = (e) => {
-//   if (
-//     e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
-//     e.message === 'ResizeObserver loop limit exceeded' ||
-//     e.message.includes('ResizeObserver')
-//   ) {
-//     e.stopImmediatePropagation();
-//     e.preventDefault();
-//     return true;
-//   }
-//   return false;
-// };
-
-// // Handle both error and unhandledrejection events
-// window.addEventListener('error', suppressResizeObserverError);
-// window.addEventListener('unhandledrejection', (e) => {
-//   if (e.reason && typeof e.reason === 'string' && e.reason.includes('ResizeObserver')) {
-//     e.preventDefault();
-//   }
-// });
-
-// // Suppress console errors for ResizeObserver
-// const originalError = console.error;
-// console.error = (...args) => {
-//   const message = args[0];
-//   if (
-//     typeof message === 'string' &&
-//     (message.includes('ResizeObserver') ||
-//       message.includes('loop completed with undelivered notifications'))
-//   ) {
-//     return;
-//   }
-//   originalError.apply(console, args);
-// };
-
 // Memoize the components that don't depend on state
 const MemoizedStaticContent = React.memo(() => (
   <>
@@ -191,17 +116,6 @@ const ButtonPanel = ({ onLoadContainers, onCreateFromContent, keepLayout, setKee
         <option value="2">Server B</option>
       </select>
 
-      {/* Keep Layout Toggle */}
-      <label className="inline-flex items-center space-x-2 text-sm">
-        <input
-          type="checkbox"
-          id="keepLayoutToggle"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-          checked={keepLayout}
-          onChange={(e) => setKeepLayout(e.target.checked)}
-        />
-        <span>Keep Layout</span>
-      </label>
     </div>
   );
 };
