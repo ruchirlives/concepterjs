@@ -10,10 +10,17 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     // Fetch parent→children relationships
     if (!parentChildMap) return;
 
-    // Filter parentChildMap by originalIDSet
-    const filteredParentChildMap = parentChildMap.filter(({ container_id, children }) =>
-        originalIdSet.has(container_id) || children.some(child => originalIdSet.has(child.id))
-    );
+    // Filter parentChildMap by originalIdSet and remove successors or group-type children
+    const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
+    const filteredParentChildMap = parentChildMap
+        .filter(({ container_id, children }) =>
+            originalIdSet.has(container_id) || children.some(child => originalIdSet.has(child.id))
+        )
+        .map(({ container_id, children }) => ({
+            container_id,
+            // Exclude successor relations and group nodes
+            children: children.filter(c => c.label !== 'successor' && !groupSet.has(c.id.toString()))
+        }));
 
     // Build childMap: container_id → children objects
     const childMap = Object.fromEntries(
