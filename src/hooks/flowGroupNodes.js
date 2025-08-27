@@ -1,5 +1,5 @@
 import React from 'react';
-import { Handle, NodeResizer, useNodeId } from '@xyflow/react';
+import { Handle, useNodeId } from '@xyflow/react';
 
 /**
  * Simple visual representation of a group/subflow node.

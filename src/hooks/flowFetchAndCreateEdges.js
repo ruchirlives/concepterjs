@@ -8,7 +8,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
 
     // Build lookup of all original node IDs before hide
     const originalIdSet = new Set(computedNodes.map(n => n.id));
-    const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
+    // const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
 
     // Filter parentChildMap by originalIdSet and remove only 'successor' relations
     const filteredParentChildMap = parentChildMap
