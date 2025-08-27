@@ -10,6 +10,7 @@ const FlowHeader = ({
   clearStateScores,
   comparatorState,
   stateScores,
+  children, // <-- add this
 }) => {
   return (
     <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
@@ -43,6 +44,8 @@ const FlowHeader = ({
           title="Filter layers in Flow"
           dropdownTitle="Hide Layers in Flow"
         />
+
+        {children} {/* <-- render children inline here */}
       </div>
 
       <button

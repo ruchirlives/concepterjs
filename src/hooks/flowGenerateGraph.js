@@ -7,7 +7,11 @@ export async function generateNodesAndEdges(params) {
         rowData,
         stateScores,
         getHighestScoringContainer,
-        parentChildMap // <-- make sure this is passed in!
+        parentChildMap,
+        groupByLayers,
+        activeLayers,
+        keepLayout,         // <-- add this
+        layoutPositions,    // <-- add this
     } = params;
 
     if (!rowData || rowData.length === 0) return;
@@ -27,73 +31,140 @@ export async function generateNodesAndEdges(params) {
         return (score - minScore) / scoreRange;
     };
 
-    // Build a lookup: childId -> parentId (for group nodes)
-    const groupIds = rowData
-        .filter(item => (item.Tags || '').toLowerCase().split(',').map(t => t.trim()).includes('group'))
-        .map(item => item.id?.toString());
+    let computedNodes = [];
+    let childToGroup = {};
 
-    const childToGroup = {};
-    if (parentChildMap) {
-        parentChildMap.forEach(({ container_id, children }) => {
-            if (groupIds.includes(container_id?.toString())) {
-                children.forEach(child => {
-                    // Find the child node in rowData to check if it's a group
-                    const childItem = rowData.find(item => item.id?.toString() === child.id?.toString());
-                    const childTags = (childItem?.Tags || '').toLowerCase().split(',').map(t => t.trim());
-                    const childIsGroup = childTags.includes('group');
-                    // Only assign parentId if not a group and not a 'successor' relationship
-                    if (!childIsGroup && child.label !== 'successor') {
-                        childToGroup[child.id?.toString()] = container_id?.toString();
-                    }
-                });
+    // Helper to get position
+    const getNodePosition = (id, fallback) => {
+        if (keepLayout && layoutPositions && layoutPositions[id]) {
+            return layoutPositions[id];
+        }
+        return fallback;
+    };
+
+    if (groupByLayers && Array.isArray(activeLayers) && activeLayers.length > 0) {
+        // --- GROUP BY LAYERS MODE ---
+        // 1. Create group nodes for each active layer
+        const layerGroups = activeLayers.map((layer, i) => {
+            const saved = layoutPositions?.[`layer-${layer}`] || {};
+            return {
+                id: `layer-${layer}`,
+                type: 'group',
+                data: { Name: layer, children: [] },
+                style: {
+                    width: saved.width || GROUP_NODE_WIDTH,
+                    height: saved.height || 180,
+                },
+                position: saved.x !== undefined && saved.y !== undefined
+                    ? { x: saved.x, y: saved.y }
+                    : { x: 100 * i, y: 0 }
             }
         });
-    }
 
-    // Now, map nodes and assign parentId if in childToGroup
-    let computedNodes = rowData.map((item, index) => {
-        const tags = (item.Tags || '')
-            .toLowerCase()
-            .split(',')
-            .map(t => t.trim());
-        const isGroup = tags.includes('group');
-        const parentId = childToGroup[item.id?.toString()];
+        // 2. Assign parentId for each node tagged with a layer
+        rowData.forEach((item, index) => {
+            const tags = (item.Tags || '').toLowerCase().split(',').map(t => t.trim());
+            const matchedLayer = activeLayers.find(l => tags.includes(l.toLowerCase()));
+            if (matchedLayer) {
+                childToGroup[item.id?.toString()] = `layer-${matchedLayer}`;
+            }
+        });
 
-        // Position: relative for children, absolute for others
-        let position;
-        if (parentId) {
-            // Place children in a grid inside the group
-            const siblings = Object.entries(childToGroup)
-                .filter(([cid, pid]) => pid === parentId)
-                .map(([cid]) => cid);
-            const childIndex = siblings.indexOf(item.id?.toString());
-            const col = childIndex % 2;
-            const row = Math.floor(childIndex / 2);
-            position = { x: 40 + col * 120, y: 40 + row * 80 };
-        } else {
-            position = { x: 100 * index, y: 100 * index };
+        // 3. Map nodes, assign parentId if in childToGroup
+        const childNodes = rowData.map((item, index) => {
+            const parentId = childToGroup[item.id?.toString()];
+            return {
+                id: item.id.toString(),
+                position: getNodePosition(
+                    item.id.toString(),
+                    parentId
+                        ? { x: 40 + (index % 2) * 120, y: 40 + Math.floor(index / 2) * 80 }
+                        : { x: 100 * index, y: 100 * index }
+                ),
+                data: {
+                    id: item.id,
+                    Name: item.Name || `Node ${item.id}`,
+                    Description: item.Description || '',
+                    Budget: item.Budget || undefined,
+                    Cost: item.Cost || undefined,
+                    Tags: item.Tags || '',
+                    isHighestScoring: highestScoringId === item.id?.toString(),
+                    score: stateScores?.[item.id],
+                    normalizedScore: normalizeScore(stateScores?.[item.id]),
+                    PendingEdges: item.PendingEdges || [],
+                },
+                type: 'custom',
+                ...(parentId ? { parentId, extent: 'parent' } : {}),
+            };
+        });
+
+        computedNodes = [...layerGroups, ...childNodes];
+    } else {
+        // --- DEFAULT GROUP BY TAGS MODE ---
+        // Build a lookup: childId -> parentId (for group nodes)
+        const groupIds = rowData
+            .filter(item => (item.Tags || '').toLowerCase().split(',').map(t => t.trim()).includes('group'))
+            .map(item => item.id?.toString());
+
+        if (parentChildMap) {
+            parentChildMap.forEach(({ container_id, children }) => {
+                if (groupIds.includes(container_id?.toString())) {
+                    children.forEach(child => {
+                        // Find the child node in rowData to check if it's a group
+                        const childItem = rowData.find(item => item.id?.toString() === child.id?.toString());
+                        const childTags = (childItem?.Tags || '').toLowerCase().split(',').map(t => t.trim());
+                        const childIsGroup = childTags.includes('group');
+                        // Only assign parentId if not a group and not a 'successor' relationship
+                        if (!childIsGroup && child.label !== 'successor') {
+                            childToGroup[child.id?.toString()] = container_id?.toString();
+                        }
+                    });
+                }
+            });
         }
 
-        return {
-            id: item.id.toString(),
-            position,
-            data: {
-                id: item.id,
-                Name: item.Name || `Node ${item.id}`,
-                Description: item.Description || '',
-                Budget: item.Budget || undefined,
-                Cost: item.Cost || undefined,
-                Tags: item.Tags || '',
-                isHighestScoring: highestScoringId === item.id?.toString(),
-                score: stateScores?.[item.id],
-                normalizedScore: normalizeScore(stateScores?.[item.id]),
-                PendingEdges: item.PendingEdges || [],
-            },
-            type: isGroup ? 'group' : 'custom',
-            style: isGroup ? { width: GROUP_NODE_WIDTH, height: 180 } : {},
-            ...(parentId ? { parentId, extent: 'parent' } : {}),
-        };
-    });
+        computedNodes = rowData.map((item, index) => {
+            const tags = (item.Tags || '')
+                .toLowerCase()
+                .split(',')
+                .map(t => t.trim());
+            const isGroup = tags.includes('group');
+            const parentId = childToGroup[item.id?.toString()];
+
+            let fallbackPosition;
+            if (parentId) {
+                const siblings = Object.entries(childToGroup)
+                    .filter(([cid, pid]) => pid === parentId)
+                    .map(([cid]) => cid);
+                const childIndex = siblings.indexOf(item.id?.toString());
+                const col = childIndex % 2;
+                const row = Math.floor(childIndex / 2);
+                fallbackPosition = { x: 40 + col * 120, y: 40 + row * 80 };
+            } else {
+                fallbackPosition = { x: 100 * index, y: 100 * index };
+            }
+
+            return {
+                id: item.id.toString(),
+                position: getNodePosition(item.id.toString(), fallbackPosition), // <-- use getNodePosition
+                data: {
+                    id: item.id,
+                    Name: item.Name || `Node ${item.id}`,
+                    Description: item.Description || '',
+                    Budget: item.Budget || undefined,
+                    Cost: item.Cost || undefined,
+                    Tags: item.Tags || '',
+                    isHighestScoring: highestScoringId === item.id?.toString(),
+                    score: stateScores?.[item.id],
+                    normalizedScore: normalizeScore(stateScores?.[item.id]),
+                    PendingEdges: item.PendingEdges || [],
+                },
+                type: isGroup ? 'group' : 'custom',
+                style: isGroup ? { width: GROUP_NODE_WIDTH, height: 180 } : {},
+                ...(parentId ? { parentId, extent: 'parent' } : {}),
+            };
+        });
+    }
 
     // Sort: group nodes first, then others
     computedNodes.sort((a, b) => {
