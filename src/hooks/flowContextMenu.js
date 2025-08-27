@@ -647,3 +647,5 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
     };
 }
 
+export { removeAction };
+

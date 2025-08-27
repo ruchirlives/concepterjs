@@ -9,7 +9,7 @@ import NodeSearchBox from "./NodeSearchBox";
 Modal.setAppElement("#app");
 
 const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null }) => {
-  const { setRowData, activeLayers, rowData, layerOptions } = useAppContext();
+  const { setRowData, rowData, layerOptions } = useAppContext();
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -30,9 +30,9 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null })
     if (!name) return;
     const id = await createContainer();
     if (!id) return;
-    // Combine activeLayers and selectedContentLayer for Tags
-    const tagsArr = [...activeLayers];
-    if (selectedContentLayer && !tagsArr.includes(selectedContentLayer)) {
+    // Only add selectedContentLayer as tag (not all activeLayers)
+    let tagsArr = [];
+    if (selectedContentLayer) {
       tagsArr.push(selectedContentLayer);
     }
     const newRow = {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAppContext } from "./AppContext";
 import { handleWriteBack } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
+import { removeAction } from "./hooks/flowContextMenu";
 
 // Excel export button
 function ExcelButton({ handleExportExcel }) {
@@ -62,6 +63,15 @@ function ContextMenu({ contextMenu, onRemove, setContextMenu }) {
         }}
       >
         Select
+      </button>
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={async () => {
+          await removeAction({ selectedIds: [contextMenu.cid] });
+          setContextMenu(null);
+        }}
+      >
+        Remove from Project
       </button>
     </div>
   );
