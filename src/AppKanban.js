@@ -71,7 +71,6 @@ function TableLayersAsColumns(props) {
               {source.Name}
             </th>
             {props.activeLayers.map(layer => {
-              // Find children of this source that have this layer as a tag
               const children = (props.childrenMap[source.id] || [])
                 .map(cid => props.rowData.find(r => r.id.toString() === cid))
                 .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
@@ -81,6 +80,19 @@ function TableLayersAsColumns(props) {
                   key={layer}
                   className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30"
                   onDoubleClick={() => props.setEditingKey({ sourceId: source.id, layer })}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => {
+                    if (props.dragItem) {
+                      props.handleDrop({
+                        fromSource: props.dragItem.fromSource,
+                        fromLayer: props.dragItem.fromLayer,
+                        cid: props.dragItem.cid,
+                        toSource: source.id,
+                        toLayer: layer,
+                      });
+                      props.setDragItem(null);
+                    }
+                  }}
                 >
                   {children.length > 0 ? (
                     <ul className="text-xs space-y-1">
@@ -274,6 +286,31 @@ const AppKanban = () => {
     // For example, you might want to refresh data or optimistically update rowData/childrenMap
   };
 
+  // Move child to new source if needed, but do NOT remove from previous cell (allow multi-cell presence)
+  const handleDrop = async ({ fromSource, fromLayer, cid, toSource, toLayer }) => {
+    if (!cid || !toSource || !toLayer) return;
+
+    // Only add child to new source if not already present
+    if (!(childrenMap[toSource] || []).includes(cid)) {
+      await addChildren(toSource, [cid]);
+    }
+
+    // Add new layer tag if not present (do NOT remove old layer)
+    const child = rowData.find(r => r.id.toString() === cid);
+    if (child) {
+      let tagsArr = (child.Tags || "")
+        .split(",")
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      // Add new layer if not present
+      if (!tagsArr.includes(toLayer)) tagsArr.push(toLayer);
+
+      child.Tags = tagsArr.join(", ");
+      setRowData([...rowData]);
+    }
+  };
+
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener("click", handleClick);
@@ -315,6 +352,7 @@ const AppKanban = () => {
                   dragItem={dragItem}
                   setDragItem={setDragItem}
                   setContextMenu={setContextMenu}
+                  handleDrop={handleDrop} // <-- add this
                 />
               </div>
             </div>
