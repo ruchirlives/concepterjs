@@ -16,6 +16,7 @@ export function buildVisibleEdges(params) {
         const children = childMap[parentId] || [];
 
         children.forEach(c => {
+            console.log('Processing child:', c);
             const childId = c.id;
             const childNode = nodeById[childId];
 
@@ -29,7 +30,8 @@ export function buildVisibleEdges(params) {
                     source: parentId,
                     target: childId,
                     type: 'customEdge',
-                    style: { stroke: colors.black }
+                    style: { stroke: colors.black },
+                    data: { label: c.position?.label || '' }, 
                 });
             }
         });

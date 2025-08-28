@@ -87,7 +87,13 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const ghostNode = {
                 id: ghostNodeId,
                 type: 'ghost',
-                data: { label: pending.Name, parentId: node.id, id: pending.to || null },
+                data: { 
+                    label: pending.Name 
+                        ? pending.Name.slice(0, 50) + (pending.Name.length > 50 ? '…' : '') 
+                        : '', 
+                    parentId: node.id, 
+                    id: pending.to || null 
+                },
                 position: {
                     x: (node.position?.x || 0) + 150,
                     y: (node.position?.y || 0) + 60 * (idx + 1)
