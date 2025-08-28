@@ -10,6 +10,7 @@ export async function generateNodesAndEdges(params) {
         parentChildMap,
         groupByLayers,
         activeLayers,
+        layerOptions,
         keepLayout,         // <-- add this
         layoutPositions,    // <-- add this
     } = params;
@@ -42,10 +43,14 @@ export async function generateNodesAndEdges(params) {
         return fallback;
     };
 
-    if (groupByLayers && Array.isArray(activeLayers) && activeLayers.length > 0) {
+    const layersToUse = Array.isArray(activeLayers) && activeLayers.length > 0
+        ? activeLayers
+        : Array.isArray(layerOptions) ? layerOptions : [];
+
+    if (groupByLayers && layersToUse.length > 0) {
         // --- GROUP BY LAYERS MODE ---
-        // 1. Create group nodes for each active layer
-        const layerGroups = activeLayers.map((layer, i) => {
+        // 1. Create group nodes for each layer in layersToUse
+        const layerGroups = layersToUse.map((layer, i) => {
             const saved = layoutPositions?.[`layer-${layer}`] || {};
             return {
                 id: `layer-${layer}`,
@@ -64,7 +69,7 @@ export async function generateNodesAndEdges(params) {
         // 2. Assign parentId for each node tagged with a layer
         rowData.forEach((item, index) => {
             const tags = (item.Tags || '').toLowerCase().split(',').map(t => t.trim());
-            const matchedLayer = activeLayers.find(l => tags.includes(l.toLowerCase()));
+            const matchedLayer = layersToUse.find(l => tags.includes(l.toLowerCase()));
             if (matchedLayer) {
                 childToGroup[item.id?.toString()] = `layer-${matchedLayer}`;
             }

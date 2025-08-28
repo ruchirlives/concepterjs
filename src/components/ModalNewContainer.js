@@ -4,7 +4,7 @@ import { useAppContext } from "AppContext";
 import { handleWriteBack } from "hooks/effectsShared";
 
 export default function useCreateNewRow() {
-    const { rowData, setRowData, activeLayers, activeGroup } = useAppContext();
+    const { rowData, setRowData, activeGroup, selectedContentLayer } = useAppContext();
 
     return async () => {
         console.log("Creating new rows");
@@ -57,7 +57,7 @@ export default function useCreateNewRow() {
                 id: id,
                 Name: fullText,
                 Description: fullText,
-                Tags: activeLayers.join(', '),
+                Tags: selectedContentLayer ? selectedContentLayer : "", // Use context value
                 StartDate: new Date().toISOString().split("T")[0],
                 EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
                     .toISOString()
@@ -78,12 +78,13 @@ export default function useCreateNewRow() {
             });
         }
 
-        // Merge activeLayers into loadedNodes' Tags, preserving previous tags and avoiding duplicates
+        // Merge selectedContentLayer into loadedNodes' Tags, preserving previous tags and avoiding duplicates
         const updatedLoadedNodes = loadedNodes.map(node => {
             const prevTags = node.Tags
                 ? node.Tags.split(',').map(tag => tag.trim()).filter(Boolean)
                 : [];
-            const mergedTagsSet = new Set([...prevTags, ...activeLayers]);
+            const mergedTagsSet = new Set([...prevTags]);
+            if (selectedContentLayer) mergedTagsSet.add(selectedContentLayer);
             return {
                 ...node,
                 Tags: Array.from(mergedTagsSet).join(', ')

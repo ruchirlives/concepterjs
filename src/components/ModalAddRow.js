@@ -8,8 +8,8 @@ import NodeSearchBox from "./NodeSearchBox";
 
 Modal.setAppElement("#app");
 
-const ModalAddRow = ({ isOpen, onClose, onSelect, selectedContentLayer = null, initialSelectedIds = [] }) => {
-  const { setRowData, rowData, layerOptions } = useAppContext();
+const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [] }) => {
+  const { setRowData, rowData, layerOptions, selectedContentLayer } = useAppContext();
   const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
   const [searchTerm, setSearchTerm] = useState("");
 

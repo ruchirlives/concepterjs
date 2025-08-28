@@ -86,6 +86,8 @@ const AppLayers = () => {
     toggleLayer,
     rowData,
     setRowData,
+    selectedContentLayer, // <-- get from context
+    setSelectedContentLayer, // <-- get from context
   } = useAppContext();
   const [collapsed, setCollapsed] = useState(true);
   const [newLayer, setNewLayer] = useState("");
@@ -94,7 +96,6 @@ const AppLayers = () => {
 
   // Modal state for adding a row
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalLayer, setModalLayer] = useState(null);
 
   // Extract tags from rowData and add as layers, but only when not collapsed
   useEffect(() => {
@@ -188,22 +189,22 @@ const AppLayers = () => {
 
   // Handle double click to open modal for adding a row to a layer
   const handleCellDoubleClick = (layer) => {
-    setModalLayer(layer);
+    setSelectedContentLayer(layer); // <-- set context value
     setModalOpen(true);
   };
 
   // When a new row is added via modal, ensure it gets the correct layer tag
   const handleModalSelect = async (newRows) => {
-    if (!modalLayer || !newRows || !newRows.length) return;
+    if (!selectedContentLayer || !newRows || !newRows.length) return;
     setRowData((prev) => {
       const updated = prev.map((row) => {
         if (!newRows.some((nr) => nr.id === row.id)) return row;
-        // Ensure the new row has the modalLayer in its Tags
+        // Ensure the new row has the selectedContentLayer in its Tags
         const tags = (row.Tags || "")
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean);
-        if (!tags.includes(modalLayer)) tags.push(modalLayer);
+        if (!tags.includes(selectedContentLayer)) tags.push(selectedContentLayer);
         return { ...row, Tags: tags.join(", ") };
       });
       handleWriteBack(updated);
@@ -426,7 +427,7 @@ const AppLayers = () => {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSelect={handleModalSelect}
-        selectedContentLayer={modalLayer}
+        // Remove selectedContentLayer prop, ModalAddRow will get it from context
       />
     </div>
   );

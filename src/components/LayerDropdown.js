@@ -68,6 +68,22 @@ const LayerDropdown = ({
               ))
             )}
           </div>
+          {layerOptions.length > 0 && hiddenLayers.size < layerOptions.length && (
+            <div className="p-2 border-t border-gray-200">
+              <button
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  // Hide all layers
+                  layerOptions.forEach(layer => {
+                    if (!hiddenLayers.has(layer)) toggleLayerVisibility(layer);
+                  });
+                }}
+                className="text-xs text-red-600 hover:text-red-800"
+              >
+                Hide All Layers
+              </button>
+            </div>
+          )}
           {hiddenLayers.size > 0 && (
             <div className="p-2 border-t border-gray-200">
               <button
