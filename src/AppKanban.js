@@ -361,21 +361,27 @@ const AppKanban = () => {
       <Header contentLayerOptions={contentLayerOptions} length={filteredSources.length} _length={filteredTargets.length} collapsed={collapsed} setCollapsed={setCollapsed} layerOptions={layerOptions} flipped={flipped} selectedFromLayer={selectedFromLayer} setSelectedFromLayer={setSelectedFromLayer} selectedToLayer={selectedToLayer} setSelectedToLayer={setSelectedToLayer} selectedContentLayer={selectedContentLayer} setSelectedContentLayer={setSelectedContentLayer} handleExportExcel={handleExportExcel}></Header>
 
       {/* Matrix Table */}
-      <div className={`overflow-auto transition-all duration-300`} style={{ height: collapsed ? 0 : "auto" }}>
-        {!collapsed && (
-          <Table
-            nameById={nameById}
-            filteredSources={sortedSources}
-            filteredTargets={sortedTargets}
-            cellContents={filteredCellContents}
-            dragItem={dragItem}
-            setDragItem={setDragItem}
-            setEditingKey={setEditingKey}
-            setContextMenu={setContextMenu}
-            handleDrop={handleDrop}
-            relationships={relationships} // <-- pass relationships to Table
-          />
-        )}
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 700 }}>
+        <div className="h-full flex flex-col">
+          {!collapsed && (
+            <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
+              <div className="overflow-x-auto overflow-y-auto w-full h-full" style={{ maxHeight: "600px" }}>
+                <Table
+                  nameById={nameById}
+                  filteredSources={sortedSources}
+                  filteredTargets={sortedTargets}
+                  cellContents={filteredCellContents}
+                  dragItem={dragItem}
+                  setDragItem={setDragItem}
+                  setEditingKey={setEditingKey}
+                  setContextMenu={setContextMenu}
+                  handleDrop={handleDrop}
+                  relationships={relationships}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal for adding rows */}
