@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
 
 export default function NodeSearchBox({
@@ -25,22 +25,6 @@ export default function NodeSearchBox({
         setOtherTag,
     } = useNodeSearchAndSelect(selectedIds,
         setSelectedIds, searchTerm, setSearchTerm);
-
-    // Ensure selectedContentLayer is checked by default
-    useEffect(() => {
-        if (
-            selectedContentLayer &&
-            !tagsSearchTerm.includes(selectedContentLayer)
-        ) {
-            setTagsSearchTerm((prev) =>
-                prev.includes(selectedContentLayer)
-                    ? prev
-                    : [...prev, selectedContentLayer]
-            );
-        }
-        // Only run when selectedContentLayer changes
-        // eslint-disable-next-line
-    }, [selectedContentLayer]);
 
     // For asterisk display
     const existingIds = new Set((rowData || []).map((row) => row.id));
@@ -74,7 +58,8 @@ export default function NodeSearchBox({
         setSelectedIds(allIds);
     };
 
-    console.log("NodeSearchBox selectedIds:", selectedIds);
+    // console.log("NodeSearchBox selectedIds:", selectedIds);
+    console.log("initialResults in NodeSearchBox:", initialResults);
 
     // Use initialResults if no search has been performed and searchTerm is empty
     const hasActiveFilters = tagsSearchTerm.length > 0 || (otherTag && otherTag.trim().length > 0);

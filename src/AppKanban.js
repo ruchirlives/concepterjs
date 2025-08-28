@@ -329,9 +329,17 @@ const AppKanban = () => {
           onClose={() => setEditingKey(null)}
           onSelect={rows => rows.forEach(row => handleAddItem(editingKey, row))}
           selectedContentLayer={selectedContentLayer}
+          layer={editingKey.layer}
           initialSelectedIds={
-            typeof editingKey === "object" && editingKey.sourceId
-              ? childrenMap[editingKey.sourceId] || []
+            typeof editingKey === "object" && editingKey.layer
+              ? rowData
+                  .filter(row =>
+                    (row.Tags || "")
+                      .split(",")
+                      .map(t => t.trim())
+                      .includes(editingKey.layer)
+                  )
+                  .map(row => row.id)
               : []
           }
         />

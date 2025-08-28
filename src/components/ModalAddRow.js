@@ -8,9 +8,11 @@ import NodeSearchBox from "./NodeSearchBox";
 
 Modal.setAppElement("#app");
 
-const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [] }) => {
-  const { setRowData, rowData, layerOptions, selectedContentLayer } = useAppContext();
-  const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
+const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer }) => {
+  const { setRowData, rowData, layerOptions, selectedContentLayer, setSelectedContentLayer } = useAppContext();
+
+  // Always start with no pre-selected items (unticked by default)
+  const [selectedIds, setSelectedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
 
 
@@ -21,9 +23,14 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [] }) => 
   useEffect(() => {
     if (isOpen) {
       setSearchTerm("");
-      setSelectedIds([]); // <-- Do NOT pre-select children
+      setSelectedIds([]); // Always unticked by default when modal opens
+      // Set the content layer to the current layer when modal opens
+      if (setSelectedContentLayer && layer) {
+        setSelectedContentLayer(layer);
+      }
     }
-  }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, layer, rowData]);
 
   const handleAddNew = async () => {
     const name = searchTerm.trim();
@@ -68,6 +75,15 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [] }) => 
     onClose();
   };
 
+  const initialResults = rowData.filter(row =>
+    (row.Tags || "")
+      .split(",")
+      .map(t => t.trim())
+      .includes(layer)
+  );
+
+
+
   return (
     <Modal
       isOpen={isOpen}
@@ -85,8 +101,8 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [] }) => 
           setSelectedIds={setSelectedIds}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
-          selectedContentLayer={selectedContentLayer}
-          initialResults={rowData.filter(row => initialSelectedIds.includes(row.id))}
+          selectedContentLayer={layer || selectedContentLayer}
+          initialResults={initialResults}
         />
         <button
           onClick={handleAddNew}

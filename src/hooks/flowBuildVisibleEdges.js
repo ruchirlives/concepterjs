@@ -16,7 +16,7 @@ export function buildVisibleEdges(params) {
         const children = childMap[parentId] || [];
 
         children.forEach(c => {
-            console.log('Processing child:', c);
+            // console.log('Processing child:', c);
             const childId = c.id;
             const childNode = nodeById[childId];
 
