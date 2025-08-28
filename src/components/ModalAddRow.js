@@ -69,6 +69,39 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
     let loadedNodes = [];
     if (selectedIds.length > 0) {
       loadedNodes = await loadCheckedNodes();
+
+      // Ensure each loaded node has selectedContentLayer in its Tags
+      if (selectedContentLayer) {
+        let updated = false;
+        loadedNodes.forEach(node => {
+          const tagsArr = (node.Tags || "")
+            .split(",")
+            .map(t => t.trim())
+            .filter(Boolean);
+          if (!tagsArr.includes(selectedContentLayer)) {
+            tagsArr.push(selectedContentLayer);
+            node.Tags = tagsArr.join(", ");
+            updated = true;
+          }
+        });
+        if (updated) {
+          // Update rowData and persist changes
+          setRowData(prev =>
+            prev.map(row =>
+              loadedNodes.find(n => n.id === row.id)
+                ? { ...row, Tags: loadedNodes.find(n => n.id === row.id).Tags }
+                : row
+            )
+          );
+          writeBackData(
+            rowData.map(row =>
+              loadedNodes.find(n => n.id === row.id)
+                ? { ...row, Tags: loadedNodes.find(n => n.id === row.id).Tags }
+                : row
+            )
+          );
+        }
+      }
     }
     requestRefreshChannel();
     await onSelect(loadedNodes);

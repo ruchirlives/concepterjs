@@ -59,7 +59,7 @@ export default function NodeSearchBox({
     };
 
     // console.log("NodeSearchBox selectedIds:", selectedIds);
-    console.log("initialResults in NodeSearchBox:", initialResults);
+    // console.log("initialResults in NodeSearchBox:", initialResults);
 
     // Use initialResults if no search has been performed and searchTerm is empty
     const hasActiveFilters = tagsSearchTerm.length > 0 || (otherTag && otherTag.trim().length > 0);
