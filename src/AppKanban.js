@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
-import { addChildren } from "./api";
+import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 
 function ExcelButton(props) {
@@ -267,16 +267,11 @@ const AppKanban = () => {
 
   // Remove a layer tag from a child in a source
   const handleRemove = async (context) => {
-    const { sourceId, layer, cid } = context;
-    const child = rowData.find(r => r.id.toString() === cid);
-    if (child) {
-      child.Tags = (child.Tags || "")
-        .split(",")
-        .map(t => t.trim())
-        .filter(t => t !== layer)
-        .join(", ");
-      setRowData([...rowData]);
-    }
+    const { sourceId, cid } = context;
+    // Call the API to remove the child from the source/container
+    await removeChildren(sourceId, [cid]);
+    // Optionally, update your local state/UI here if needed
+    // For example, you might want to refresh data or optimistically update rowData/childrenMap
   };
 
   useEffect(() => {
