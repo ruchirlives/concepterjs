@@ -1,17 +1,26 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
-import { addChildren, removeChildren } from "./api";
+import { addChildren, removeChildren, setPosition } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 import { requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
 
 
-function linkItems(sourceItem, targetItem) {
-  // Implement the logic to link items
-  console.log("sourceItem", sourceItem)
-  console.log("targetItem", targetItem)
-  alert(`Linking item ${sourceItem.cid} to item ${targetItem.id}`);
+async function linkItems(sourceItem, targetItem, relationships) {
+  // Get current label if it exists
+  const key = `${sourceItem.cid}--${targetItem.id}`;
+  const currentLabel = relationships[key] || null;
+
+  // Inputbox
+  const newLabel = prompt("Enter new label:", currentLabel);
+  if (newLabel !== null) {
+    // Update the label in the relationships
+    await setPosition(sourceItem.cid, targetItem.id, newLabel);
+    requestRefreshChannel();
+
+
+  }
 }
 
 function ExcelButton(props) {
@@ -256,6 +265,7 @@ const AppKanban = () => {
   const {
     kanbanFilteredSources: filteredSources,
     childrenMap,
+    relationships,
     flowWrapperRef,
     collapsed,
     setCollapsed,
@@ -413,7 +423,7 @@ const AppKanban = () => {
         const targetId = elem.dataset.kanbanItemId;
         const targetItem = rowData.find(r => r.id.toString() === targetId);
         if (targetItem && dragItemRef.current) {
-          linkItems(dragItemRef.current, targetItem);
+          linkItems(dragItemRef.current, targetItem, relationships);
         }
       }
       setDragItem(null);
