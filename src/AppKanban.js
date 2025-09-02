@@ -100,8 +100,15 @@ function TableLayersAsColumns(props) {
                       {children.map(child => (
                         <li
                           key={child.id}
-                          draggable
-                          onDragStart={() => props.setDragItem({ cid: child.id.toString(), fromSource: source.id, fromLayer: layer })}
+                          data-kanban-item-id={child.id}
+                          draggable={!props.ctrlDragging} // Only allow native drag if not ctrl-dragging
+                          onDragStart={e => props.handleDragStart(child, source.id, layer, e)}
+                          onMouseDown={e => {
+                            if (e.ctrlKey) {
+                              e.preventDefault();
+                              props.handleCtrlMouseDown(child, source.id, layer, e);
+                            }
+                          }}
                           onContextMenu={e => {
                             e.preventDefault();
                             props.setContextMenu({
@@ -232,8 +239,10 @@ const AppKanban = () => {
   } = useMatrixLogic();
 
   const [dragItem, setDragItem] = useState(null);
+  const [ctrlDragging, setCtrlDragging] = useState(false); // NEW
   const [editingKey, setEditingKey] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
 
   // Use activeLayers if available, otherwise fallback to layerOptions
   const columns = (activeLayers && activeLayers.length > 0) ? activeLayers : layerOptions;
@@ -313,11 +322,88 @@ const AppKanban = () => {
     }
   };
 
+  const handleDragStart = (child, sourceId, layer, event) => {
+    if (event.ctrlKey) {
+      setCtrlDragging(true);
+      setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: true });
+      const startPos = getItemCenter(child.id);
+      if (startPos) setDragLine({ from: startPos, to: startPos });
+    } else {
+      setCtrlDragging(false);
+      setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: false });
+      setDragLine(null);
+    }
+  };
+
+  const handleCtrlMouseDown = (child, sourceId, layer, event) => {
+    setCtrlDragging(true);
+    setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: true });
+
+    // Use the actual element under the mouse
+    const rect = event.target.getBoundingClientRect();
+    const startPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    setDragLine({ from: startPos, to: startPos });
+
+    // Start listening for mousemove and mouseup
+    const handleMouseMove = (e) => {
+      setDragLine(line => line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line);
+    };
+    const handleMouseUp = (e) => {
+      setCtrlDragging(false);
+      setDragLine(null);
+      setDragItem(null);
+
+      // Detect drop target
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      if (elem && elem.dataset && elem.dataset.kanbanItemId) {
+        const targetId = elem.dataset.kanbanItemId;
+        alert(`Dropped over item ${targetId}`);
+        // You can call your linking logic here
+      }
+
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  // NEW: Get the center position of a kanban item by child ID
+  const getItemCenter = (childId) => {
+    const el = document.querySelector(`[data-kanban-item-id="${childId}"]`);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  };
+
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
   }, []);
+
+  useEffect(() => {
+    if (!ctrlDragging || !dragLine) return;
+    const handleMouseMove = (e) => {
+      setDragLine(line => line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [ctrlDragging, dragLine]);
+
+  useEffect(() => {
+    if (!ctrlDragging) {
+      setDragLine(null);
+      return;
+    }
+    const handleDragEnd = () => {
+      setCtrlDragging(false);
+      setDragLine(null);
+      setDragItem(null);
+    };
+    window.addEventListener("dragend", handleDragEnd);
+    return () => window.removeEventListener("dragend", handleDragEnd);
+  }, [ctrlDragging]);
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
@@ -344,6 +430,29 @@ const AppKanban = () => {
         <div className="h-full flex flex-col">
           {!collapsed && (
             <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
+              {/* Draw drag line if active */}
+              {dragLine && (
+                <svg
+                  style={{
+                    position: "fixed",
+                    pointerEvents: "none",
+                    left: 0,
+                    top: 0,
+                    width: "100vw",
+                    height: "100vh",
+                    zIndex: 1000,
+                  }}
+                >
+                  <line
+                    x1={dragLine.from.x}
+                    y1={dragLine.from.y}
+                    x2={dragLine.to.x}
+                    y2={dragLine.to.y}
+                    stroke="red"
+                    strokeWidth="2"
+                  />
+                </svg>
+              )}
               <div className="overflow-x-auto overflow-y-auto w-full h-full" style={{ maxHeight: "600px" }}>
                 <TableLayersAsColumns
                   rowData={rowData}
@@ -354,7 +463,9 @@ const AppKanban = () => {
                   dragItem={dragItem}
                   setDragItem={setDragItem}
                   setContextMenu={setContextMenu}
-                  handleDrop={handleDrop} // <-- add this
+                  handleDrop={handleDrop}
+                  handleDragStart={handleDragStart}
+                  handleCtrlMouseDown={handleCtrlMouseDown}
                 />
               </div>
             </div>
