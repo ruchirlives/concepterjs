@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
@@ -10,7 +10,8 @@ import { removeFromLayer } from "./AppLayers";
 function linkItems(sourceItem, targetItem) {
   // Implement the logic to link items
   console.log("sourceItem", sourceItem)
-  alert(`Linking item ${sourceItem.id} to item ${targetItem.id}`);
+  console.log("targetItem", targetItem)
+  alert(`Linking item ${sourceItem.cid} to item ${targetItem.id}`);
 }
 
 function ExcelButton(props) {
@@ -270,10 +271,15 @@ const AppKanban = () => {
   } = useMatrixLogic();
 
   const [dragItem, setDragItem] = useState(null);
+  const dragItemRef = useRef(dragItem);
   const [ctrlDragging, setCtrlDragging] = useState(false); // NEW
   const [editingKey, setEditingKey] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
+
+  useEffect(() => {
+    dragItemRef.current = dragItem;
+  }, [dragItem]);
 
   // Use activeLayers if available, otherwise fallback to layerOptions
   const columns = (activeLayers && activeLayers.length > 0) ? activeLayers : layerOptions;
@@ -401,21 +407,16 @@ const AppKanban = () => {
     const handleMouseUp = (e) => {
       setCtrlDragging(false);
       setDragLine(null);
-      setDragItem(null);
 
-      // Detect drop target
       const elem = document.elementFromPoint(e.clientX, e.clientY);
       if (elem && elem.dataset && elem.dataset.kanbanItemId) {
         const targetId = elem.dataset.kanbanItemId;
-        // alert(`Dropped over item ${targetId}`);
-        // You can call your linking logic here
         const targetItem = rowData.find(r => r.id.toString() === targetId);
-        if (targetItem) {
-          // Link the dragged item to the target item
-          linkItems(dragItem, targetItem);
+        if (targetItem && dragItemRef.current) {
+          linkItems(dragItemRef.current, targetItem);
         }
-
       }
+      setDragItem(null);
 
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
@@ -540,13 +541,13 @@ const AppKanban = () => {
           initialSelectedIds={
             typeof editingKey === "object" && editingKey.layer
               ? rowData
-                  .filter(row =>
-                    (row.Tags || "")
-                      .split(",")
-                      .map(t => t.trim())
-                      .includes(editingKey.layer)
-                  )
-                  .map(row => row.id)
+                .filter(row =>
+                  (row.Tags || "")
+                    .split(",")
+                    .map(t => t.trim())
+                    .includes(editingKey.layer)
+                )
+                .map(row => row.id)
               : []
           }
         />
