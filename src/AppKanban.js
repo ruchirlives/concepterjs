@@ -3,6 +3,7 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
+import { requestRefreshChannel } from "hooks/effectsShared";
 
 function ExcelButton(props) {
   return (
@@ -284,6 +285,7 @@ const AppKanban = () => {
     await removeChildren(sourceId, [cid]);
     // Optionally, update your local state/UI here if needed
     // For example, you might want to refresh data or optimistically update rowData/childrenMap
+    requestRefreshChannel();
   };
 
   // Move child to new source if needed, but do NOT remove from previous cell (allow multi-cell presence)
