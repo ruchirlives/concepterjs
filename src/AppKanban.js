@@ -6,6 +6,13 @@ import ModalAddRow from "./components/ModalAddRow";
 import { requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
 
+
+function linkItems(sourceItem, targetItem) {
+  // Implement the logic to link items
+  console.log("sourceItem", sourceItem)
+  alert(`Linking item ${sourceItem.id} to item ${targetItem.id}`);
+}
+
 function ExcelButton(props) {
   return (
     <button
@@ -400,8 +407,14 @@ const AppKanban = () => {
       const elem = document.elementFromPoint(e.clientX, e.clientY);
       if (elem && elem.dataset && elem.dataset.kanbanItemId) {
         const targetId = elem.dataset.kanbanItemId;
-        alert(`Dropped over item ${targetId}`);
+        // alert(`Dropped over item ${targetId}`);
         // You can call your linking logic here
+        const targetItem = rowData.find(r => r.id.toString() === targetId);
+        if (targetItem) {
+          // Link the dragged item to the target item
+          linkItems(dragItem, targetItem);
+        }
+
       }
 
       window.removeEventListener("mousemove", handleMouseMove);
