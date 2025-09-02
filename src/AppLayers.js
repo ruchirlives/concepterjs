@@ -171,21 +171,7 @@ const AppLayers = () => {
     setDragItem(null);
   };
 
-  const handleRemove = (layer, cid) => {
-    setRowData((prev) => {
-      const updated = prev.map((row) => {
-        if (row.id.toString() !== cid) return row;
-        const tags = (row.Tags || "")
-          .split(",")
-          .map((t) => t.trim())
-          .filter((t) => t && t !== layer);
-        return { ...row, Tags: tags.join(", ") };
-      });
-      // Call writeback after updating
-      handleWriteBack(updated);
-      return updated;
-    });
-  };
+  const handleRemove = removeFromLayer(setRowData);
 
   // Handle double click to open modal for adding a row to a layer
   const handleCellDoubleClick = (layer) => {
@@ -434,3 +420,21 @@ const AppLayers = () => {
 };
 
 export default AppLayers;
+
+export function removeFromLayer(setRowData) {
+  return (layer, cid) => {
+    setRowData((prev) => {
+      const updated = prev.map((row) => {
+        if (row.id.toString() !== cid) return row;
+        const tags = (row.Tags || "")
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t && t !== layer);
+        return { ...row, Tags: tags.join(", ") };
+      });
+      // Call writeback after updating
+      handleWriteBack(updated);
+      return updated;
+    });
+  };
+}

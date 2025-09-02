@@ -4,6 +4,7 @@ import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 import { requestRefreshChannel } from "hooks/effectsShared";
+import { removeFromLayer } from "./AppLayers";
 
 function ExcelButton(props) {
   return (
@@ -27,6 +28,7 @@ function ContextMenu(props) {
       }}
       onContextMenu={e => e.preventDefault()}
     >
+      {/* Remove from both layer and source */}
       <button
         className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
         onClick={e => {
@@ -36,6 +38,28 @@ function ContextMenu(props) {
         }}
       >
         Remove
+      </button>
+      {/* Remove just from layer */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleRemoveLayer(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Remove from Layer
+      </button>
+      {/* Remove just from source */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleRemoveSource(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Remove from Source
       </button>
     </div>
   );
@@ -246,6 +270,7 @@ const AppKanban = () => {
 
   // Use activeLayers if available, otherwise fallback to layerOptions
   const columns = (activeLayers && activeLayers.length > 0) ? activeLayers : layerOptions;
+  const removeChildFromLayer = removeFromLayer(setRowData);
 
   // Export to Excel for Kanban (layers as columns)
   const handleExportExcel = useCallback(() => {
@@ -289,6 +314,24 @@ const AppKanban = () => {
 
   // Remove a layer tag from a child in a source
   const handleRemove = async (context) => {
+    const { sourceId, cid, layer } = context;
+    // Call the API to remove the child from the source/container
+    await removeChildren(sourceId, [cid]);
+    await removeChildFromLayer(layer, cid);
+    // Optionally, update your local state/UI here if needed
+    // For example, you might want to refresh data or optimistically update rowData/childrenMap
+    requestRefreshChannel();
+  };
+
+  const handleRemoveLayer = async (context) => {
+    const { cid, layer } = context;
+    // Call the API to remove the layer tag from the child
+    await removeChildFromLayer(layer, cid);
+    // Optionally, update your local state/UI here if needed
+    requestRefreshChannel();
+  };
+
+  const handleRemoveSource = async (context) => {
     const { sourceId, cid } = context;
     // Call the API to remove the child from the source/container
     await removeChildren(sourceId, [cid]);
@@ -502,6 +545,8 @@ const AppKanban = () => {
           contextMenu={contextMenu}
           setContextMenu={setContextMenu}
           handleRemove={handleRemove}
+          handleRemoveLayer={handleRemoveLayer}
+          handleRemoveSource={handleRemoveSource}
         />
       )}
     </div>
