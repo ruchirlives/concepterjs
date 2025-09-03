@@ -8,11 +8,43 @@ function estimateNodeHeight(label, width, fontSize = 16, paddingY = 16) {
 }
 
 function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {}) {
+    if (nodes.length === 0) return [];
+
+    // Find all node IDs that are connected by edges
+    const connectedIds = new Set();
+    edges.forEach(e => {
+        connectedIds.add(e.source);
+        connectedIds.add(e.target);
+    });
+
+    // Split nodes into connected and disconnected (islands)
+    const connectedNodes = nodes.filter(n => connectedIds.has(n.id));
+    const disconnectedNodes = nodes.filter(n => !connectedIds.has(n.id));
+
+    // If all nodes are disconnected, use grid fallback
+    if (connectedNodes.length === 0) {
+        const gridColCount = 8;
+        const gridSpacingX = 340;
+        const gridSpacingY = 120;
+        return nodes.map((node, idx) => {
+            const col = idx % gridColCount;
+            const row = Math.floor(idx / gridColCount);
+            return {
+                ...node,
+                position: {
+                    x: col * gridSpacingX,
+                    y: row * gridSpacingY
+                }
+            };
+        });
+    }
+
+    // Otherwise, lay out connected nodes with dagre and disconnected nodes in a grid
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: direction, nodesep, ranksep });
 
-    nodes.forEach((node) => {
+    connectedNodes.forEach((node) => {
         const width = nodeSizes[node.id]?.width || node.style?.width || 320;
         const height = nodeSizes[node.id]?.height || node.style?.height ||
             estimateNodeHeight(node.data?.Name || '', width);
@@ -21,16 +53,36 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
     edges.forEach((edge) => g.setEdge(edge.source, edge.target));
     dagre.layout(g);
 
-    return nodes.map((node) => {
-        const n = g.node(node.id);
-        if (n) {
-            return {
-                ...node,
-                position: { x: n.x - n.width / 2, y: n.y - n.height / 2 },
-            };
-        }
-        return node;
+    // Lay out disconnected nodes in a grid
+    const gridColCount = 8;
+    const gridSpacingX = 340;
+    const gridSpacingY = 120;
+    const gridNodes = disconnectedNodes.map((node, idx) => {
+        const col = idx % gridColCount;
+        const row = Math.floor(idx / gridColCount);
+        return {
+            ...node,
+            position: {
+                x: col * gridSpacingX,
+                y: row * gridSpacingY
+            }
+        };
     });
+
+    // Combine dagre and grid results
+    return [
+        ...connectedNodes.map((node) => {
+            const n = g.node(node.id);
+            if (n) {
+                return {
+                    ...node,
+                    position: { x: n.x - n.width / 2, y: n.y - n.height / 2 },
+                };
+            }
+            return node;
+        }),
+        ...gridNodes
+    ];
 }
 
 export const getLayoutedElements = (
@@ -40,24 +92,16 @@ export const getLayoutedElements = (
     nodesep = 35,
     ranksep = 100
 ) => {
+    // Declare grid parameters once
+    const gridColCount = 8;
+    const padding = 40;
+
     // 1. Compute group sizes based on their children
     const nodeSizes = {};
     const allNodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
 
-    // --- Identify island nodes ---
-    const nodeIdsWithEdges = new Set();
-    edges.forEach(e => {
-        nodeIdsWithEdges.add(e.source);
-        nodeIdsWithEdges.add(e.target);
-    });
-    const islandNodes = nodes.filter(
-        n => !n.parentId && !nodeIdsWithEdges.has(n.id)
-    );
-    const nonIslandNodes = nodes.filter(n => !islandNodes.includes(n));
-
-    // --- Compute group sizes for non-island nodes only ---
-    nonIslandNodes.filter(n => n.type === 'group').forEach(group => {
-        const children = nonIslandNodes.filter(n => n.parentId === group.id);
+    nodes.filter(n => n.type === 'group').forEach(group => {
+        const children = nodes.filter(n => n.parentId === group.id);
         if (children.length === 0) {
             nodeSizes[group.id] = {
                 width: group.style?.width || 320,
@@ -72,7 +116,37 @@ export const getLayoutedElements = (
             const tParent = allNodesById[e.target]?.parentId;
             return sParent === group.id && tParent === group.id;
         });
-        const laidOutChildren = layoutSubset(children, childEdges, direction, nodesep, ranksep);
+
+        // Find connected children
+        const connectedIds = new Set();
+        childEdges.forEach(e => {
+            connectedIds.add(e.source);
+            connectedIds.add(e.target);
+        });
+        const connectedChildren = children.filter(n => connectedIds.has(n.id));
+        const islandChildren = children.filter(n => !connectedIds.has(n.id));
+
+        // Lay out connected children with dagre
+        const laidOutConnected = layoutSubset(connectedChildren, childEdges, direction, nodesep, ranksep);
+
+        // Lay out island children in a grid
+        const gridColCount = 8;
+        const gridSpacingX = 340;
+        const gridSpacingY = 120;
+        const laidOutIslands = islandChildren.map((node, idx) => {
+            const col = idx % gridColCount;
+            const row = Math.floor(idx / gridColCount);
+            return {
+                ...node,
+                position: {
+                    x: col * gridSpacingX,
+                    y: row * gridSpacingY
+                }
+            };
+        });
+
+        // Combine both sets
+        const laidOutChildren = [...laidOutConnected, ...laidOutIslands];
 
         // Bounding box
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -91,74 +165,224 @@ export const getLayoutedElements = (
         nodeSizes[group.id] = { width, height };
     });
 
-    // 2. Layout top-level nodes using computed group sizes (excluding islands)
-    const topNodes = nonIslandNodes.filter(n => !n.parentId);
+    // After step 1: Compute group sizes based on their children
+
+    // STEP 1.5: Lay out group nodes in a grid with variable sizes so they don't overlap
+
+    let colWidths = Array(gridColCount).fill(0);
+    let rowHeights = [];
+    let positions = [];
+    let col = 0, row = 0;
+
+    const groupNodes = nodes
+        .filter(n => n.type === 'group')
+        .map(n => ({
+            ...n,
+            style: {
+                ...n.style,
+                width: nodeSizes[n.id].width,
+                height: nodeSizes[n.id].height
+            }
+        }));
+
+    groupNodes.forEach((node, idx) => {
+        const width = node.style?.width || nodeSizes[node.id]?.width || 320;
+        const height = node.style?.height || nodeSizes[node.id]?.height || 180;
+
+        // Calculate X position: sum widths of previous columns in this row
+        let x = padding;
+        for (let c = 0; c < col; c++) {
+            x += colWidths[c] + padding;
+        }
+
+        // Calculate Y position: sum heights of previous rows
+        let y = padding;
+        for (let r = 0; r < row; r++) {
+            y += rowHeights[r] + padding;
+        }
+
+        positions.push({ x, y });
+
+        // Update column width and row height
+        colWidths[col] = Math.max(colWidths[col], width);
+        rowHeights[row] = Math.max(rowHeights[row] || 0, height);
+
+        col++;
+        if (col >= gridColCount) {
+            col = 0;
+            row++;
+        }
+    });
+
+    const layoutedGroups = groupNodes.map((node, idx) => ({
+        ...node,
+        position: positions[idx]
+    }));
+
+    // 2. Layout top-level nodes using computed group sizes
+    const topNodes = nodes.filter(n => !n.parentId && n.type !== 'group');
     const topNodeIds = new Set(topNodes.map(n => n.id));
     const topEdges = edges.filter(e =>
         topNodeIds.has(e.source) && topNodeIds.has(e.target)
     );
-    let layoutedNodes = layoutSubset(topNodes, topEdges, direction, nodesep, ranksep, nodeSizes);
+    let layoutedTopNodes;
+    if (topEdges.length === 0) {
+        // Use grid layout for top-level nodes if no edges between them
+        const gridColCount = 8;
+        const gridSpacingX = 340;
+        const gridSpacingY = 120;
+        layoutedTopNodes = topNodes.map((node, idx) => {
+            const col = idx % gridColCount;
+            const row = Math.floor(idx / gridColCount);
+            return {
+                ...node,
+                position: {
+                    x: col * gridSpacingX,
+                    y: row * gridSpacingY
+                }
+            };
+        });
+    } else {
+        layoutedTopNodes = layoutSubset(topNodes, topEdges, direction, nodesep, ranksep, nodeSizes);
+    }
 
-    // 3. Layout and position children inside their groups (excluding islands)
-    layoutedNodes
-        .filter(n => n.type === 'group')
-        .forEach(group => {
-            const children = nonIslandNodes.filter(n => n.parentId === group.id);
-            if (children.length === 0) return;
+    let layoutedNodes = [
+        ...layoutedGroups,
+        ...layoutedTopNodes
+    ];
 
-            const childEdgesForGroup = edges.filter(e => {
-                const sParent = allNodesById[e.source]?.parentId;
-                const tParent = allNodesById[e.target]?.parentId;
-                return sParent === group.id && tParent === group.id;
-            });
+    // 3. Layout and position children inside their groups
+    layoutedGroups.forEach(group => {
+        const children = nodes.filter(n => n.parentId === group.id);
+        if (children.length === 0) return;
 
-            const laidOutChildren = layoutSubset(children, childEdgesForGroup, direction, nodesep, ranksep);
-
-            // Use the same bounding box logic as above
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            laidOutChildren.forEach(n => {
-                minX = Math.min(minX, n.position.x);
-                minY = Math.min(minY, n.position.y);
-                maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
-                const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
-                maxY = Math.max(maxY, n.position.y + h);
-            });
-
-            const padding = 40;
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-
-            // Update group node's style in layoutedNodes
-            layoutedNodes = layoutedNodes.map(n =>
-                n.id === group.id
-                    ? { ...n, style: { ...n.style, width, height } }
-                    : n
-            );
-
-            // Shift children into group coordinate system
-            const offsetX = padding - minX;
-            const offsetY = padding - minY;
-            laidOutChildren.forEach(n => {
-                n.position = { x: n.position.x + offsetX, y: n.position.y + offsetY };
-                layoutedNodes.push(n);
-            });
+        const childEdgesForGroup = edges.filter(e => {
+            const sParent = allNodesById[e.source]?.parentId;
+            const tParent = allNodesById[e.target]?.parentId;
+            return sParent === group.id && tParent === group.id;
         });
 
-    // 4. Layout island nodes in an 8-column grid
-    const gridCols = 8;
-    const gridSpacingX = 340; // width + margin
-    const gridSpacingY = 120; // height + margin
-    islandNodes.forEach((node, i) => {
-        const col = i % gridCols;
-        const row = Math.floor(i / gridCols);
-        const width = node.style?.width || 320;
-        const height = node.style?.height || estimateNodeHeight(node.data?.Name || '', width);
-        node.position = {
-            x: col * gridSpacingX,
-            y: row * gridSpacingY
-        };
-        layoutedNodes.push({ ...node, position: node.position });
+        // Split children into connected and islands
+        const connectedIds = new Set();
+        childEdgesForGroup.forEach(e => {
+            connectedIds.add(e.source);
+            connectedIds.add(e.target);
+        });
+        const connectedChildren = children.filter(n => connectedIds.has(n.id));
+        const islandChildren = children.filter(n => !connectedIds.has(n.id));
+
+        const laidOutConnected = layoutSubset(connectedChildren, childEdgesForGroup, direction, nodesep, ranksep);
+
+        const gridColCount = 8;
+        const gridSpacingX = 340;
+        const gridSpacingY = 120;
+        const laidOutIslands = islandChildren.map((node, idx) => {
+            const col = idx % gridColCount;
+            const row = Math.floor(idx / gridColCount);
+            return {
+                ...node,
+                position: {
+                    x: col * gridSpacingX,
+                    y: row * gridSpacingY
+                }
+            };
+        });
+
+        const laidOutChildren = [...laidOutConnected, ...laidOutIslands];
+
+        // Use the same bounding box logic as above
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        laidOutChildren.forEach(n => {
+            minX = Math.min(minX, n.position.x);
+            minY = Math.min(minY, n.position.y);
+            maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
+            const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
+            maxY = Math.max(maxY, n.position.y + h);
+        });
+
+        const padding = 40;
+        const width = maxX - minX + padding * 2;
+        const height = maxY - minY + padding * 2;
+
+        // Update group node's style in layoutedNodes
+        layoutedNodes = layoutedNodes.map(n =>
+            n.id === group.id
+                ? { ...n, style: { ...n.style, width, height } }
+                : n
+        );
+
+        // Shift children into group coordinate system
+        const offsetX = padding - minX;
+        const offsetY = padding - minY;
+        laidOutChildren.forEach(n => {
+            n.position = { x: n.position.x + offsetX, y: n.position.y + offsetY };
+            layoutedNodes.push(n);
+        });
     });
+
+    // After laying out groups and before returning nodes
+    // 1. Collect group bounding boxes
+    const groupBoxes = layoutedNodes
+        .filter(n => n.type === 'group')
+        .map(group => ({
+            minX: group.position?.x ?? 0,
+            minY: group.position?.y ?? 0,
+            maxX: (group.position?.x ?? 0) + (group.style?.width || 320),
+            maxY: (group.position?.y ?? 0) + (group.style?.height || 180)
+        }));
+
+    // 2. Find the max Y (bottom) of all groups to offset top-level nodes below them
+    const groupBottom = groupBoxes.length
+        ? Math.max(...groupBoxes.map(box => box.maxY))
+        : 0;
+
+    // 3. Offset top-level nodes if they overlap any group
+    const overlappingTopNodes = [];
+    const nonOverlappingTopNodes = [];
+
+    layoutedNodes.forEach(n => {
+        if (!n.parentId && n.type !== 'group') {
+            const nodeY = n.position.y;
+            const overlaps = groupBoxes.some(box =>
+                n.position.x < box.maxX &&
+                n.position.x + (n.style?.width || 320) > box.minX &&
+                nodeY < box.maxY &&
+                nodeY + (n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320)) > box.minY
+            );
+            if (overlaps) {
+                overlappingTopNodes.push(n);
+            } else {
+                nonOverlappingTopNodes.push(n);
+            }
+        }
+    });
+
+    // Lay out ALL top-level nodes (not in groups) below all groups using dagre
+    const gridYOffset = groupBottom + 80; // 80px gap below groups
+
+    const topLevelNodes = layoutedNodes.filter(n => !n.parentId && n.type !== 'group');
+    const topLevelNodeIds = new Set(topLevelNodes.map(n => n.id));
+    const topLevelEdges = edges.filter(e =>
+        topLevelNodeIds.has(e.source) && topLevelNodeIds.has(e.target)
+    );
+
+    // Use dagre for layout
+    let dagreNodes = layoutSubset(topLevelNodes, topLevelEdges, direction, nodesep, ranksep);
+
+    // Offset all top-level nodes by gridYOffset
+    dagreNodes = dagreNodes.map(node => ({
+        ...node,
+        position: {
+            x: node.position.x,
+            y: node.position.y + gridYOffset
+        }
+    }));
+
+    // Remove all top-level nodes from layoutedNodes, then add dagreNodes
+    layoutedNodes = [
+        ...layoutedNodes.filter(n => n.parentId || n.type === 'group'),
+        ...dagreNodes
+    ];
 
     return { nodes: layoutedNodes, edges };
 };
