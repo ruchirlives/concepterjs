@@ -44,8 +44,20 @@ export const getLayoutedElements = (
     const nodeSizes = {};
     const allNodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
 
-    nodes.filter(n => n.type === 'group').forEach(group => {
-        const children = nodes.filter(n => n.parentId === group.id);
+    // --- Identify island nodes ---
+    const nodeIdsWithEdges = new Set();
+    edges.forEach(e => {
+        nodeIdsWithEdges.add(e.source);
+        nodeIdsWithEdges.add(e.target);
+    });
+    const islandNodes = nodes.filter(
+        n => !n.parentId && !nodeIdsWithEdges.has(n.id)
+    );
+    const nonIslandNodes = nodes.filter(n => !islandNodes.includes(n));
+
+    // --- Compute group sizes for non-island nodes only ---
+    nonIslandNodes.filter(n => n.type === 'group').forEach(group => {
+        const children = nonIslandNodes.filter(n => n.parentId === group.id);
         if (children.length === 0) {
             nodeSizes[group.id] = {
                 width: group.style?.width || 320,
@@ -79,19 +91,19 @@ export const getLayoutedElements = (
         nodeSizes[group.id] = { width, height };
     });
 
-    // 2. Layout top-level nodes using computed group sizes
-    const topNodes = nodes.filter(n => !n.parentId);
+    // 2. Layout top-level nodes using computed group sizes (excluding islands)
+    const topNodes = nonIslandNodes.filter(n => !n.parentId);
     const topNodeIds = new Set(topNodes.map(n => n.id));
     const topEdges = edges.filter(e =>
         topNodeIds.has(e.source) && topNodeIds.has(e.target)
     );
     let layoutedNodes = layoutSubset(topNodes, topEdges, direction, nodesep, ranksep, nodeSizes);
 
-    // 3. Layout and position children inside their groups
+    // 3. Layout and position children inside their groups (excluding islands)
     layoutedNodes
         .filter(n => n.type === 'group')
         .forEach(group => {
-            const children = nodes.filter(n => n.parentId === group.id);
+            const children = nonIslandNodes.filter(n => n.parentId === group.id);
             if (children.length === 0) return;
 
             const childEdgesForGroup = edges.filter(e => {
@@ -131,6 +143,22 @@ export const getLayoutedElements = (
                 layoutedNodes.push(n);
             });
         });
+
+    // 4. Layout island nodes in an 8-column grid
+    const gridCols = 8;
+    const gridSpacingX = 340; // width + margin
+    const gridSpacingY = 120; // height + margin
+    islandNodes.forEach((node, i) => {
+        const col = i % gridCols;
+        const row = Math.floor(i / gridCols);
+        const width = node.style?.width || 320;
+        const height = node.style?.height || estimateNodeHeight(node.data?.Name || '', width);
+        node.position = {
+            x: col * gridSpacingX,
+            y: row * gridSpacingY
+        };
+        layoutedNodes.push({ ...node, position: node.position });
+    });
 
     return { nodes: layoutedNodes, edges };
 };
