@@ -16,12 +16,19 @@ export function buildVisibleEdges(params) {
         const children = childMap[parentId] || [];
 
         children.forEach(c => {
-            // console.log('Processing child:', c);
             const childId = c.id;
             const childNode = nodeById[childId];
 
             // Skip edge if child is a direct child of this group (handled by parentId)
             if (childNode?.parentId === parentId) return;
+
+            // Skip edge if parent and child are in different groups (or one is in a group and the other is not)
+            const parentGroup = parentNode.parentId;
+            const childGroup = childNode?.parentId;
+            if (
+                (parentGroup && parentGroup !== childGroup) ||
+                (childGroup && childGroup !== parentGroup)
+            ) return;
 
             const edgeId = `${parentId}-to-${childId}`;
             if (!newEdges.some(e => e.id === edgeId)) {
