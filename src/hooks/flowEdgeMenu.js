@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import useCreateNewRow from '../components/ModalNewContainer';
-import { addChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
+import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from '../AppContext'; // Import the AppContext to access tiptapContent
@@ -9,7 +9,7 @@ import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDouble
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent, setTiptapContent, edges, setEdges } = useAppContext();
+    const { tiptapContent, setTiptapContent, setEdges } = useAppContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
     const newRowFunc = useCreateNewRow();
 
@@ -25,15 +25,17 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
 
     const onMenuItemClick = async (action, rowData, setRowData) => {
         // Get source and target nodes from the stored edge
-        const edgeData = menuRef.current.edge;
-        const edgeId = edgeData?.id;
-        const edge = edgeId ? edges.find((e) => e.id === edgeId) : edgeData;
+        const edge = menuRef.current.edge;
         if (!edge) return;
         console.log("Selected Edge:", edge);
         const sourceNodeId = edge.source;
         const targetNodeId = edge.target;
+
+        // construct edgeId from edges using source -to- target
+        const edgeId = sourceNodeId + "-to-" + targetNodeId;
         console.log("Source Node ID:", sourceNodeId);
         console.log("Target Node ID:", targetNodeId);
+        console.log("Edge ID:", edgeId);
 
         if (action === "delete edge" && edgeId) {
             console.log("Edge Id:", action, edgeId);
@@ -41,17 +43,15 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             removeEdgeById(edgeId);
         }
         // Add other actions here if needed
-        else if (action === "edit edge" && edgeId) {
-            // Handle edit edge action here
-            console.log("Edit edge action triggered");
-        }
         else if (action === "flip edge" && edgeId) {
             // Handle flip edge action here
             console.log("Flip edge action triggered");
             // 1. Get metadata from the old edge
             const position = await getPosition(sourceNodeId, targetNodeId);
+            console.log("Old Edge Position:", position);
 
             // 2. Remove the old edge
+            console.log("Removing edge:", edgeId);
             removeEdgeById(edgeId);
 
             // 3. Create a new edge in the reverse direction
@@ -135,6 +135,7 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
         function removeEdgeById(edgeId) {
             setEdges((oldEdges) => {
                 // For each removal change, find the corresponding edge in the old edges.
+                console.log("Removing edge with ID:", edgeId);
                 return newFunction();
 
                 function newFunction() {
@@ -143,7 +144,24 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
                     return oldEdges.filter((edge) => edge.id !== edgeId);
                 }
             });
+
             console.log("Edge removed:", edgeId);
+
+            // Call your API to remove the edge
+            const sourceNodeId = edge.source;
+            const targetNodeId = edge.target;
+            removeChildren(sourceNodeId, [targetNodeId])
+                .then((response) => {
+                    if (response) {
+                        console.log("Edge removed successfully.");
+                    } else {
+                        alert("Failed to remove edge.");
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error removing edge:", error);
+                    alert("Failed to remove edge.");
+                });
         }
     }
 
@@ -163,7 +181,7 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
             style={{ display: "none" }}
             className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
         >
-            {["delete edge", "rename", "insert node", "edit edge", "flip edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
+            {["delete edge", "rename", "insert node", "flip edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}

@@ -179,7 +179,7 @@ export async function generateNodesAndEdges(params) {
     });
 
     // No more activeGroup logic needed!
-    console.log(computedNodes);
+    // console.log(computedNodes);
     await fetchAndCreateEdges(computedNodes, params);
     fitViewToFlow();
 }
