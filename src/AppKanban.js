@@ -113,9 +113,19 @@ function TableLayersAsColumns(props) {
               {source.Name}
             </th>
             {props.activeLayers.map(layer => {
-              const children = (props.childrenMap[source.id] || [])
-                .map(cid => props.rowData.find(r => r.id.toString() === cid))
-                .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+              let items = [];
+              if (!props.flipped) {
+                // Show children (default)
+                items = (props.childrenMap[source.id] || [])
+                  .map(cid => props.rowData.find(r => r.id.toString() === cid))
+                  .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+              } else {
+                // Show parents (reverse relationship)
+                items = props.rowData.filter(row =>
+                  (props.childrenMap[row.id] || []).includes(source.id.toString()) &&
+                  (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
+                );
+              }
 
               return (
                 <td
@@ -136,18 +146,18 @@ function TableLayersAsColumns(props) {
                     }
                   }}
                 >
-                  {children.length > 0 ? (
+                  {items.length > 0 ? (
                     <ul className="text-xs space-y-1">
-                      {children.map(child => (
+                      {items.map(item => (
                         <li
-                          key={child.id}
-                          data-kanban-item-id={child.id}
-                          draggable={!props.ctrlDragging} // Only allow native drag if not ctrl-dragging
-                          onDragStart={e => props.handleDragStart(child, source.id, layer, e)}
+                          key={item.id}
+                          data-kanban-item-id={item.id}
+                          draggable={!props.ctrlDragging}
+                          onDragStart={e => props.handleDragStart(item, source.id, layer, e)}
                           onMouseDown={e => {
                             if (e.ctrlKey) {
                               e.preventDefault();
-                              props.handleCtrlMouseDown(child, source.id, layer, e);
+                              props.handleCtrlMouseDown(item, source.id, layer, e);
                             }
                           }}
                           onContextMenu={e => {
@@ -157,11 +167,11 @@ function TableLayersAsColumns(props) {
                               y: e.clientY,
                               sourceId: source.id,
                               layer,
-                              cid: child.id.toString(),
+                              cid: item.id.toString(),
                             });
                           }}
                         >
-                          {child.Name}
+                          {item.Name}
                         </li>
                       ))}
                     </ul>
@@ -264,7 +274,10 @@ function Header(props) {
             Layers
           </button>
           {layerDropdownOpen && (
-            <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded shadow p-2 max-h-60 overflow-auto">
+            <div
+              className="absolute mt-1 bg-white border border-gray-300 rounded shadow p-2 max-h-60 overflow-auto"
+              style={{ zIndex: 9999 }} // <-- Add this line
+            >
               {props.layerOptions.map(layer => (
                 <label key={layer} className="flex items-center gap-1 text-xs whitespace-nowrap">
                   <input
@@ -280,6 +293,14 @@ function Header(props) {
         </div>
         {/* Export to Excel Button */}
         <ExcelButton handleExportExcel={props.handleExportExcel} />
+        {/* Flip Button - moved here */}
+        <button
+          className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+          onClick={props.onFlip}
+          title="Flip row/column relationship"
+        >
+          Flip
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -303,7 +324,6 @@ const AppKanban = () => {
     flowWrapperRef,
     collapsed,
     setCollapsed,
-    flipped,
     selectedFromLayer,
     setSelectedFromLayer,
     selectedToLayer,
@@ -311,6 +331,9 @@ const AppKanban = () => {
     selectedContentLayer,
     setSelectedContentLayer,
     contentLayerOptions = [],
+    flipped, 
+    setFlipped
+
   } = useMatrixLogic();
 
   const [selectedLayers, setSelectedLayers] = useState(contextActiveLayers || []);
@@ -320,7 +343,7 @@ const AppKanban = () => {
   const [editingKey, setEditingKey] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
-
+  
   useEffect(() => {
     dragItemRef.current = dragItem;
   }, [dragItem]);
@@ -361,43 +384,60 @@ const AppKanban = () => {
   // Add a child to a source and tag it with a layer
   const handleAddItem = async ({ sourceId, layer }, row) => {
     const cid = row.id.toString();
-    // Add child to source if not already present
-    if (!(childrenMap[sourceId] || []).includes(cid)) {
-      await addChildren(sourceId, [cid]);
-    }
-    // Add the layer tag to the child if not present
-    const child = rowData.find(r => r.id.toString() === cid);
-    if (child && !(child.Tags || "").split(",").map(t => t.trim()).includes(layer)) {
-      child.Tags = child.Tags ? `${child.Tags}, ${layer}` : layer;
-      setRowData([...rowData]);
+    if (!flipped) {
+      // Normal: add child to source
+      if (!(childrenMap[sourceId] || []).includes(cid)) {
+        await addChildren(sourceId, [cid]);
+      }
+      // Add the layer tag to the child if not present
+      const child = rowData.find(r => r.id.toString() === cid);
+      if (child && !(child.Tags || "").split(",").map(t => t.trim()).includes(layer)) {
+        child.Tags = child.Tags ? `${child.Tags}, ${layer}` : layer;
+        setRowData([...rowData]);
+      }
+    } else {
+      // Flipped: add source as child to row (parent)
+      if (!(childrenMap[cid] || []).includes(sourceId.toString())) {
+        await addChildren(cid, [sourceId.toString()]);
+      }
+      // Add the layer tag to the parent if not present
+      if (row && !(row.Tags || "").split(",").map(t => t.trim()).includes(layer)) {
+        row.Tags = row.Tags ? `${row.Tags}, ${layer}` : layer;
+        setRowData([...rowData]);
+      }
     }
   };
 
   // Remove a layer tag from a child in a source
   const handleRemove = async (context) => {
     const { sourceId, cid, layer } = context;
-    // Call the API to remove the child from the source/container
-    await removeChildren(sourceId, [cid]);
-    await removeChildFromLayer(layer, cid);
-    // Optionally, update your local state/UI here if needed
-    // For example, you might want to refresh data or optimistically update rowData/childrenMap
+    if (!flipped) {
+      await removeChildren(sourceId, [cid]);
+      await removeChildFromLayer(layer, cid);
+    } else {
+      await removeChildren(cid, [sourceId.toString()]);
+      await removeChildFromLayer(layer, sourceId.toString());
+    }
     requestRefreshChannel();
   };
 
   const handleRemoveLayer = async (context) => {
-    const { cid, layer } = context;
-    // Call the API to remove the layer tag from the child
-    await removeChildFromLayer(layer, cid);
-    // Optionally, update your local state/UI here if needed
+    const { cid, layer, sourceId } = context;
+    if (!flipped) {
+      await removeChildFromLayer(layer, cid);
+    } else {
+      await removeChildFromLayer(layer, sourceId.toString());
+    }
     requestRefreshChannel();
   };
 
   const handleRemoveSource = async (context) => {
     const { sourceId, cid } = context;
-    // Call the API to remove the child from the source/container
-    await removeChildren(sourceId, [cid]);
-    // Optionally, update your local state/UI here if needed
-    // For example, you might want to refresh data or optimistically update rowData/childrenMap
+    if (!flipped) {
+      await removeChildren(sourceId, [cid]);
+    } else {
+      await removeChildren(cid, [sourceId.toString()]);
+    }
     requestRefreshChannel();
   };
 
@@ -405,24 +445,42 @@ const AppKanban = () => {
   const handleDrop = async ({ fromSource, fromLayer, cid, toSource, toLayer }) => {
     if (!cid || !toSource || !toLayer) return;
 
-    // Only add child to new source if not already present
-    if (!(childrenMap[toSource] || []).includes(cid)) {
-      await addChildren(toSource, [cid]);
-    }
+    if (!flipped) {
+      // Normal: add child to new source
+      if (!(childrenMap[toSource] || []).includes(cid)) {
+        await addChildren(toSource, [cid]);
+      }
+      // Add new layer tag if not present
+      const child = rowData.find(r => r.id.toString() === cid);
+      if (child) {
+        let tagsArr = (child.Tags || "")
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean);
 
-    // Add new layer tag if not present (do NOT remove old layer)
-    const child = rowData.find(r => r.id.toString() === cid);
-    if (child) {
-      let tagsArr = (child.Tags || "")
-        .split(",")
-        .map(t => t.trim())
-        .filter(Boolean);
+        if (!tagsArr.includes(toLayer)) tagsArr.push(toLayer);
 
-      // Add new layer if not present
-      if (!tagsArr.includes(toLayer)) tagsArr.push(toLayer);
+        child.Tags = tagsArr.join(", ");
+        setRowData([...rowData]);
+      }
+    } else {
+      // Flipped: add toSource (row header) as child to cid (parent)
+      if (!(childrenMap[cid] || []).includes(toSource.toString())) {
+        await addChildren(cid, [toSource.toString()]);
+      }
+      // Add new layer tag if not present
+      const parent = rowData.find(r => r.id.toString() === cid);
+      if (parent) {
+        let tagsArr = (parent.Tags || "")
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean);
 
-      child.Tags = tagsArr.join(", ");
-      setRowData([...rowData]);
+        if (!tagsArr.includes(toLayer)) tagsArr.push(toLayer);
+
+        parent.Tags = tagsArr.join(", ");
+        setRowData([...rowData]);
+      }
     }
   };
 
@@ -530,6 +588,7 @@ const AppKanban = () => {
         selectedContentLayer={selectedContentLayer}
         setSelectedContentLayer={setSelectedContentLayer}
         handleExportExcel={handleExportExcel}
+        onFlip={() => setFlipped(f => !f)}
       />
 
       {/* Kanban Table */}
@@ -573,6 +632,8 @@ const AppKanban = () => {
                   handleDrop={handleDrop}
                   handleDragStart={handleDragStart}
                   handleCtrlMouseDown={handleCtrlMouseDown}
+                  ctrlDragging={ctrlDragging}
+                  flipped={flipped} // <-- Add this line
                 />
               </div>
             </div>
