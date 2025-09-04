@@ -82,7 +82,57 @@ function ContextMenu(props) {
   );
 }
 
+// Calculate frequency of each item across all cells
+// function getItemCellCount({ filteredSources, columns, childrenMap, rowData, flipped }) {
+//   const itemCellCount = {};
+//   filteredSources.forEach(source => {
+//     columns.forEach(layer => {
+//       let items = [];
+//       if (!flipped) {
+//         items = (childrenMap[source.id] || [])
+//           .map(cid => rowData.find(r => r.id.toString() === cid))
+//           .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+//       } else {
+//         items = rowData.filter(row =>
+//           (childrenMap[row.id] || []).includes(source.id.toString()) &&
+//           (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
+//         );
+//       }
+//       items.forEach(item => {
+//         itemCellCount[item.id] = (itemCellCount[item.id] || 0) + 1;
+//       });
+//     });
+//   });
+//   return itemCellCount;
+// }
+
+// Utility: assign a visually distinct background color to each item ID
+function getColorForId(id) {
+  // Hash the id to a number
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Use hash to pick a hue (0-360), faded saturation (30-45%), and high lightness (85-95%)
+  const hue = Math.abs(hash) % 360;
+  const sat = 30 + (Math.abs(hash * 13) % 15); // 30-45%
+  const light = 85 + (Math.abs(hash * 7) % 10); // 85-95%
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
 function TableLayersAsColumns(props) {
+  // Calculate item frequency for coloring
+  // const itemCellCount = getItemCellCount({
+  //   filteredSources: props.filteredSources,
+  //   columns: props.activeLayers,
+  //   childrenMap: props.childrenMap,
+  //   rowData: props.rowData,
+  //   flipped: props.flipped
+  // });
+
+  // Find max frequency for scaling
+  // const maxCount = Math.max(2, ...Object.values(itemCellCount));
+
   return (
     <table className="table-auto border-collapse border border-gray-300 w-full">
       <thead>
@@ -115,12 +165,10 @@ function TableLayersAsColumns(props) {
             {props.activeLayers.map(layer => {
               let items = [];
               if (!props.flipped) {
-                // Show children (default)
                 items = (props.childrenMap[source.id] || [])
                   .map(cid => props.rowData.find(r => r.id.toString() === cid))
                   .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
               } else {
-                // Show parents (reverse relationship)
                 items = props.rowData.filter(row =>
                   (props.childrenMap[row.id] || []).includes(source.id.toString()) &&
                   (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
@@ -148,32 +196,43 @@ function TableLayersAsColumns(props) {
                 >
                   {items.length > 0 ? (
                     <ul className="text-xs space-y-1">
-                      {items.map(item => (
-                        <li
-                          key={item.id}
-                          data-kanban-item-id={item.id}
-                          draggable={!props.ctrlDragging}
-                          onDragStart={e => props.handleDragStart(item, source.id, layer, e)}
-                          onMouseDown={e => {
-                            if (e.ctrlKey) {
+                      {items.map(item => {
+                        // const count = itemCellCount[item.id] || 1;
+                        // Scale red from 0 (1 cell) to 255 (maxCount cells)
+                        // const red = Math.round(255 * (count - 1) / (maxCount - 1));
+                        // const bgColor = count > 1 ? `rgba(${red},0,0,0.15)` : "transparent";
+                        return (
+                          <li
+                            key={item.id}
+                            data-kanban-item-id={item.id}
+                            draggable={!props.ctrlDragging}
+                            onDragStart={e => props.handleDragStart(item, source.id, layer, e)}
+                            onMouseDown={e => {
+                              if (e.ctrlKey) {
+                                e.preventDefault();
+                                props.handleCtrlMouseDown(item, source.id, layer, e);
+                              }
+                            }}
+                            onContextMenu={e => {
                               e.preventDefault();
-                              props.handleCtrlMouseDown(item, source.id, layer, e);
-                            }
-                          }}
-                          onContextMenu={e => {
-                            e.preventDefault();
-                            props.setContextMenu({
-                              x: e.clientX,
-                              y: e.clientY,
-                              sourceId: source.id,
-                              layer,
-                              cid: item.id.toString(),
-                            });
-                          }}
-                        >
-                          {item.Name}
-                        </li>
-                      ))}
+                              props.setContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                sourceId: source.id,
+                                layer,
+                                cid: item.id.toString(),
+                              });
+                            }}
+                            style={{
+                              background: getColorForId(item.id),
+                              borderRadius: "4px",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            {item.Name}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <span className="text-xs text-gray-400">—</span>
