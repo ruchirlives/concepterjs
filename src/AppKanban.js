@@ -421,10 +421,19 @@ const AppKanban = () => {
     const rows = filteredSources.map((source) => {
       const values = [source.Name];
       columns.forEach((layer) => {
-        // Find children of this source that have this layer as a tag
-        const children = (childrenMap[source.id] || [])
-          .map(cid => rowData.find(r => r.id.toString() === cid))
-          .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+        let children = [];
+        if (!flipped) {
+          // Normal mode: children of source, filtered by layer tag
+          children = (childrenMap[source.id] || [])
+            .map(cid => rowData.find(r => r.id.toString() === cid))
+            .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+        } else {
+          // Flipped mode: rows whose children include source, filtered by layer tag
+          children = rowData.filter(row =>
+            (childrenMap[row.id] || []).includes(source.id.toString()) &&
+            (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
+          );
+        }
         const namesRaw = children.map(child => child.Name).join("\n");
         const names = namesRaw.includes("\n") ? `"${namesRaw}"` : namesRaw;
         values.push(names);
@@ -438,7 +447,7 @@ const AppKanban = () => {
     } else {
       alert(tsv);
     }
-  }, [filteredSources, columns, childrenMap, rowData]);
+  }, [filteredSources, columns, childrenMap, rowData, flipped]);
 
   // Add a child to a source and tag it with a layer
   const handleAddItem = async ({ sourceId, layer }, row) => {
