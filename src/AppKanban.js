@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
-import { addChildren, removeChildren, setPosition } from "./api";
+import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 import { requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
@@ -82,6 +82,30 @@ function ContextMenu(props) {
   );
 }
 
+function ColumnContextMenu(props) {
+  return (
+    <div
+      className="fixed z-50 bg-white border border-gray-300 rounded shadow"
+      style={{
+        top: props.contextMenu.y,
+        left: props.contextMenu.x,
+      }}
+      onContextMenu={e => e.preventDefault()}
+    >
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleFlip(props.contextMenu.layer);
+          props.setContextMenu(null);
+        }}
+      >
+        Flip
+      </button>
+    </div>
+  );
+}
+
 // Calculate frequency of each item across all cells
 // function getItemCellCount({ filteredSources, columns, childrenMap, rowData, flipped }) {
 //   const itemCellCount = {};
@@ -142,6 +166,7 @@ function TableLayersAsColumns(props) {
             <th
               key={layer}
               className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+              onContextMenu={e => props.onColumnContextMenu && props.onColumnContextMenu(e, layer)}
             >
               {layer}
             </th>
@@ -401,6 +426,7 @@ const AppKanban = () => {
   const [ctrlDragging, setCtrlDragging] = useState(false); // NEW
   const [editingKey, setEditingKey] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [columnContextMenu, setColumnContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
   
   useEffect(() => {
@@ -504,6 +530,47 @@ const AppKanban = () => {
     requestRefreshChannel();
   };
 
+  const handleColumnContextMenu = (e, layer) => {
+    e.preventDefault();
+    setColumnContextMenu({ x: e.clientX, y: e.clientY, layer });
+  };
+
+  const handleColumnFlip = async (layer) => {
+    for (const source of filteredSources) {
+      let items = [];
+      if (!flipped) {
+        items = (childrenMap[source.id] || [])
+          .map(cid => rowData.find(r => r.id.toString() === cid))
+          .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+      } else {
+        items = rowData.filter(row =>
+          (childrenMap[row.id] || []).includes(source.id.toString()) &&
+          (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
+        );
+      }
+      for (const item of items) {
+        if (!flipped) {
+          const position = await getPosition(source.id, item.id);
+          await removeChildren(source.id, [item.id.toString()]);
+          await addChildren(item.id, [source.id.toString()]);
+          if (position) {
+            if (position.label) await setPosition(item.id, source.id.toString(), position.label);
+            if (position.narrative) await setNarrative(item.id, source.id.toString(), position.narrative);
+          }
+        } else {
+          const position = await getPosition(item.id, source.id);
+          await removeChildren(item.id, [source.id.toString()]);
+          await addChildren(source.id, [item.id.toString()]);
+          if (position) {
+            if (position.label) await setPosition(source.id, item.id.toString(), position.label);
+            if (position.narrative) await setNarrative(source.id, item.id.toString(), position.narrative);
+          }
+        }
+      }
+    }
+    requestRefreshChannel();
+  };
+
   // Move child to new source if needed, but do NOT remove from previous cell (allow multi-cell presence)
   const handleDrop = async ({ fromSource, fromLayer, cid, toSource, toLayer }) => {
     if (!cid || !toSource || !toLayer) return;
@@ -603,7 +670,10 @@ const AppKanban = () => {
   };
 
   useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    const handleClick = () => {
+      setContextMenu(null);
+      setColumnContextMenu(null);
+    };
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
   }, []);
@@ -697,6 +767,7 @@ const AppKanban = () => {
                   handleCtrlMouseDown={handleCtrlMouseDown}
                   ctrlDragging={ctrlDragging}
                   flipped={flipped} // <-- Add this line
+                  onColumnContextMenu={handleColumnContextMenu}
                 />
               </div>
             </div>
@@ -735,6 +806,13 @@ const AppKanban = () => {
           handleRemove={handleRemove}
           handleRemoveLayer={handleRemoveLayer}
           handleRemoveSource={handleRemoveSource}
+        />
+      )}
+      {columnContextMenu && (
+        <ColumnContextMenu
+          contextMenu={columnContextMenu}
+          setContextMenu={setColumnContextMenu}
+          handleFlip={handleColumnFlip}
         />
       )}
     </div>
