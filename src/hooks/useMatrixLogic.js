@@ -258,14 +258,21 @@ export const useMatrixLogic = () => {
   );
 
   const handleExportExcel = useCallback(() => {
-    const headers = ["", ...filteredTargets.map((c) => c.Name), `Difference to ${comparatorState}`];
-    const rows = filteredSources.map((source) => {
-      const values = [source.Name];
-      filteredTargets.forEach((target) => {
-        const key = `${source.id}--${target.id}`;
+    // Always: rows = filteredSources, columns = filteredTargets (matches UI)
+    const exportRows = filteredSources;
+    const exportCols = filteredTargets;
+
+    const headers = ["", ...exportCols.map((c) => c.Name), `Difference to ${comparatorState}`];
+    const rows = exportRows.map((rowItem) => {
+      const values = [rowItem.Name];
+      exportCols.forEach((colItem) => {
+        // Relationship key: direction depends on flipped
+        const key = flipped
+          ? `${colItem.id}--${rowItem.id}` // flipped: target (col) is parent, source (row) is child
+          : `${rowItem.id}--${colItem.id}`; // normal: source (row) is parent, target (col) is child
         values.push(relationships[key] || "");
       });
-      values.push(differences[source.id] || "No difference");
+      values.push(differences[rowItem.id] || "No difference");
       return values.join("\t");
     });
     const tsv = [headers.join("\t"), ...rows].join("\n");
@@ -286,7 +293,7 @@ export const useMatrixLogic = () => {
         </button>
       </div>
     ));
-  }, [filteredSources, filteredTargets, relationships, differences, comparatorState]);
+  }, [filteredSources, filteredTargets, relationships, differences, comparatorState, flipped]);
 
   const handleCopyDiff = async (containerId) => {
     try {
