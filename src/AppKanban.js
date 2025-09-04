@@ -179,6 +179,16 @@ function TableLayersAsColumns(props) {
 }
 
 function Header(props) {
+  const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
+
+  const handleLayerToggle = (layer) => {
+    if (props.selectedLayers.includes(layer)) {
+      props.setSelectedLayers(props.selectedLayers.filter(l => l !== layer));
+    } else {
+      props.setSelectedLayers([...props.selectedLayers, layer]);
+    }
+  };
+
   return (
     <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
       <div className="flex items-center gap-4">
@@ -244,6 +254,30 @@ function Header(props) {
             ))}
           </select>
         </div>
+        {/* Layer Selection Dropdown */}
+        <div className="relative">
+          <button
+            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+            onClick={() => setLayerDropdownOpen(o => !o)}
+            title="Select layers to display"
+          >
+            Layers
+          </button>
+          {layerDropdownOpen && (
+            <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded shadow p-2 max-h-60 overflow-auto">
+              {props.layerOptions.map(layer => (
+                <label key={layer} className="flex items-center gap-1 text-xs whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={props.selectedLayers.includes(layer)}
+                    onChange={() => handleLayerToggle(layer)}
+                  />
+                  <span>{layer}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
         {/* Export to Excel Button */}
         <ExcelButton handleExportExcel={props.handleExportExcel} />
       </div>
@@ -261,7 +295,7 @@ function Header(props) {
 }
 
 const AppKanban = () => {
-  const { rowData, setRowData, activeLayers } = useAppContext();
+  const { rowData, setRowData, activeLayers: contextActiveLayers, layerOptions } = useAppContext();
   const {
     kanbanFilteredSources: filteredSources,
     childrenMap,
@@ -269,7 +303,6 @@ const AppKanban = () => {
     flowWrapperRef,
     collapsed,
     setCollapsed,
-    layerOptions,
     flipped,
     selectedFromLayer,
     setSelectedFromLayer,
@@ -280,6 +313,7 @@ const AppKanban = () => {
     contentLayerOptions = [],
   } = useMatrixLogic();
 
+  const [selectedLayers, setSelectedLayers] = useState(contextActiveLayers || []);
   const [dragItem, setDragItem] = useState(null);
   const dragItemRef = useRef(dragItem);
   const [ctrlDragging, setCtrlDragging] = useState(false); // NEW
@@ -291,16 +325,20 @@ const AppKanban = () => {
     dragItemRef.current = dragItem;
   }, [dragItem]);
 
-  // Use activeLayers if available, otherwise fallback to layerOptions
-  const columns = (activeLayers && activeLayers.length > 0) ? activeLayers : layerOptions;
+  useEffect(() => {
+    setSelectedLayers(contextActiveLayers || []);
+  }, [contextActiveLayers]);
+
+  // Use selectedLayers if available, otherwise fallback to layerOptions
+  const columns = (selectedLayers && selectedLayers.length > 0) ? selectedLayers : layerOptions;
   const removeChildFromLayer = removeFromLayer(setRowData);
 
   // Export to Excel for Kanban (layers as columns)
   const handleExportExcel = useCallback(() => {
-    const headers = ["", ...activeLayers];
+    const headers = ["", ...columns];
     const rows = filteredSources.map((source) => {
       const values = [source.Name];
-      activeLayers.forEach((layer) => {
+      columns.forEach((layer) => {
         // Find children of this source that have this layer as a tag
         const children = (childrenMap[source.id] || [])
           .map(cid => rowData.find(r => r.id.toString() === cid))
@@ -318,7 +356,7 @@ const AppKanban = () => {
     } else {
       alert(tsv);
     }
-  }, [filteredSources, activeLayers, childrenMap, rowData]);
+  }, [filteredSources, columns, childrenMap, rowData]);
 
   // Add a child to a source and tag it with a layer
   const handleAddItem = async ({ sourceId, layer }, row) => {
@@ -482,6 +520,8 @@ const AppKanban = () => {
         collapsed={collapsed}
         setCollapsed={setCollapsed}
         layerOptions={layerOptions}
+        selectedLayers={selectedLayers}
+        setSelectedLayers={setSelectedLayers}
         flipped={flipped}
         selectedFromLayer={selectedFromLayer}
         setSelectedFromLayer={setSelectedFromLayer}
