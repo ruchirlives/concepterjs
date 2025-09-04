@@ -413,21 +413,16 @@ const AppKanban = () => {
     const { sourceId, cid, layer } = context;
     if (!flipped) {
       await removeChildren(sourceId, [cid]);
-      await removeChildFromLayer(layer, cid);
     } else {
       await removeChildren(cid, [sourceId.toString()]);
-      await removeChildFromLayer(layer, sourceId.toString());
     }
+    await removeChildFromLayer(layer, cid);
     requestRefreshChannel();
   };
 
   const handleRemoveLayer = async (context) => {
-    const { cid, layer, sourceId } = context;
-    if (!flipped) {
-      await removeChildFromLayer(layer, cid);
-    } else {
-      await removeChildFromLayer(layer, sourceId.toString());
-    }
+    const { cid, layer } = context;
+    await removeChildFromLayer(layer, cid);
     requestRefreshChannel();
   };
 
