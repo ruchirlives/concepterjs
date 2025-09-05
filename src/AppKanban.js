@@ -3,9 +3,9 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
-import { requestRefreshChannel } from "hooks/effectsShared";
+import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
-
+import toast from 'react-hot-toast';
 
 async function linkItems(sourceItem, targetItem, relationships) {
   // Get current label if it exists
@@ -42,9 +42,23 @@ function ContextMenu(props) {
       style={{
         top: props.contextMenu.y,
         left: props.contextMenu.x,
+        maxHeight: "260px",
+        overflowY: "auto",
+        minWidth: "180px",
       }}
       onContextMenu={e => e.preventDefault()}
     >
+      {/* Rename option */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={async e => {
+          e.stopPropagation();
+          props.handleRename(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Rename
+      </button>
       {/* Remove from both layer and source */}
       <button
         className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
@@ -54,7 +68,7 @@ function ContextMenu(props) {
           props.setContextMenu(null);
         }}
       >
-        Remove
+        Remove from Both
       </button>
       {/* Remove just from layer */}
       <button
@@ -106,29 +120,41 @@ function ColumnContextMenu(props) {
   );
 }
 
-// Calculate frequency of each item across all cells
-// function getItemCellCount({ filteredSources, columns, childrenMap, rowData, flipped }) {
-//   const itemCellCount = {};
-//   filteredSources.forEach(source => {
-//     columns.forEach(layer => {
-//       let items = [];
-//       if (!flipped) {
-//         items = (childrenMap[source.id] || [])
-//           .map(cid => rowData.find(r => r.id.toString() === cid))
-//           .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
-//       } else {
-//         items = rowData.filter(row =>
-//           (childrenMap[row.id] || []).includes(source.id.toString()) &&
-//           (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
-//         );
-//       }
-//       items.forEach(item => {
-//         itemCellCount[item.id] = (itemCellCount[item.id] || 0) + 1;
-//       });
-//     });
-//   });
-//   return itemCellCount;
-// }
+function RowContextMenu(props) {
+  return (
+    <div
+      className="fixed z-50 bg-white border border-gray-300 rounded shadow"
+      style={{
+        top: props.contextMenu.y,
+        left: props.contextMenu.x,
+      }}
+      onContextMenu={e => e.preventDefault()}
+    >
+      {/* Rename option */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={async e => {
+          e.stopPropagation();
+          props.handleRename(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Rename
+      </button>
+      {/* Select option */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleSelect(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Select
+      </button>
+    </div>
+  );
+}
 
 // Utility: assign a visually distinct background color to each item ID
 function getColorForId(id) {
@@ -145,17 +171,6 @@ function getColorForId(id) {
 }
 
 function TableLayersAsColumns(props) {
-  // Calculate item frequency for coloring
-  // const itemCellCount = getItemCellCount({
-  //   filteredSources: props.filteredSources,
-  //   columns: props.activeLayers,
-  //   childrenMap: props.childrenMap,
-  //   rowData: props.rowData,
-  //   flipped: props.flipped
-  // });
-
-  // Find max frequency for scaling
-  // const maxCount = Math.max(2, ...Object.values(itemCellCount));
 
   return (
     <table className="table-auto border-collapse border border-gray-300 w-full">
@@ -184,6 +199,7 @@ function TableLayersAsColumns(props) {
                 width: 150,
                 overflow: "hidden",
               }}
+              onContextMenu={e => props.handleRowHeaderContextMenu && props.handleRowHeaderContextMenu(e, source.id)}
             >
               {source.Name}
             </th>
@@ -238,16 +254,7 @@ function TableLayersAsColumns(props) {
                                 props.handleCtrlMouseDown(item, source.id, layer, e);
                               }
                             }}
-                            onContextMenu={e => {
-                              e.preventDefault();
-                              props.setContextMenu({
-                                x: e.clientX,
-                                y: e.clientY,
-                                sourceId: source.id,
-                                layer,
-                                cid: item.id.toString(),
-                              });
-                            }}
+                            onContextMenu={e => props.handleCellContextMenu && props.handleCellContextMenu(e, { sourceId: source.id, layer, item })}
                             style={{
                               background: getColorForId(item.id),
                               borderRadius: "4px",
@@ -428,6 +435,8 @@ const AppKanban = () => {
   const [contextMenu, setContextMenu] = useState(null);
   const [columnContextMenu, setColumnContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
+  const [rowHeaderContextMenu, setRowHeaderContextMenu] = useState(null);
+
 
   useEffect(() => {
     dragItemRef.current = dragItem;
@@ -502,6 +511,30 @@ const AppKanban = () => {
     }
   };
 
+  const handleRename = async (context) => {
+    const { cid } = context;
+    const currname = rowData.find(item => item.id === cid)?.Name || "";
+    const name = prompt("Enter new name:", currname);
+    if (name) {
+      // Update the nodes in rowData
+      const updatedRowData = rowData.map(row =>
+        row.id === cid ? { ...row, Name: name } : row
+      );
+      setRowData(updatedRowData);
+      handleWriteBack(updatedRowData);
+      toast.success("Node(s) renamed successfully!");
+      requestRefreshChannel();
+    }
+  }
+
+  const handleSelect = async (context) => {
+    const { cid } = context;
+    console.log("Selecting ", cid)
+    const channel = new BroadcastChannel('selectNodeChannel');
+    channel.postMessage({ nodeId:cid });
+    channel.close();
+  }
+
   // Remove a layer tag from a child in a source
   const handleRemove = async (context) => {
     const { sourceId, cid, layer } = context;
@@ -530,9 +563,20 @@ const AppKanban = () => {
     requestRefreshChannel();
   };
 
+  // Column header context menu
   const handleColumnContextMenu = (e, layer) => {
     e.preventDefault();
     setColumnContextMenu({ x: e.clientX, y: e.clientY, layer });
+  };
+
+  // Row header context menu
+  const handleRowHeaderContextMenu = (e, sourceId) => {
+    e.preventDefault();
+    setRowHeaderContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      cid: sourceId,
+    });
   };
 
   const handleColumnFlip = async (layer) => {
@@ -701,6 +745,27 @@ const AppKanban = () => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
+  useEffect(() => {
+    if (!rowHeaderContextMenu) return;
+    const handleClick = () => setRowHeaderContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [rowHeaderContextMenu]);
+
+  // Add this function inside AppKanban, before the return statement
+  const handleCellContextMenu = (e, { sourceId, layer, item }) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      sourceId,
+      layer,
+      cid: item.id.toString(),
+      rowData,
+      setRowData
+    });
+  };
+
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
@@ -755,6 +820,7 @@ const AppKanban = () => {
               <div className="overflow-x-auto overflow-y-auto w-full h-full" style={{ maxHeight: "600px" }}>
                 <TableLayersAsColumns
                   rowData={rowData}
+                  setRowData={setRowData}
                   filteredSources={filteredSources}
                   activeLayers={columns}
                   childrenMap={childrenMap}
@@ -768,6 +834,8 @@ const AppKanban = () => {
                   ctrlDragging={ctrlDragging}
                   flipped={flipped} // <-- Add this line
                   onColumnContextMenu={handleColumnContextMenu}
+                  handleRowHeaderContextMenu={handleRowHeaderContextMenu}
+                  handleCellContextMenu={handleCellContextMenu}
                 />
               </div>
             </div>
@@ -803,6 +871,7 @@ const AppKanban = () => {
         <ContextMenu
           contextMenu={contextMenu}
           setContextMenu={setContextMenu}
+          handleRename={handleRename}
           handleRemove={handleRemove}
           handleRemoveLayer={handleRemoveLayer}
           handleRemoveSource={handleRemoveSource}
@@ -813,6 +882,14 @@ const AppKanban = () => {
           contextMenu={columnContextMenu}
           setContextMenu={setColumnContextMenu}
           handleFlip={handleColumnFlip}
+        />
+      )}
+      {rowHeaderContextMenu && (
+        <RowContextMenu
+          contextMenu={rowHeaderContextMenu}
+          setContextMenu={setRowHeaderContextMenu}
+          handleRename={handleRename}
+          handleSelect={handleSelect}
         />
       )}
     </div>
