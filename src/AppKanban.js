@@ -383,7 +383,7 @@ function Header(props) {
           onClick={props.onFlip}
           title="Flip row/column relationship"
         >
-          Flip
+          {props.flipped ? "Flip (flipped)" : "Flip"}
         </button>
       </div>
       <div className="flex items-center gap-2">
@@ -415,7 +415,7 @@ const AppKanban = () => {
     selectedContentLayer,
     setSelectedContentLayer,
     contentLayerOptions = [],
-    flipped, 
+    flipped,
     setFlipped
 
   } = useMatrixLogic();
@@ -428,7 +428,7 @@ const AppKanban = () => {
   const [contextMenu, setContextMenu] = useState(null);
   const [columnContextMenu, setColumnContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
-  
+
   useEffect(() => {
     dragItemRef.current = dragItem;
   }, [dragItem]);
