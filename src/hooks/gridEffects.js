@@ -88,7 +88,7 @@ export const useImportButtonEffect = (setIsLoadModalOpen, setMerge) => {
     useButtonEffect("importContainersButton", handleOpenImportModal, [handleOpenImportModal]);
 };
 
-export const useSaveButtonEffect = (saveData, currentContainer) => {
+export const useSaveButtonEffect = (saveData, currentContainer, setCurrentContainer) => {
     const handleSaveClick = useCallback(async () => {
         // Check if there are any containers in the backend
         const response = await fetchContainers();
@@ -103,8 +103,9 @@ export const useSaveButtonEffect = (saveData, currentContainer) => {
         const name = prompt("Enter a name for the save:", currentContainer);
         if (name) {
             saveData(name);
+            setCurrentContainer(name);
         }
-    }, [saveData, currentContainer]);
+    }, [saveData, currentContainer, setCurrentContainer]);
 
     useButtonEffect("saveContainersButton", handleSaveClick, [handleSaveClick]);
 };

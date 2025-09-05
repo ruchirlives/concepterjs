@@ -237,7 +237,7 @@ const App = () => {
   useAddRowButton(handleAddRow);
   useLoadButtonEffect(setLoadModalOpen, setMerge);
   useImportButtonEffect(setLoadModalOpen, setMerge);
-  useSaveButtonEffect(saveData, currentContainer);
+  useSaveButtonEffect(saveData, currentContainer, setCurrentContainer);
   useDropDownEffect();
   useClearButtonEffect(setRowData, setCurrentContainer);
   // useModalButtonEffect(setModalOpen); // Pass modal state updater to the hook
