@@ -161,7 +161,7 @@ function TableLayersAsColumns(props) {
     <table className="table-auto border-collapse border border-gray-300 w-full">
       <thead>
         <tr>
-          <th className="sticky top-0 left-0 z-10 bg-gray-100 p-2 border border-gray-300" />
+          <th className="sticky top-0 left-0 z-5 bg-gray-100 p-2 border border-gray-300" />
           {props.activeLayers.map(layer => (
             <th
               key={layer}
@@ -177,7 +177,7 @@ function TableLayersAsColumns(props) {
         {props.filteredSources.map(source => (
           <tr key={source.id}>
             <th
-              className="sticky left-0 z-10 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+              className="sticky left-0 z-5 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
               style={{
                 minWidth: 120,
                 maxWidth: 200,
