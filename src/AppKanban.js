@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
@@ -156,21 +156,23 @@ function RowContextMenu(props) {
   );
 }
 
-// Utility: assign a visually distinct background color to each item ID
+// Utility: assign a visually distinct background color to each item ID (with memoized cache)
+const __colorCache = new Map();
 function getColorForId(id) {
-  // Hash the id to a number
+  if (__colorCache.has(id)) return __colorCache.get(id);
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
   }
-  // Use hash to pick a hue (0-360), faded saturation (30-45%), and high lightness (85-95%)
   const hue = Math.abs(hash) % 360;
-  const sat = 30 + (Math.abs(hash * 13) % 15); // 30-45%
-  const light = 85 + (Math.abs(hash * 7) % 10); // 85-95%
-  return `hsl(${hue}, ${sat}%, ${light}%)`;
+  const sat = 30 + (Math.abs(hash * 13) % 15);
+  const light = 85 + (Math.abs(hash * 7) % 10);
+  const color = `hsl(${hue}, ${sat}%, ${light}%)`;
+  __colorCache.set(id, color);
+  return color;
 }
 
-function TableLayersAsColumns(props) {
+const TableLayersAsColumns = React.memo(function TableLayersAsColumns(props) {
 
   return (
     <table className="table-auto border-collapse border border-gray-300 w-full">
@@ -204,17 +206,24 @@ function TableLayersAsColumns(props) {
               {source.Name}
             </th>
             {props.activeLayers.map(layer => {
-              let items = [];
-              if (!props.flipped) {
-                items = (props.childrenMap[source.id] || [])
-                  .map(cid => props.rowData.find(r => r.id.toString() === cid))
-                  .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
-              } else {
-                items = props.rowData.filter(row =>
-                  (props.childrenMap[row.id] || []).includes(source.id.toString()) &&
-                  (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
-                );
-              }
+              // Prefer precomputed itemsByCell for efficiency; fallback to on-the-fly computation
+              let items =
+                props.itemsByCell &&
+                props.itemsByCell[source.id] &&
+                props.itemsByCell[source.id][layer]
+                  ? props.itemsByCell[source.id][layer]
+                  : (() => {
+                      if (!props.flipped) {
+                        return (props.childrenMap[source.id] || [])
+                          .map(cid => props.rowData.find(r => r.id.toString() === cid))
+                          .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
+                      } else {
+                        return props.rowData.filter(row =>
+                          (props.childrenMap[row.id] || []).includes(source.id.toString()) &&
+                          (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
+                        );
+                      }
+                    })();
 
               return (
                 <td
@@ -277,7 +286,7 @@ function TableLayersAsColumns(props) {
       </tbody>
     </table>
   );
-}
+});
 
 function Header(props) {
   const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
@@ -436,6 +445,8 @@ const AppKanban = () => {
   const [columnContextMenu, setColumnContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null); // { from: {x, y}, to: {x, y} }
   const [rowHeaderContextMenu, setRowHeaderContextMenu] = useState(null);
+  const [manualMouseTracking, setManualMouseTracking] = useState(false);
+  const rafIdRef = useRef(null);
 
 
   useEffect(() => {
@@ -450,25 +461,79 @@ const AppKanban = () => {
   const columns = (selectedLayers && selectedLayers.length > 0) ? selectedLayers : layerOptions;
   const removeChildFromLayer = removeFromLayer(setRowData);
 
+  // Memoized helpers for quick lookup and tag checks
+  const rowById = useMemo(() => {
+    const m = new Map();
+    (rowData || []).forEach(r => m.set(r.id.toString(), r));
+    return m;
+  }, [rowData]);
+
+  const tagsById = useMemo(() => {
+    const m = new Map();
+    (rowData || []).forEach(r => {
+      const set = new Set((r.Tags || "").split(",").map(t => t.trim()).filter(Boolean));
+      m.set(r.id.toString(), set);
+    });
+    return m;
+  }, [rowData]);
+
+  // Precompute items per visible cell [sourceId][layer]
+  const itemsByCell = useMemo(() => {
+    const result = {};
+    const layerSet = new Set(columns || []);
+
+    if (!flipped) {
+      (filteredSources || []).forEach(source => {
+        const sid = source.id.toString();
+        if (!result[sid]) result[sid] = {};
+        const childIds = (childrenMap[sid] || []);
+        const children = childIds.map(cid => rowById.get(cid)).filter(Boolean);
+        layerSet.forEach(layer => {
+          result[sid][layer] = children.filter(child => tagsById.get(child.id.toString())?.has(layer));
+        });
+      });
+    } else {
+      // flipped: rows whose children include source.id
+      (filteredSources || []).forEach(source => {
+        const sid = source.id.toString();
+        if (!result[sid]) result[sid] = {};
+      });
+      (rowData || []).forEach(row => {
+        const rid = row.id.toString();
+        const children = new Set(childrenMap[rid] || []);
+        // Row contributes to any source it contains
+        (filteredSources || []).forEach(source => {
+          const sid = source.id.toString();
+          if (children.has(sid)) {
+            layerSet.forEach(layer => {
+              if (tagsById.get(rid)?.has(layer)) {
+                if (!result[sid]) result[sid] = {};
+                if (!result[sid][layer]) result[sid][layer] = [];
+                result[sid][layer].push(row);
+              }
+            });
+          }
+        });
+      });
+      // Ensure empty arrays for missing cells to keep shape predictable
+      (filteredSources || []).forEach(source => {
+        const sid = source.id.toString();
+        layerSet.forEach(layer => {
+          if (!result[sid][layer]) result[sid][layer] = [];
+        });
+      });
+    }
+
+    return result;
+  }, [filteredSources, columns, flipped, childrenMap, rowData, rowById, tagsById]);
+
   // Export to Excel for Kanban (layers as columns)
   const handleExportExcel = useCallback(() => {
     const headers = ["", ...columns];
     const rows = filteredSources.map((source) => {
       const values = [source.Name];
       columns.forEach((layer) => {
-        let children = [];
-        if (!flipped) {
-          // Normal mode: children of source, filtered by layer tag
-          children = (childrenMap[source.id] || [])
-            .map(cid => rowData.find(r => r.id.toString() === cid))
-            .filter(child => child && (child.Tags || "").split(",").map(t => t.trim()).includes(layer));
-        } else {
-          // Flipped mode: rows whose children include source, filtered by layer tag
-          children = rowData.filter(row =>
-            (childrenMap[row.id] || []).includes(source.id.toString()) &&
-            (row.Tags || "").split(",").map(t => t.trim()).includes(layer)
-          );
-        }
+        const children = (itemsByCell?.[source.id]?.[layer]) || [];
         const namesRaw = children.map(child => child.Name).join("\n");
         const names = namesRaw.includes("\n") ? `"${namesRaw}"` : namesRaw;
         values.push(names);
@@ -482,7 +547,7 @@ const AppKanban = () => {
     } else {
       alert(tsv);
     }
-  }, [filteredSources, columns, childrenMap, rowData, flipped]);
+  }, [filteredSources, columns, itemsByCell]);
 
   // Add a child to a source and tag it with a layer
   const handleAddItem = async ({ sourceId, layer }, row) => {
@@ -564,20 +629,20 @@ const AppKanban = () => {
   };
 
   // Column header context menu
-  const handleColumnContextMenu = (e, layer) => {
+  const handleColumnContextMenu = useCallback((e, layer) => {
     e.preventDefault();
     setColumnContextMenu({ x: e.clientX, y: e.clientY, layer });
-  };
+  }, []);
 
   // Row header context menu
-  const handleRowHeaderContextMenu = (e, sourceId) => {
+  const handleRowHeaderContextMenu = useCallback((e, sourceId) => {
     e.preventDefault();
     setRowHeaderContextMenu({
       x: e.clientX,
       y: e.clientY,
       cid: sourceId,
     });
-  };
+  }, []);
 
   const handleColumnFlip = async (layer) => {
     for (const source of filteredSources) {
@@ -616,7 +681,7 @@ const AppKanban = () => {
   };
 
   // Move child to new source if needed, but do NOT remove from previous cell (allow multi-cell presence)
-  const handleDrop = async ({ fromSource, fromLayer, cid, toSource, toLayer }) => {
+  const handleDrop = useCallback(async ({ fromSource, fromLayer, cid, toSource, toLayer }) => {
     if (!cid || !toSource || !toLayer) return;
 
     if (!flipped) {
@@ -656,9 +721,9 @@ const AppKanban = () => {
         setRowData([...rowData]);
       }
     }
-  };
+  }, [flipped, childrenMap, rowData, setRowData]);
 
-  const handleDragStart = (child, sourceId, layer, event) => {
+  const handleDragStart = useCallback((child, sourceId, layer, event) => {
     if (event.ctrlKey) {
       setCtrlDragging(true);
       setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: true });
@@ -669,10 +734,11 @@ const AppKanban = () => {
       setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: false });
       setDragLine(null);
     }
-  };
+  }, []);
 
-  const handleCtrlMouseDown = (child, sourceId, layer, event) => {
+  const handleCtrlMouseDown = useCallback((child, sourceId, layer, event) => {
     setCtrlDragging(true);
+    setManualMouseTracking(true);
     setDragItem({ cid: child.id.toString(), fromSource: sourceId, fromLayer: layer, ctrl: true });
 
     // Use the actual element under the mouse
@@ -682,11 +748,16 @@ const AppKanban = () => {
 
     // Start listening for mousemove and mouseup
     const handleMouseMove = (e) => {
-      setDragLine(line => line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line);
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine(line => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
+        rafIdRef.current = null;
+      });
     };
     const handleMouseUp = (e) => {
       setCtrlDragging(false);
       setDragLine(null);
+      setManualMouseTracking(false);
 
       const elem = document.elementFromPoint(e.clientX, e.clientY);
       if (elem && elem.dataset && elem.dataset.kanbanItemId) {
@@ -703,7 +774,7 @@ const AppKanban = () => {
     };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-  };
+  }, [relationships, rowData]);
 
   // NEW: Get the center position of a kanban item by child ID
   const getItemCenter = (childId) => {
@@ -723,13 +794,17 @@ const AppKanban = () => {
   }, []);
 
   useEffect(() => {
-    if (!ctrlDragging || !dragLine) return;
+    if (!ctrlDragging || !dragLine || manualMouseTracking) return;
     const handleMouseMove = (e) => {
-      setDragLine(line => line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line);
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine(line => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
+        rafIdRef.current = null;
+      });
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [ctrlDragging, dragLine]);
+  }, [ctrlDragging, dragLine, manualMouseTracking]);
 
   useEffect(() => {
     if (!ctrlDragging) {
@@ -753,7 +828,7 @@ const AppKanban = () => {
   }, [rowHeaderContextMenu]);
 
   // Add this function inside AppKanban, before the return statement
-  const handleCellContextMenu = (e, { sourceId, layer, item }) => {
+  const handleCellContextMenu = useCallback((e, { sourceId, layer, item }) => {
     e.preventDefault();
     setContextMenu({
       x: e.clientX,
@@ -764,7 +839,7 @@ const AppKanban = () => {
       rowData,
       setRowData
     });
-  };
+  }, [rowData, setRowData]);
 
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
@@ -824,6 +899,7 @@ const AppKanban = () => {
                   filteredSources={filteredSources}
                   activeLayers={columns}
                   childrenMap={childrenMap}
+                  itemsByCell={itemsByCell}
                   setEditingKey={setEditingKey}
                   dragItem={dragItem}
                   setDragItem={setDragItem}
@@ -832,7 +908,7 @@ const AppKanban = () => {
                   handleDragStart={handleDragStart}
                   handleCtrlMouseDown={handleCtrlMouseDown}
                   ctrlDragging={ctrlDragging}
-                  flipped={flipped} // <-- Add this line
+                  flipped={flipped}
                   onColumnContextMenu={handleColumnContextMenu}
                   handleRowHeaderContextMenu={handleRowHeaderContextMenu}
                   handleCellContextMenu={handleCellContextMenu}
