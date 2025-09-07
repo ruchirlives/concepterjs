@@ -4,18 +4,20 @@ import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
 // Build ancestry tree as flat array: [{id, level, label}, ...]
-function buildAncestryTree(nodeId, parentMap, nameById, childrenMap, maxDepth = 6) {
+function buildAncestryTree(nodeId, parentMap, nameById, childrenMap, maxDepth = 6, startingLevel=0) {
   const tree = [];
 
   // Step 1: Add root item at level 0
-  tree.push({
-    id: nodeId,
-    level: 0,
-    label: nameById[nodeId] || nodeId
-  });
+  if (startingLevel === 0) {
+    tree.push({
+      id: nodeId,
+      level: 0,
+      label: nameById[nodeId] || nodeId
+    });
+  }
 
   // Step 2: Build levels iteratively
-  for (let level = 0; level < maxDepth; level++) {
+  for (let level = startingLevel; level < maxDepth; level++) {
     // Get all items at current level
     const currentLevelItems = tree.filter(item => item.level === level);
 
