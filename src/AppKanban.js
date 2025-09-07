@@ -594,10 +594,11 @@ const AppKanban = () => {
 
   const handleSelect = async (context) => {
     const { cid } = context;
-    console.log("Selecting ", cid)
+    console.log("Selecting ", cid);
     const channel = new BroadcastChannel('selectNodeChannel');
-    channel.postMessage({ nodeId:cid });
-    channel.close();
+    channel.postMessage({ nodeId: cid });
+    // Add a small delay before closing to ensure message is sent
+    setTimeout(() => channel.close(), 10);
   }
 
   // Remove a layer tag from a child in a source

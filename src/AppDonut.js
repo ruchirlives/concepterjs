@@ -3,50 +3,108 @@ import { AgCharts } from "ag-charts-react";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
-// Converts chartData to arrays for each donut ring
-function getDonutSeriesData(chartData) {
-  const rings = [];
-  
-  // First pass: collect all unique names at each level to create dynamic keys
-  const levelNames = [];
-  chartData.forEach(({ orgHierarchy }) => {
-    orgHierarchy.forEach((name, i) => {
-      if (!levelNames[i]) levelNames[i] = new Set();
-      levelNames[i].add(name);
-    });
-  });
-  
-  // Create dynamic ring keys based on the most common/first name at each level
-  // or use generic names like "level0", "level1", etc.
-  const ringKeys = levelNames.map((nameSet, i) => {
-    // You can customize this logic:
-    // Option 1: Use the first name at each level (good for consistent hierarchy)
-    const firstName = Array.from(nameSet)[0];
-    if (firstName && firstName.length > 20) {
-      return `level${i}`; // Use generic name if the name is too long
+// Helper function to find direct parent of a node
+function findDirectParent(nodeId, childrenMap) {
+  for (const [parentId, children] of Object.entries(childrenMap)) {
+    if (children.includes(nodeId)) {
+      return parentId;
     }
-    return firstName ? firstName.toLowerCase().replace(/\s+/g, '') : `level${i}`;
-    
-    // Option 2: Just use generic level names
-    // return `level${i}`;
-  });
-  
-  // Second pass: build the rings data
-  chartData.forEach(({ orgHierarchy, value }) => {
-    orgHierarchy.forEach((name, i) => {
-      if (!rings[i]) rings[i] = {};
-      if (!rings[i][name]) {
-        rings[i][name] = { value: 0 };
+  }
+  return null;
+}
+
+// Converts data to hierarchical donut ring structure with proper angular constraints
+function getDonutSeriesData(startNodeId, childrenMap, nameById) {
+  if (!startNodeId || !childrenMap || !nameById) return [];
+
+  const rings = [];
+  let currentLevelNodes = [{ nodeId: startNodeId, parentId: null, parentAngle: 0, parentArc: 360 }];
+  const maxRings = 5;
+  let ringIndex = 0;
+  const processedNodes = new Set();
+
+  while (currentLevelNodes.length > 0 && ringIndex < maxRings) {
+    const newNodes = currentLevelNodes.filter(node => !processedNodes.has(node.nodeId));
+    if (newNodes.length === 0) break;
+
+    const ringData = [];
+
+    // Group nodes by their parent to handle angular constraints
+    const nodesByParent = new Map();
+    newNodes.forEach(node => {
+      const parentKey = node.parentId || 'root';
+      if (!nodesByParent.has(parentKey)) {
+        nodesByParent.set(parentKey, []);
       }
-      rings[i][name].value += value;
+      nodesByParent.get(parentKey).push(node);
     });
-  });
-  
-  return rings.map((ring, i) => {
-    const key = ringKeys[i] || `level${i}`;
-    return Object.entries(ring).map(([name, obj]) => ({
-      [key]: name.length > 30 ? name.substring(0, 30) + "..." : name, // <-- Truncate long names
-      value: obj.value,
+
+    // Calculate angles for each parent group
+    nodesByParent.forEach((siblings, parentKey) => {
+      const parentArc = siblings[0].parentArc || 360;
+      const parentAngle = siblings[0].parentAngle || 0;
+      const arcPerSibling = parentArc / siblings.length;
+
+      siblings.forEach((node, siblingIndex) => {
+        const nodeName = nameById[node.nodeId] || node.nodeId;
+        const startAngle = parentAngle + (siblingIndex * arcPerSibling);
+        const endAngle = startAngle + arcPerSibling;
+
+        ringData.push({
+          nodeId: node.nodeId,
+          name: nodeName,
+          value: 1,
+          parentId: node.parentId,
+          startAngle: startAngle,
+          endAngle: endAngle,
+          arc: arcPerSibling
+        });
+
+        processedNodes.add(node.nodeId);
+      });
+    });
+
+    rings.push(ringData);
+
+    // Find parents for next ring level with their angular constraints
+    const parentNodes = [];
+    newNodes.forEach(node => {
+      Object.entries(childrenMap).forEach(([parentId, children]) => {
+        if (children.includes(node.nodeId) && !processedNodes.has(parentId)) {
+          // Find the angular constraints for this parent
+          const nodeData = ringData.find(r => r.nodeId === node.nodeId);
+          parentNodes.push({
+            nodeId: parentId,
+            parentId: findDirectParent(parentId, childrenMap),
+            parentAngle: nodeData ? nodeData.startAngle : 0,
+            parentArc: nodeData ? nodeData.arc : 360
+          });
+        }
+      });
+    });
+
+    // Remove duplicates while preserving angular info
+    const uniqueParents = [];
+    const seenParents = new Set();
+    parentNodes.forEach(parent => {
+      if (!seenParents.has(parent.nodeId)) {
+        seenParents.add(parent.nodeId);
+        uniqueParents.push(parent);
+      }
+    });
+
+    currentLevelNodes = uniqueParents;
+    ringIndex++;
+  }
+
+  // Convert to AG Charts format with proper angular data
+  return rings.map((ringData, i) => {
+    const key = `level${i}`;
+    return ringData.map(({ name, value, startAngle, endAngle }) => ({
+      [key]: name && name.length > 25 ? name.substring(0, 25) + "..." : name || "Unknown",
+      value: value,
+      startAngle: startAngle,
+      endAngle: endAngle,
     }));
   });
 }
@@ -56,100 +114,87 @@ const AppDonut = ({ targetId }) => {
   const { childrenMap, nameById } = useMatrixLogic();
 
   const [id, setId] = useState(
-    targetId || (rowData.length > 0 ? rowData[0].id.toString() : "")
+    targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
   );
 
   useEffect(() => {
-    const channel = new BroadcastChannel("rowSelectChannel");
-    const handler = (event) => {
-      if (event?.data?.nodeId) {
-        setId(event.data.nodeId.toString());
+    const channel = new BroadcastChannel('selectNodeChannel');
+
+    channel.onmessage = (event) => {
+      console.log("AppDonut received:", event.data);
+      const { nodeId } = event.data;
+      if (nodeId) {
+        setId(nodeId.toString());
       }
     };
-    channel.addEventListener("message", handler);
-    return () => {
-      channel.close();
-    };
+
+    return () => channel.close();
   }, []);
 
-  const chartData = useMemo(() => {
-    if (!id) return [];
-
-    const buildPaths = (currentId, path = []) => {
-      const label = nameById?.[currentId] || currentId;
-      const newPath = [...path, label];
-      const parents = Object.entries(childrenMap)
-        .filter(([pid, childList]) => childList.includes(currentId))
-        .map(([pid]) => pid);
-
-      if (parents.length === 0) {
-        return [{ orgHierarchy: newPath.reverse(), value: 1 }];
-      }
-
-      return parents.flatMap((pid) => buildPaths(pid, newPath));
-    };
-
-    return buildPaths(id);
+  // Convert to series data for each donut ring
+  const donutRings = useMemo(() => {
+    console.log("Building donut rings for id:", id);
+    if (!id || !childrenMap || !nameById) {
+      console.log("Missing data:", { id, hasChildrenMap: !!childrenMap, hasNameById: !!nameById });
+      return [];
+    }
+    try {
+      return getDonutSeriesData(id, childrenMap, nameById);
+    } catch (error) {
+      console.error("Error building donut rings:", error);
+      return [];
+    }
   }, [id, childrenMap, nameById]);
-
-  // Convert chartData to series data for each donut ring
-  const donutRings = useMemo(() => getDonutSeriesData(chartData), [chartData]);
 
   // Build series dynamically based on available rings
   const series = useMemo(() => {
-    // Extract the dynamic ring keys from the data
-    const ringKeys = donutRings.map((ringData, i) => {
-      if (ringData.length > 0) {
-        // Get the key from the first data item (excluding 'value')
-        const keys = Object.keys(ringData[0]).filter(k => k !== 'value');
-        return keys[0] || `level${i}`;
-      }
-      return `level${i}`;
-    });
-    
+    console.log("Donut rings:", donutRings.length, "rings");
+
+    if (!donutRings || donutRings.length === 0) {
+      return [];
+    }
+
     return donutRings.map((ringData, i) => {
-      if (ringData.length === 0) return null;
-      
-      const labelKey = ringKeys[i];
-      const numRings = donutRings.filter(ring => ring.length > 0).length;
-      
-      // Calculate ring ratios dynamically based on number of rings
-      const outerRatio = 1 - (i * 0.8 / numRings);
-      const innerRatio = Math.max(0, outerRatio - (0.8 / numRings));
-      
+      if (!ringData || ringData.length === 0) return null;
+
+      const labelKey = `level${i}`;
+      const numRings = donutRings.filter(ring => ring && ring.length > 0).length;
+
+      // Calculate ring ratios - center (i=0) is selected node, outer rings are parents
+      const outerRatio = Math.min(1, 0.2 + ((i + 1) * 0.8 / numRings));
+      const innerRatio = i === 0 ? 0 : Math.max(0, 0.2 + (i * 0.8 / numRings));
+
       const seriesConfig = {
         data: ringData,
         type: "donut",
         angleKey: "value",
         outerRadiusRatio: outerRatio,
         innerRadiusRatio: innerRatio,
-        fillOpacity: 0.6 + (i * 0.1),
-        // sectorLabelKey: labelKey,
-        // sectorLabel: {
-        //   color: "white",
-        //   fontWeight: "bold",  
-        //   fontSize: 10,
-        //   rotation: "tangential", // or "tangential" for different curve behavior
-        //   avoidCollisions: false,
-        //   // You can also try:
-        //   // rotation: "tangential", // Alternative curve style
-        //   // offset: 10, // Push text toward outer edge of ring
-        //   // textAlign: "center", // Center text within the segment
-        // },
+        fillOpacity: Math.min(1, 0.6 + (i * 0.1)),
       };
 
-      // Use callout for outer rings, curved sector labels for inner rings
+      // Add angular constraints if available
+      if (ringData[0] && ringData[0].startAngle !== undefined) {
+        seriesConfig.startAngleKey = "startAngle";
+        seriesConfig.endAngleKey = "endAngle";
+      }
+
+      // Use different label strategies based on ring
       if (i === 0) {
-        seriesConfig.calloutLabelKey = labelKey;
-        seriesConfig.calloutLabel = { offset: 15, fontSize: 11 };
-      } else {
+        // Center ring - use sector labels
         seriesConfig.sectorLabelKey = labelKey;
         seriesConfig.sectorLabel = {
           color: "white",
           fontWeight: "bold",
-          fontSize: 10,
-          rotation: "auto",
-          avoidCollisions: false,
+          fontSize: 12,
+        };
+      } else {
+        // Outer rings - use callout labels
+        seriesConfig.calloutLabelKey = labelKey;
+        seriesConfig.calloutLabel = {
+          offset: 10 + (i * 3),
+          fontSize: Math.max(8, 9 + (i * 1)),
+          avoidCollisions: true
         };
       }
 
@@ -159,17 +204,28 @@ const AppDonut = ({ targetId }) => {
 
   const options = {
     title: {
-      text: "Hierarchy Donut Chart",
+      text: "Hierarchy Chart",
+    },
+    subtitle: {
+      text: `Center: ${nameById?.[id] || id || "No selection"}`,
     },
     series,
     legend: { enabled: false },
-    // Make the chart fill more of the container
     width: 700,
     height: 700,
   };
 
+  if (!id) {
+    return (
+      <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}>
+        <h2 className="font-semibold mb-2">Donut View</h2>
+        <p>No node selected</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}> {/* Increased from 500x500 */}
+    <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}>
       <h2 className="font-semibold mb-2">Donut View</h2>
       <AgCharts options={options} />
     </div>
