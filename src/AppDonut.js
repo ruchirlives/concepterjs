@@ -4,7 +4,7 @@ import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
 // Build ancestry tree as flat array: [{id, level, label}, ...]
-function buildAncestryTree(nodeId, parentMap, nameById, childrenMap, maxDepth = 6, startingLevel=0) {
+function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel=0) {
   const tree = [];
 
   // Step 1: Add root item at level 0
@@ -39,10 +39,10 @@ function buildAncestryTree(nodeId, parentMap, nameById, childrenMap, maxDepth = 
     }
 
     // Actually, let's use parentMap directly
-    const parentId = parentMap[firstItem.id];
-    if (parentId) {
-      parentIds.push(parentId);
-    }
+    // const parentId = parentMap[firstItem.id];
+    // if (parentId) {
+    //   parentIds.push(parentId);
+    // }
 
     // Add parents as next level
     parentIds.forEach(parentId => {
@@ -84,17 +84,6 @@ const AppDonut = ({ targetId }) => {
     return () => channel.close();
   }, []);
 
-  // Build parent map: childId -> parentId
-  const parentMap = useMemo(() => {
-    const map = {};
-    Object.entries(childrenMap || {}).forEach(([parentId, children]) => {
-      children.forEach(childId => {
-        map[childId] = parentId;
-      });
-    });
-    return map;
-  }, [childrenMap]);
-
   // Build the donut tree whenever id changes
   useEffect(() => {
     // Determine which node to use as the root
@@ -106,9 +95,9 @@ const AppDonut = ({ targetId }) => {
     }
 
     // Build ancestry tree starting from the determined root node
-    const tree = buildAncestryTree(rootNodeId, parentMap, nameById, childrenMap);
+    const tree = buildAncestryTree(rootNodeId, nameById, childrenMap);
     setDonutTree(tree);
-  }, [id, focusedNodeId, parentMap, nameById, childrenMap]);
+  }, [id, focusedNodeId, nameById, childrenMap]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
