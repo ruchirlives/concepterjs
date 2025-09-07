@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { Sunburst } from "@ant-design/plots";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
@@ -7,7 +7,24 @@ const AppDonut = ({ targetId }) => {
   const { rowData } = useAppContext();
   const { childrenMap, nameById } = useMatrixLogic();
 
-  const id = targetId || (rowData.length > 0 ? rowData[0].id.toString() : "");
+  // Use state for id so it can be updated by BroadcastChannel
+  const [id, setId] = useState(
+    targetId || (rowData.length > 0 ? rowData[0].id.toString() : "")
+  );
+
+  // Subscribe to rowSelectChannel
+  useEffect(() => {
+    const channel = new BroadcastChannel("rowSelectChannel");
+    const handler = (event) => {
+      if (event?.data?.nodeId) {
+        setId(event.data.nodeId.toString());
+      }
+    };
+    channel.addEventListener("message", handler);
+    return () => {
+      channel.close();
+    };
+  }, []);
 
   const data = useMemo(() => {
     if (!id) return { name: "", children: [] };
@@ -41,11 +58,14 @@ const AppDonut = ({ targetId }) => {
     };
   }, [id, childrenMap, nameById]);
 
+  console.log("Donut data", data);
+
+
   const config = {
     data,
     innerRadius: 0.2,
     label: {
-      content: "name",
+      content: (datum) => "datum.name", // Only use datum.name
       style: {
         fontSize: 10,
       },

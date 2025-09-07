@@ -15,6 +15,7 @@ const AppMatrix = React.lazy(() => import('./AppMatrix'));
 const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
+const AppDonut = React.lazy(() => import('./AppDonut'));
 // const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
 // Memoize the components that don't depend on state
@@ -37,12 +38,10 @@ const MemoizedStaticContent = React.memo(() => (
         <AppState />
       </Suspense>
     </section>
-{/* 
-    <section id="wordcloud">
-      <Suspense fallback={<div>Loading word cloud...</div>}>
-        <AppWordcloud />
-      </Suspense>
-    </section> */}
+
+    <section id="donut">
+      <AppDonut />
+    </section>
 
     <section id="tiptap">
       <Suspense fallback={<div>Loading editor...</div>}>
@@ -55,7 +54,6 @@ const MemoizedStaticContent = React.memo(() => (
         <AppMermaid />
       </Suspense>
     </section>
-
   </>
 ));
 
