@@ -3,26 +3,61 @@ import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
-// 1. Build a tree from your data
-function buildTree(nodeId, childrenMap, nameById, processed = new Set(), maxDepth = 6, depth = 0) {
-  if (!nodeId || processed.has(nodeId) || depth > maxDepth) return null;
-  processed.add(nodeId);
-  const node = {
+// Build ancestry tree as flat array: [{id, level, label}, ...]
+function buildAncestryTree(nodeId, parentMap, nameById, childrenMap, maxDepth = 6) {
+  const tree = [];
+
+  // Step 1: Add root item at level 0
+  tree.push({
     id: nodeId,
-    name: nameById[nodeId] || nodeId,
-    children: []
-  };
-  // Find children (i.e., nodes for which this node is a parent)
-  const childIds = Object.entries(childrenMap)
-    .filter(([parentId, children]) => parentId === nodeId)
-    .flatMap(([_, children]) => children);
-  node.children = childIds
-    .map(childId => buildTree(childId, childrenMap, nameById, processed, maxDepth, depth + 1))
-    .filter(Boolean);
-  return node;
+    level: 0,
+    label: nameById[nodeId] || nodeId
+  });
+
+  // Step 2: Build levels iteratively
+  for (let level = 0; level < maxDepth; level++) {
+    // Get all items at current level
+    const currentLevelItems = tree.filter(item => item.level === level);
+
+    if (currentLevelItems.length === 0) break;
+
+    // Take the first item of current level
+    const firstItem = currentLevelItems[0];
+
+    // Find all parents of this item
+    const parentIds = [];
+    if (childrenMap[firstItem.id]) {
+      // This is wrong - we want parents, not children
+      // Let's find who has this node as a child
+      Object.entries(childrenMap).forEach(([parentId, children]) => {
+        if (children.includes(firstItem.id)) {
+          parentIds.push(parentId);
+        }
+      });
+    }
+
+    // Actually, let's use parentMap directly
+    const parentId = parentMap[firstItem.id];
+    if (parentId) {
+      parentIds.push(parentId);
+    }
+
+    // Add parents as next level
+    parentIds.forEach(parentId => {
+      // Check if this parent is already in the tree
+      if (!tree.find(item => item.id === parentId)) {
+        tree.push({
+          id: parentId,
+          level: level + 1,
+          label: nameById[parentId] || parentId
+        });
+      }
+    });
+  }
+
+  return tree;
 }
 
-// 2. Use d3.partition to compute angles
 const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
@@ -32,6 +67,8 @@ const AppDonut = ({ targetId }) => {
   const [id, setId] = useState(
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
   );
+  const [focusedNodeId, setFocusedNodeId] = useState(null);
+  const [donutTree, setDonutTree] = useState([]); // New state variable
 
   useEffect(() => {
     const channel = new BroadcastChannel('selectNodeChannel');
@@ -39,15 +76,42 @@ const AppDonut = ({ targetId }) => {
       const { nodeId } = event.data;
       if (nodeId) {
         setId(nodeId.toString());
+        setFocusedNodeId(null); // Reset focus when changing root
       }
     };
     return () => channel.close();
   }, []);
 
-  const treeData = useMemo(() => {
-    if (!id || !childrenMap || !nameById) return null;
-    return buildTree(id, childrenMap, nameById);
-  }, [id, childrenMap, nameById]);
+  // Build parent map: childId -> parentId
+  const parentMap = useMemo(() => {
+    const map = {};
+    Object.entries(childrenMap || {}).forEach(([parentId, children]) => {
+      children.forEach(childId => {
+        map[childId] = parentId;
+      });
+    });
+    return map;
+  }, [childrenMap]);
+
+  // Build the donut tree whenever id changes
+  useEffect(() => {
+    if (!id || !childrenMap || !nameById) {
+      setDonutTree([]);
+      return;
+    }
+
+    const tree = buildAncestryTree(id, parentMap, nameById, childrenMap);
+    setDonutTree(tree);
+  }, [id, parentMap, nameById, childrenMap]);
+
+  // Rebuild donut tree when focusedNodeId changes
+  useEffect(() => {
+    if (!focusedNodeId || !childrenMap || !nameById) return;
+
+    // Build ancestry tree starting from the focused node
+    const tree = buildAncestryTree(focusedNodeId, parentMap, nameById, childrenMap);
+    setDonutTree(tree);
+  }, [focusedNodeId, parentMap, nameById, childrenMap]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
@@ -59,26 +123,106 @@ const AppDonut = ({ targetId }) => {
     return Array.from(tags);
   }, [rowData]);
 
-  // 2. Color scale by tag
+  // 2. Color scale by tag (lighten the colors)
   const colorByTag = useMemo(() => {
+    const pastel = d3.schemePastel1;
+    if (allTags.length <= pastel.length) {
+      return d3.scaleOrdinal().domain(allTags).range(pastel);
+    }
     return d3.scaleOrdinal()
       .domain(allTags)
-      .range(d3.schemeCategory10.concat(d3.schemeSet3, d3.schemePaired));
+      .range(allTags.map((_, i) => {
+        const c = d3.color(d3.interpolateRainbow(i / allTags.length));
+        c.opacity = 1;
+        const r = Math.round((c.r + 255) / 2);
+        const g = Math.round((c.g + 255) / 2);
+        const b = Math.round((c.b + 255) / 2);
+        return `rgb(${r},${g},${b})`;
+      }));
   }, [allTags]);
 
   // Get the root node's full label
   const rootLabel = useMemo(() => {
-    if (!treeData) return "";
-    return treeData.name || "";
-  }, [treeData]);
+    if (donutTree.length === 0) return "";
+    const rootItem = donutTree.find(item => item.level === 0);
+    return rootItem ? rootItem.label : "";
+  }, [donutTree]);
 
   useEffect(() => {
-    if (!treeData) return;
+    if (donutTree.length === 0) return;
+    console.log("Rendering donut with tree:", donutTree); // DEBUG
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
     const width = 700, height = 700, radius = Math.min(width, height) / 2 - 20;
     const g = svg.append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+    // Group items by level
+    const levels = {};
+    donutTree.forEach(item => {
+      if (!levels[item.level]) levels[item.level] = [];
+      levels[item.level].push(item);
+    });
+
+    // Build proper hierarchy: level 0 → level 1 as children → level 2 as children of first level 1, etc.
+    function buildProperHierarchy() {
+      if (!levels[0] || levels[0].length === 0) return null;
+
+      // Start with level 0 (root)
+      const root = {
+        id: levels[0][0].id,
+        name: levels[0][0].label,
+        level: 0,
+        children: []
+      };
+
+      // Add level 1 items as children of root
+      if (levels[1] && levels[1].length > 0) {
+        root.children = levels[1].map(item => ({
+          id: item.id,
+          name: item.label,
+          level: 1,
+          children: []
+        }));
+
+        // Add level 2 items as children of the first level 1 item
+        if (levels[2] && levels[2].length > 0 && root.children.length > 0) {
+          root.children[0].children = levels[2].map(item => ({
+            id: item.id,
+            name: item.label,
+            level: 2,
+            children: []
+          }));
+
+          // Add level 3 items as children of the first level 2 item
+          if (levels[3] && levels[3].length > 0 && root.children[0].children.length > 0) {
+            root.children[0].children[0].children = levels[3].map(item => ({
+              id: item.id,
+              name: item.label,
+              level: 3,
+              children: []
+            }));
+
+            // Continue for level 4, 5, 6...
+            if (levels[4] && levels[4].length > 0 && root.children[0].children[0].children.length > 0) {
+              root.children[0].children[0].children[0].children = levels[4].map(item => ({
+                id: item.id,
+                name: item.label,
+                level: 4,
+                children: []
+              }));
+            }
+          }
+        }
+      }
+
+      return root;
+    }
+
+    const treeData = buildProperHierarchy();
+    console.log("D3 Hierarchy Data:", treeData); // DEBUG
+
+    if (!treeData) return;
 
     // Convert tree to d3.hierarchy
     const root = d3.hierarchy(treeData)
@@ -104,19 +248,23 @@ const AppDonut = ({ targetId }) => {
       .outerRadius(d => (d.y0 + d.y1) / 2);
 
     // Draw arcs
-    const nodes = root.descendants().filter(d => d.depth > 0);
+    const nodes = root.descendants().filter(d => d.depth >= 0);
 
     g.selectAll("path")
       .data(nodes)
       .enter().append("path")
       .attr("d", arc)
       .attr("fill", d => {
-        // Find the row for this node
         const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
         return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
       })
       .attr("stroke", "#fff")
-      .on("mousemove", function(event, d) {
+      .style("cursor", "pointer")
+      .on("click", function (event, d) {
+        event.stopPropagation();
+        setFocusedNodeId(prev => prev === d.data.id ? null : d.data.id);
+      })
+      .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
           tooltip.style.display = "block";
@@ -125,7 +273,7 @@ const AppDonut = ({ targetId }) => {
           tooltip.textContent = d.data.name;
         }
       })
-      .on("mouseleave", function() {
+      .on("mouseleave", function () {
         const tooltip = tooltipRef.current;
         if (tooltip) {
           tooltip.style.display = "none";
@@ -139,10 +287,8 @@ const AppDonut = ({ targetId }) => {
       .append("path")
       .attr("id", d => `arc-label-${d.data.id}`)
       .attr("d", d => {
-        // Flip path for left-side arcs
         const midAngle = (d.x0 + d.x1) / 2;
         if (midAngle > Math.PI / 2 && midAngle < 3 * Math.PI / 2) {
-          // Reverse path
           return textArc({ ...d, x0: d.x1, x1: d.x0 });
         }
         return textArc(d);
@@ -160,19 +306,19 @@ const AppDonut = ({ targetId }) => {
       .attr("href", d => `#arc-label-${d.data.id}`)
       .attr("startOffset", "5%")
       .style("text-anchor", "left")
-      .style("font-size", "10px") // <-- Add this line
+      .style("font-size", "10px")
       .text(d => {
         const arcLength = Math.abs(d.x1 - d.x0);
         const minArc = 0.35;
         const fontSize = 10;
         const r = (d.y0 + d.y1) / 2;
-        const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.6));
+        const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.7));
         if (arcLength < minArc || estMaxChars < 3) return "";
         let label = d.data.name;
         if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
         return label;
       });
-  }, [treeData, rowData, colorByTag]);
+  }, [donutTree, rowData, colorByTag]); // Changed dependencies
 
   if (!id) {
     return (
@@ -184,19 +330,51 @@ const AppDonut = ({ targetId }) => {
   }
 
   return (
-    <div className="bg-white rounded shadow p-4" style={{ width: 900, height: 800, position: "relative" }}>
+    <div
+      className="bg-white rounded shadow p-4"
+      style={{
+        width: 900,
+        height: 1000,
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center"
+      }}
+    >
       <h2 className="font-semibold mb-2">Donut View (D3)</h2>
-      {/* Root node label at the top */}
       <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
         {rootLabel}
+        {focusedNodeId && (
+          <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
+            Focused on: {nameById[focusedNodeId]}
+          </div>
+        )}
       </div>
+      {focusedNodeId && (
+        <button
+          onClick={() => setFocusedNodeId(null)}
+          style={{
+            marginBottom: "10px",
+            padding: "5px 10px",
+            background: "#f0f0f0",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer"
+          }}
+        >
+          Show All Lineage
+        </button>
+      )}
       <svg
         ref={svgRef}
         width={850}
         height={750}
-        style={{ border: "1px solid #ddd" }}
+        style={{
+          border: "1px solid #ddd",
+          display: "block",
+          margin: "0 auto"
+        }}
       />
-      {/* Tooltip div */}
       <div
         ref={tooltipRef}
         style={{
