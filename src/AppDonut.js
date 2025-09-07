@@ -95,23 +95,18 @@ const AppDonut = ({ targetId }) => {
 
   // Build the donut tree whenever id changes
   useEffect(() => {
-    if (!id || !childrenMap || !nameById) {
+    // Determine which node to use as the root
+    const rootNodeId = focusedNodeId || id;
+
+    if (!rootNodeId || !childrenMap || !nameById) {
       setDonutTree([]);
       return;
     }
 
-    const tree = buildAncestryTree(id, parentMap, nameById, childrenMap);
+    // Build ancestry tree starting from the determined root node
+    const tree = buildAncestryTree(rootNodeId, parentMap, nameById, childrenMap);
     setDonutTree(tree);
-  }, [id, parentMap, nameById, childrenMap]);
-
-  // Rebuild donut tree when focusedNodeId changes
-  useEffect(() => {
-    if (!focusedNodeId || !childrenMap || !nameById) return;
-
-    // Build ancestry tree starting from the focused node
-    const tree = buildAncestryTree(focusedNodeId, parentMap, nameById, childrenMap);
-    setDonutTree(tree);
-  }, [focusedNodeId, parentMap, nameById, childrenMap]);
+  }, [id, focusedNodeId, parentMap, nameById, childrenMap]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
@@ -150,7 +145,6 @@ const AppDonut = ({ targetId }) => {
 
   useEffect(() => {
     if (donutTree.length === 0) return;
-    console.log("Rendering donut with tree:", donutTree); // DEBUG
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
@@ -201,7 +195,6 @@ const AppDonut = ({ targetId }) => {
     }
 
     const treeData = buildProperHierarchy();
-    console.log("D3 Hierarchy Data:", treeData); // DEBUG
 
     if (!treeData) return;
 
