@@ -6,7 +6,6 @@ import { useMatrixLogic } from "./hooks/useMatrixLogic";
 // Build ancestry tree as flat array: [{id, level, label}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
   const tree = [];
-  console.log(`Building ancestry tree for nodeId: ${nodeId}, startingLevel: ${startingLevel}`);
 
   // Step 1: Add root item at level 0
   if (startingLevel === 0) {
@@ -15,16 +14,12 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
       level: 0,
       label: nameById[nodeId] || nodeId
     });
-    console.log(`Added root at level 0:`, tree[tree.length - 1]);
   }
 
   // Step 2: Build levels iteratively
   for (let level = startingLevel; level < maxDepth; level++) {
-    console.log(`Processing level ${level}`);
-    
     // Get all items at current level
     let currentLevelItems = tree.filter(item => item.level === level);
-    console.log(`Items at level ${level}:`, currentLevelItems);
 
     // Special case: if we're at startingLevel > 0 and there are no items yet, add the starting node
     if (currentLevelItems.length === 0 && level === startingLevel && startingLevel > 0) {
@@ -34,21 +29,17 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
         label: nameById[nodeId] || nodeId
       };
       tree.push(startingItem);
-      console.log(`Added starting node at level ${startingLevel}:`, startingItem);
-      
       // Update currentLevelItems to include the node we just added
       currentLevelItems = [startingItem];
     }
 
     // If still no items at this level, break
     if (currentLevelItems.length === 0) {
-      console.log(`Breaking at level ${level} - no items to process`);
       break;
     }
 
     // Take the first item of current level
     const firstItem = currentLevelItems[0];
-    console.log(`Processing first item at level ${level}:`, firstItem);
 
     // Find all parents of this item
     const parentIds = [];
@@ -58,7 +49,6 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
       }
     });
 
-    console.log(`Found ${parentIds.length} parents for ${firstItem.id}:`, parentIds);
 
     // Add parents as next level
     parentIds.forEach(parentId => {
@@ -70,19 +60,15 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
           label: nameById[parentId] || parentId
         };
         tree.push(parentItem);
-        console.log(`Added parent at level ${level + 1}:`, parentItem);
       } else {
-        console.log(`Parent ${parentId} already exists in tree`);
       }
     });
 
     if (parentIds.length === 0) {
-      console.log(`No parents found for ${firstItem.id}, stopping at level ${level}`);
       break;
     }
   }
 
-  console.log(`Final tree:`, tree);
   return tree;
 }
 
@@ -96,19 +82,24 @@ const AppDonut = ({ targetId }) => {
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
   );
   const [focusedNodeId, setFocusedNodeId] = useState(null);
-  const [donutTree, setDonutTree] = useState([]); // New state variable
+  const [donutTree, setDonutTree] = useState([]);
+  const [clickedSegmentId, setClickedSegmentId] = useState(null); // New state for clicked segment
+  const [isInternalClick, setIsInternalClick] = useState(false); // Add this flag
 
   useEffect(() => {
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.onmessage = (event) => {
       const { nodeId } = event.data;
-      if (nodeId) {
+      if (nodeId && !isInternalClick) { // Only respond to external broadcasts
         setId(nodeId.toString());
         setFocusedNodeId(null); // Reset focus when changing root
+        setClickedSegmentId(null); // Clear any clicked segment highlighting
       }
+      // Reset the flag after processing
+      setIsInternalClick(false);
     };
     return () => channel.close();
-  }, []);
+  }, [isInternalClick]);
 
   // Build the donut tree whenever id changes
   useEffect(() => {
@@ -168,18 +159,22 @@ const AppDonut = ({ targetId }) => {
     const clickedId = d.data.id;
     const clickedLevel = d.data.level;
 
-    console.log(`Clicked segment - ID: ${clickedId}, Level: ${clickedLevel}`);
+    // Set flag to indicate this is an internal click
+    setIsInternalClick(true);
+
+    // Broadcast the selected segment's id
+    console.log("Selecting ", clickedId);
+    const channel = new BroadcastChannel('selectNodeChannel');
+    channel.postMessage({ nodeId: clickedId });
+
+    // Set the clicked segment for highlighting
+    setClickedSegmentId(clickedId);
 
     // Step 1: Clear all items with level >= clickedLevel + 1 from donutTree
     const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
 
-    console.log('Original donutTree:', donutTree);
-    console.log('Filtered donutTree (cleared levels beyond clicked level):', filteredTree);
-
     // Step 2: Get the subtree starting from the clicked segment
     const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 6, clickedLevel);
-
-    console.log('Subtree built from clicked segment:', subtree);
 
     // Step 3: Merge the filtered tree with the new subtree
     const mergedTree = [...filteredTree, ...subtree];
@@ -196,8 +191,6 @@ const AppDonut = ({ targetId }) => {
         uniqueTree.unshift(item);
       }
     });
-
-    console.log('Final merged and deduplicated tree:', uniqueTree);
 
     setDonutTree(uniqueTree);
   }, [donutTree, nameById, childrenMap]);
@@ -288,12 +281,25 @@ const AppDonut = ({ targetId }) => {
       .enter().append("path")
       .attr("d", arc)
       .attr("fill", d => {
+        // Check if this is the clicked segment
+        if (d.data.id === clickedSegmentId) {
+          return "#ff4444"; // Strong red color for clicked segment
+        }
+        
+        // Normal coloring for other segments
         const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
         return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
       })
-      .attr("stroke", "#fff")
+      .attr("stroke", d => {
+        // Add a thicker stroke to the clicked segment
+        return d.data.id === clickedSegmentId ? "#cc0000" : "#fff";
+      })
+      .attr("stroke-width", d => {
+        // Thicker stroke for clicked segment
+        return d.data.id === clickedSegmentId ? 3 : 1;
+      })
       .style("cursor", "pointer")
-      .on("click", handleSegmentClick) // Use the new function
+      .on("click", handleSegmentClick)
       .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
@@ -348,7 +354,12 @@ const AppDonut = ({ targetId }) => {
         if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
         return label;
       });
-  }, [donutTree, rowData, colorByTag, handleSegmentClick]); // Dependencies stay the same for now
+  }, [donutTree, rowData, colorByTag, handleSegmentClick, clickedSegmentId]); // Added clickedSegmentId to dependencies
+
+  // Reset clicked segment when changing root
+  useEffect(() => {
+    setClickedSegmentId(null);
+  }, [id]);
 
   if (!id) {
     return (
