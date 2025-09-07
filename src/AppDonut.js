@@ -1,7 +1,31 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { Sunburst } from "@ant-design/plots";
+import { AgCharts } from "ag-charts-react";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
+
+
+// Converts chartData to arrays for each donut ring
+function getDonutSeriesData(chartData) {
+  const rings = [];
+  chartData.forEach(({ orgHierarchy, value }) => {
+    orgHierarchy.forEach((name, i) => {
+      if (!rings[i]) rings[i] = {};
+      if (!rings[i][name]) {
+        rings[i][name] = { value: 0 };
+      }
+      // Add value to every segment in the path, not just the leaf
+      rings[i][name].value += value;
+    });
+  });
+  // Convert objects to arrays with label keys
+  return rings.map((ring, i) => {
+    const key = ["outer", "middle", "inner", "level3", "level4", "level5"][i] || `level${i}`;
+    return Object.entries(ring).map(([name, obj]) => ({
+      [key]: name,
+      value: obj.value,
+    }));
+  });
+}
 
 const AppDonut = ({ targetId }) => {
   const { rowData } = useAppContext();
@@ -26,56 +50,74 @@ const AppDonut = ({ targetId }) => {
     };
   }, []);
 
-  const data = useMemo(() => {
-    if (!id) return { name: "", children: [] };
+  // Convert your hierarchical data to AG Charts flat array format
+  const chartData = useMemo(() => {
+    if (!id) return [];
 
-    const getParents = (childId) => {
-      const parents = [];
-      Object.entries(childrenMap).forEach(([pid, childList]) => {
-        if (childList.includes(childId)) {
-          parents.push(pid);
-        }
-      });
-      return parents;
+    // Helper to recursively build hierarchy paths
+    const buildPaths = (currentId, path = []) => {
+      const label = nameById?.[currentId] || currentId;
+      const newPath = [...path, label];
+      const parents = Object.entries(childrenMap)
+        .filter(([pid, childList]) => childList.includes(currentId))
+        .map(([pid]) => pid);
+
+      if (parents.length === 0) {
+        // Leaf node (top-most ancestor)
+        return [{ orgHierarchy: newPath.reverse(), value: 1 }];
+      }
+
+      // For each parent, continue building the path
+      return parents.flatMap((pid) => buildPaths(pid, newPath));
     };
 
-    const parentIds = getParents(id);
-
-    return {
-      name: nameById?.[id] || id,
-      children: parentIds.map((pid) => {
-        const grandParents = getParents(pid);
-        return {
-          name: nameById?.[pid] || pid,
-          children: grandParents.length
-            ? grandParents.map((gid) => ({
-                name: nameById?.[gid] || gid,
-                value: 1,
-              }))
-            : [{ name: "", value: 1 }],
-        };
-      }),
-    };
+    return buildPaths(id);
   }, [id, childrenMap, nameById]);
 
-  console.log("Donut data", data);
+  // Convert chartData to series data for each donut ring
+  const [outer = [], middle = [], inner = []] = getDonutSeriesData(chartData);
 
-
-  const config = {
-    data,
-    innerRadius: 0.2,
-    label: {
-      content: (datum) => "datum.name", // Only use datum.name
-      style: {
-        fontSize: 10,
-      },
+  // AG Charts Sunburst config
+  const options = {
+    title: {
+      text: "Your Donut Chart",
     },
+    series: [
+      {
+        data: outer,
+        type: "donut",
+        sectorLabelKey: "outer", // <-- use sectorLabelKey for segment labels
+        angleKey: "value",
+        radiusKey: "value",
+        outerRadiusRatio: 0.8,
+        innerRadiusRatio: 0.6,
+        fillOpacity: 0.4,
+      },
+      {
+        data: middle,
+        type: "donut",
+        sectorLabelKey: "middle",
+        angleKey: "value",
+        outerRadiusRatio: 0.6,
+        innerRadiusRatio: 0.4,
+        fillOpacity: 0.6,
+      },
+      {
+        data: inner,
+        type: "donut",
+        sectorLabelKey: "inner",
+        angleKey: "value",
+        outerRadiusRatio: 0.4,
+        innerRadiusRatio: 0,
+      },
+    ],
+    legend: { enabled: false },
   };
 
   return (
-    <div className="bg-white rounded shadow p-4">
+    <div className="bg-white rounded shadow p-4" style={{ width: 500, height: 500 }}>
       <h2 className="font-semibold mb-2">Donut View</h2>
-      <Sunburst {...config} />
+      <AgCharts options={options} />
     </div>
   );
 };
