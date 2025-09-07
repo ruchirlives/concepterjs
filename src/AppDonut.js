@@ -176,45 +176,26 @@ const AppDonut = ({ targetId }) => {
         children: []
       };
 
-      // Add level 1 items as children of root
-      if (levels[1] && levels[1].length > 0) {
-        root.children = levels[1].map(item => ({
+      // Recursive function to add children at each level
+      function addChildrenAtLevel(parentNode, level) {
+        if (!levels[level] || levels[level].length === 0) return;
+
+        // Add all items at this level as children
+        parentNode.children = levels[level].map(item => ({
           id: item.id,
           name: item.label,
-          level: 1,
+          level: level,
           children: []
         }));
 
-        // Add level 2 items as children of the first level 1 item
-        if (levels[2] && levels[2].length > 0 && root.children.length > 0) {
-          root.children[0].children = levels[2].map(item => ({
-            id: item.id,
-            name: item.label,
-            level: 2,
-            children: []
-          }));
-
-          // Add level 3 items as children of the first level 2 item
-          if (levels[3] && levels[3].length > 0 && root.children[0].children.length > 0) {
-            root.children[0].children[0].children = levels[3].map(item => ({
-              id: item.id,
-              name: item.label,
-              level: 3,
-              children: []
-            }));
-
-            // Continue for level 4, 5, 6...
-            if (levels[4] && levels[4].length > 0 && root.children[0].children[0].children.length > 0) {
-              root.children[0].children[0].children[0].children = levels[4].map(item => ({
-                id: item.id,
-                name: item.label,
-                level: 4,
-                children: []
-              }));
-            }
-          }
+        // Recursively add children to the first child (to maintain linear chain)
+        if (parentNode.children.length > 0) {
+          addChildrenAtLevel(parentNode.children[0], level + 1);
         }
       }
+
+      // Start adding children from level 1
+      addChildrenAtLevel(root, 1);
 
       return root;
     }
