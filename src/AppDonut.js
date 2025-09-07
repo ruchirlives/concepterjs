@@ -25,7 +25,7 @@ function buildTree(nodeId, childrenMap, nameById, processed = new Set(), maxDept
 // 2. Use d3.partition to compute angles
 const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
-  const tooltipRef = useRef(); // Add this line
+  const tooltipRef = useRef();
   const { rowData } = useAppContext();
   const { childrenMap, nameById } = useMatrixLogic();
 
@@ -48,6 +48,29 @@ const AppDonut = ({ targetId }) => {
     if (!id || !childrenMap || !nameById) return null;
     return buildTree(id, childrenMap, nameById);
   }, [id, childrenMap, nameById]);
+
+  // 1. Gather all unique tags
+  const allTags = useMemo(() => {
+    if (!rowData) return [];
+    const tags = new Set();
+    rowData.forEach(row => {
+      if (row.Tags) tags.add(row.Tags);
+    });
+    return Array.from(tags);
+  }, [rowData]);
+
+  // 2. Color scale by tag
+  const colorByTag = useMemo(() => {
+    return d3.scaleOrdinal()
+      .domain(allTags)
+      .range(d3.schemeCategory10.concat(d3.schemeSet3, d3.schemePaired));
+  }, [allTags]);
+
+  // Get the root node's full label
+  const rootLabel = useMemo(() => {
+    if (!treeData) return "";
+    return treeData.name || "";
+  }, [treeData]);
 
   useEffect(() => {
     if (!treeData) return;
@@ -87,7 +110,11 @@ const AppDonut = ({ targetId }) => {
       .data(nodes)
       .enter().append("path")
       .attr("d", arc)
-      .attr("fill", d => d3.schemeCategory10[d.depth % 10])
+      .attr("fill", d => {
+        // Find the row for this node
+        const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
+        return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
+      })
       .attr("stroke", "#fff")
       .on("mousemove", function(event, d) {
         const tooltip = tooltipRef.current;
@@ -133,11 +160,11 @@ const AppDonut = ({ targetId }) => {
       .attr("href", d => `#arc-label-${d.data.id}`)
       .attr("startOffset", "5%")
       .style("text-anchor", "left")
-      .style("font-size", "8px") // <-- Add this line
+      .style("font-size", "10px") // <-- Add this line
       .text(d => {
         const arcLength = Math.abs(d.x1 - d.x0);
         const minArc = 0.35;
-        const fontSize = 8;
+        const fontSize = 10;
         const r = (d.y0 + d.y1) / 2;
         const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.6));
         if (arcLength < minArc || estMaxChars < 3) return "";
@@ -145,7 +172,7 @@ const AppDonut = ({ targetId }) => {
         if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
         return label;
       });
-  }, [treeData]);
+  }, [treeData, rowData, colorByTag]);
 
   if (!id) {
     return (
@@ -159,6 +186,10 @@ const AppDonut = ({ targetId }) => {
   return (
     <div className="bg-white rounded shadow p-4" style={{ width: 900, height: 800, position: "relative" }}>
       <h2 className="font-semibold mb-2">Donut View (D3)</h2>
+      {/* Root node label at the top */}
+      <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
+        {rootLabel}
+      </div>
       <svg
         ref={svgRef}
         width={850}
