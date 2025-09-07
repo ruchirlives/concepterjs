@@ -1,115 +1,31 @@
-import React, { useMemo, useEffect, useState } from "react";
-import { AgCharts } from "ag-charts-react";
+import React, { useEffect, useRef, useMemo, useState } from "react";
+import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
-// Helper function to find direct parent of a node
-function findDirectParent(nodeId, childrenMap) {
-  for (const [parentId, children] of Object.entries(childrenMap)) {
-    if (children.includes(nodeId)) {
-      return parentId;
-    }
-  }
-  return null;
+// 1. Build a tree from your data
+function buildTree(nodeId, childrenMap, nameById, processed = new Set(), maxDepth = 6, depth = 0) {
+  if (!nodeId || processed.has(nodeId) || depth > maxDepth) return null;
+  processed.add(nodeId);
+  const node = {
+    id: nodeId,
+    name: nameById[nodeId] || nodeId,
+    children: []
+  };
+  // Find children (i.e., nodes for which this node is a parent)
+  const childIds = Object.entries(childrenMap)
+    .filter(([parentId, children]) => parentId === nodeId)
+    .flatMap(([_, children]) => children);
+  node.children = childIds
+    .map(childId => buildTree(childId, childrenMap, nameById, processed, maxDepth, depth + 1))
+    .filter(Boolean);
+  return node;
 }
 
-// Converts data to hierarchical donut ring structure with proper angular constraints
-function getDonutSeriesData(startNodeId, childrenMap, nameById) {
-  if (!startNodeId || !childrenMap || !nameById) return [];
-
-  const rings = [];
-  let currentLevelNodes = [{ nodeId: startNodeId, parentId: null, parentAngle: 0, parentArc: 360 }];
-  const maxRings = 5;
-  let ringIndex = 0;
-  const processedNodes = new Set();
-
-  while (currentLevelNodes.length > 0 && ringIndex < maxRings) {
-    const newNodes = currentLevelNodes.filter(node => !processedNodes.has(node.nodeId));
-    if (newNodes.length === 0) break;
-
-    const ringData = [];
-
-    // Group nodes by their parent to handle angular constraints
-    const nodesByParent = new Map();
-    newNodes.forEach(node => {
-      const parentKey = node.parentId || 'root';
-      if (!nodesByParent.has(parentKey)) {
-        nodesByParent.set(parentKey, []);
-      }
-      nodesByParent.get(parentKey).push(node);
-    });
-
-    // Calculate angles for each parent group
-    nodesByParent.forEach((siblings, parentKey) => {
-      const parentArc = siblings[0].parentArc || 360;
-      const parentAngle = siblings[0].parentAngle || 0;
-      const arcPerSibling = parentArc / siblings.length;
-
-      siblings.forEach((node, siblingIndex) => {
-        const nodeName = nameById[node.nodeId] || node.nodeId;
-        const startAngle = parentAngle + (siblingIndex * arcPerSibling);
-        const endAngle = startAngle + arcPerSibling;
-
-        ringData.push({
-          nodeId: node.nodeId,
-          name: nodeName,
-          value: 1,
-          parentId: node.parentId,
-          startAngle: startAngle,
-          endAngle: endAngle,
-          arc: arcPerSibling
-        });
-
-        processedNodes.add(node.nodeId);
-      });
-    });
-
-    rings.push(ringData);
-
-    // Find parents for next ring level with their angular constraints
-    const parentNodes = [];
-    newNodes.forEach(node => {
-      Object.entries(childrenMap).forEach(([parentId, children]) => {
-        if (children.includes(node.nodeId) && !processedNodes.has(parentId)) {
-          // Find the angular constraints for this parent
-          const nodeData = ringData.find(r => r.nodeId === node.nodeId);
-          parentNodes.push({
-            nodeId: parentId,
-            parentId: findDirectParent(parentId, childrenMap),
-            parentAngle: nodeData ? nodeData.startAngle : 0,
-            parentArc: nodeData ? nodeData.arc : 360
-          });
-        }
-      });
-    });
-
-    // Remove duplicates while preserving angular info
-    const uniqueParents = [];
-    const seenParents = new Set();
-    parentNodes.forEach(parent => {
-      if (!seenParents.has(parent.nodeId)) {
-        seenParents.add(parent.nodeId);
-        uniqueParents.push(parent);
-      }
-    });
-
-    currentLevelNodes = uniqueParents;
-    ringIndex++;
-  }
-
-  // Convert to AG Charts format with proper angular data
-  return rings.map((ringData, i) => {
-    const key = `level${i}`;
-    return ringData.map(({ name, value, startAngle, endAngle }) => ({
-      [key]: name && name.length > 25 ? name.substring(0, 25) + "..." : name || "Unknown",
-      value: value,
-      startAngle: startAngle,
-      endAngle: endAngle,
-    }));
-  });
-}
-
+// 2. Use d3.partition to compute angles
 const AppDonut = ({ targetId }) => {
+  const svgRef = useRef();
+  const tooltipRef = useRef(); // Add this line
   const { rowData } = useAppContext();
   const { childrenMap, nameById } = useMatrixLogic();
 
@@ -119,115 +35,151 @@ const AppDonut = ({ targetId }) => {
 
   useEffect(() => {
     const channel = new BroadcastChannel('selectNodeChannel');
-
     channel.onmessage = (event) => {
-      console.log("AppDonut received:", event.data);
       const { nodeId } = event.data;
       if (nodeId) {
         setId(nodeId.toString());
       }
     };
-
     return () => channel.close();
   }, []);
 
-  // Convert to series data for each donut ring
-  const donutRings = useMemo(() => {
-    console.log("Building donut rings for id:", id);
-    if (!id || !childrenMap || !nameById) {
-      console.log("Missing data:", { id, hasChildrenMap: !!childrenMap, hasNameById: !!nameById });
-      return [];
-    }
-    try {
-      return getDonutSeriesData(id, childrenMap, nameById);
-    } catch (error) {
-      console.error("Error building donut rings:", error);
-      return [];
-    }
+  const treeData = useMemo(() => {
+    if (!id || !childrenMap || !nameById) return null;
+    return buildTree(id, childrenMap, nameById);
   }, [id, childrenMap, nameById]);
 
-  // Build series dynamically based on available rings
-  const series = useMemo(() => {
-    console.log("Donut rings:", donutRings.length, "rings");
+  useEffect(() => {
+    if (!treeData) return;
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
 
-    if (!donutRings || donutRings.length === 0) {
-      return [];
-    }
+    const width = 700, height = 700, radius = Math.min(width, height) / 2 - 20;
+    const g = svg.append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
 
-    return donutRings.map((ringData, i) => {
-      if (!ringData || ringData.length === 0) return null;
+    // Convert tree to d3.hierarchy
+    const root = d3.hierarchy(treeData)
+      .sum(d => 1)
+      .sort((a, b) => d3.ascending(a.data.name, b.data.name));
 
-      const labelKey = `level${i}`;
-      const numRings = donutRings.filter(ring => ring && ring.length > 0).length;
+    // Partition layout
+    d3.partition()
+      .size([2 * Math.PI, radius])(root);
 
-      // Calculate ring ratios - center (i=0) is selected node, outer rings are parents
-      const outerRatio = Math.min(1, 0.2 + ((i + 1) * 0.8 / numRings));
-      const innerRatio = i === 0 ? 0 : Math.max(0, 0.2 + (i * 0.8 / numRings));
+    // Arc generator
+    const arc = d3.arc()
+      .startAngle(d => d.x0)
+      .endAngle(d => d.x1)
+      .innerRadius(d => d.y0)
+      .outerRadius(d => d.y1);
 
-      const seriesConfig = {
-        data: ringData,
-        type: "donut",
-        angleKey: "value",
-        outerRadiusRatio: outerRatio,
-        innerRadiusRatio: innerRatio,
-        fillOpacity: Math.min(1, 0.6 + (i * 0.1)),
-      };
+    // For text paths (middle of arc)
+    const textArc = d3.arc()
+      .startAngle(d => d.x0)
+      .endAngle(d => d.x1)
+      .innerRadius(d => (d.y0 + d.y1) / 2)
+      .outerRadius(d => (d.y0 + d.y1) / 2);
 
-      // Add angular constraints if available
-      if (ringData[0] && ringData[0].startAngle !== undefined) {
-        seriesConfig.startAngleKey = "startAngle";
-        seriesConfig.endAngleKey = "endAngle";
-      }
+    // Draw arcs
+    const nodes = root.descendants().filter(d => d.depth > 0);
 
-      // Use different label strategies based on ring
-      if (i === 0) {
-        // Center ring - use sector labels
-        seriesConfig.sectorLabelKey = labelKey;
-        seriesConfig.sectorLabel = {
-          color: "white",
-          fontWeight: "bold",
-          fontSize: 12,
-        };
-      } else {
-        // Outer rings - use callout labels
-        seriesConfig.calloutLabelKey = labelKey;
-        seriesConfig.calloutLabel = {
-          offset: 10 + (i * 3),
-          fontSize: Math.max(8, 9 + (i * 1)),
-          avoidCollisions: true
-        };
-      }
+    g.selectAll("path")
+      .data(nodes)
+      .enter().append("path")
+      .attr("d", arc)
+      .attr("fill", d => d3.schemeCategory10[d.depth % 10])
+      .attr("stroke", "#fff")
+      .on("mousemove", function(event, d) {
+        const tooltip = tooltipRef.current;
+        if (tooltip) {
+          tooltip.style.display = "block";
+          tooltip.style.left = (event.clientX + 10) + "px";
+          tooltip.style.top = (event.clientY + 10) + "px";
+          tooltip.textContent = d.data.name;
+        }
+      })
+      .on("mouseleave", function() {
+        const tooltip = tooltipRef.current;
+        if (tooltip) {
+          tooltip.style.display = "none";
+        }
+      });
 
-      return seriesConfig;
-    }).filter(Boolean);
-  }, [donutRings]);
+    // Draw invisible paths for text
+    g.selectAll("defs")
+      .data(nodes)
+      .enter()
+      .append("path")
+      .attr("id", d => `arc-label-${d.data.id}`)
+      .attr("d", d => {
+        // Flip path for left-side arcs
+        const midAngle = (d.x0 + d.x1) / 2;
+        if (midAngle > Math.PI / 2 && midAngle < 3 * Math.PI / 2) {
+          // Reverse path
+          return textArc({ ...d, x0: d.x1, x1: d.x0 });
+        }
+        return textArc(d);
+      })
+      .style("fill", "none")
+      .style("stroke", "none");
 
-  const options = {
-    title: {
-      text: "Hierarchy Chart",
-    },
-    subtitle: {
-      text: `Center: ${nameById?.[id] || id || "No selection"}`,
-    },
-    series,
-    legend: { enabled: false },
-    width: 700,
-    height: 700,
-  };
+    // Add curved text labels
+    g.selectAll("text")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .attr("dy", "0.32em")
+      .append("textPath")
+      .attr("href", d => `#arc-label-${d.data.id}`)
+      .attr("startOffset", "5%")
+      .style("text-anchor", "left")
+      .style("font-size", "8px") // <-- Add this line
+      .text(d => {
+        const arcLength = Math.abs(d.x1 - d.x0);
+        const minArc = 0.35;
+        const fontSize = 8;
+        const r = (d.y0 + d.y1) / 2;
+        const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.6));
+        if (arcLength < minArc || estMaxChars < 3) return "";
+        let label = d.data.name;
+        if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
+        return label;
+      });
+  }, [treeData]);
 
   if (!id) {
     return (
       <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}>
-        <h2 className="font-semibold mb-2">Donut View</h2>
+        <h2 className="font-semibold mb-2">Donut View (D3)</h2>
         <p>No node selected</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}>
-      <h2 className="font-semibold mb-2">Donut View</h2>
-      <AgCharts options={options} />
+    <div className="bg-white rounded shadow p-4" style={{ width: 900, height: 800, position: "relative" }}>
+      <h2 className="font-semibold mb-2">Donut View (D3)</h2>
+      <svg
+        ref={svgRef}
+        width={850}
+        height={750}
+        style={{ border: "1px solid #ddd" }}
+      />
+      {/* Tooltip div */}
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "fixed",
+          pointerEvents: "none",
+          background: "rgba(0,0,0,0.8)",
+          color: "#fff",
+          padding: "4px 8px",
+          borderRadius: "4px",
+          fontSize: "14px",
+          display: "none",
+          zIndex: 1000
+        }}
+      />
     </div>
   );
 };
