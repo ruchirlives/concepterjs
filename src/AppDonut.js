@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useMemo, useState } from "react";
+import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
 // Build ancestry tree as flat array: [{id, level, label}, ...]
-function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel=0) {
+function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
   const tree = [];
+  console.log(`Building ancestry tree for nodeId: ${nodeId}, startingLevel: ${startingLevel}`);
 
   // Step 1: Add root item at level 0
   if (startingLevel === 0) {
@@ -14,43 +15,74 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
       level: 0,
       label: nameById[nodeId] || nodeId
     });
+    console.log(`Added root at level 0:`, tree[tree.length - 1]);
   }
 
   // Step 2: Build levels iteratively
   for (let level = startingLevel; level < maxDepth; level++) {
+    console.log(`Processing level ${level}`);
+    
     // Get all items at current level
-    const currentLevelItems = tree.filter(item => item.level === level);
+    let currentLevelItems = tree.filter(item => item.level === level);
+    console.log(`Items at level ${level}:`, currentLevelItems);
 
-    if (currentLevelItems.length === 0) break;
+    // Special case: if we're at startingLevel > 0 and there are no items yet, add the starting node
+    if (currentLevelItems.length === 0 && level === startingLevel && startingLevel > 0) {
+      const startingItem = {
+        id: nodeId,
+        level: startingLevel,
+        label: nameById[nodeId] || nodeId
+      };
+      tree.push(startingItem);
+      console.log(`Added starting node at level ${startingLevel}:`, startingItem);
+      
+      // Update currentLevelItems to include the node we just added
+      currentLevelItems = [startingItem];
+    }
+
+    // If still no items at this level, break
+    if (currentLevelItems.length === 0) {
+      console.log(`Breaking at level ${level} - no items to process`);
+      break;
+    }
 
     // Take the first item of current level
     const firstItem = currentLevelItems[0];
+    console.log(`Processing first item at level ${level}:`, firstItem);
 
     // Find all parents of this item
     const parentIds = [];
-    if (childrenMap[firstItem.id]) {
-      // This is wrong - we want parents, not children
-      // Let's find who has this node as a child
-      Object.entries(childrenMap).forEach(([parentId, children]) => {
-        if (children.includes(firstItem.id)) {
-          parentIds.push(parentId);
-        }
-      });
-    }
+    Object.entries(childrenMap).forEach(([parentId, children]) => {
+      if (children.includes(firstItem.id)) {
+        parentIds.push(parentId);
+      }
+    });
+
+    console.log(`Found ${parentIds.length} parents for ${firstItem.id}:`, parentIds);
 
     // Add parents as next level
     parentIds.forEach(parentId => {
       // Check if this parent is already in the tree
       if (!tree.find(item => item.id === parentId)) {
-        tree.push({
+        const parentItem = {
           id: parentId,
           level: level + 1,
           label: nameById[parentId] || parentId
-        });
+        };
+        tree.push(parentItem);
+        console.log(`Added parent at level ${level + 1}:`, parentItem);
+      } else {
+        console.log(`Parent ${parentId} already exists in tree`);
       }
     });
+
+    if (parentIds.length === 0) {
+      console.log(`No parents found for ${firstItem.id}, stopping at level ${level}`);
+      break;
+    }
   }
 
+  console.log(`Final tree:`, tree);
   return tree;
 }
 
@@ -127,6 +159,48 @@ const AppDonut = ({ targetId }) => {
     const rootItem = donutTree.find(item => item.level === 0);
     return rootItem ? rootItem.label : "";
   }, [donutTree]);
+
+  // Function to handle segment clicks
+  const handleSegmentClick = useCallback((event, d) => {
+    event.stopPropagation();
+
+    // Extract the level and id from the clicked segment
+    const clickedId = d.data.id;
+    const clickedLevel = d.data.level;
+
+    console.log(`Clicked segment - ID: ${clickedId}, Level: ${clickedLevel}`);
+
+    // Step 1: Clear all items with level >= clickedLevel + 1 from donutTree
+    const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
+
+    console.log('Original donutTree:', donutTree);
+    console.log('Filtered donutTree (cleared levels beyond clicked level):', filteredTree);
+
+    // Step 2: Get the subtree starting from the clicked segment
+    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 6, clickedLevel);
+
+    console.log('Subtree built from clicked segment:', subtree);
+
+    // Step 3: Merge the filtered tree with the new subtree
+    const mergedTree = [...filteredTree, ...subtree];
+
+    // Step 4: Remove duplicates (keep items from subtree if there are conflicts)
+    const uniqueTree = [];
+    const seen = new Set();
+
+    // Process in reverse order so subtree items take precedence
+    [...mergedTree].reverse().forEach(item => {
+      const key = `${item.id}-${item.level}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueTree.unshift(item);
+      }
+    });
+
+    console.log('Final merged and deduplicated tree:', uniqueTree);
+
+    setDonutTree(uniqueTree);
+  }, [donutTree, nameById, childrenMap]);
 
   useEffect(() => {
     if (donutTree.length === 0) return;
@@ -219,10 +293,7 @@ const AppDonut = ({ targetId }) => {
       })
       .attr("stroke", "#fff")
       .style("cursor", "pointer")
-      .on("click", function (event, d) {
-        event.stopPropagation();
-        setFocusedNodeId(prev => prev === d.data.id ? null : d.data.id);
-      })
+      .on("click", handleSegmentClick) // Use the new function
       .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
@@ -277,7 +348,7 @@ const AppDonut = ({ targetId }) => {
         if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
         return label;
       });
-  }, [donutTree, rowData, colorByTag]); // Changed dependencies
+  }, [donutTree, rowData, colorByTag, handleSegmentClick]); // Dependencies stay the same for now
 
   if (!id) {
     return (
