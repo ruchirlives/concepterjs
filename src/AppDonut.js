@@ -38,12 +38,6 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
       });
     }
 
-    // Actually, let's use parentMap directly
-    // const parentId = parentMap[firstItem.id];
-    // if (parentId) {
-    //   parentIds.push(parentId);
-    // }
-
     // Add parents as next level
     parentIds.forEach(parentId => {
       // Check if this parent is already in the tree
