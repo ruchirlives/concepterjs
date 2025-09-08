@@ -25,7 +25,7 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
         });
     };
 
-    // Main effect: create nodes
+    // Main effect: create nodes (DO NOT depend on zoom)
     useEffect(() => {
         if (!container || !rowData || rowData.length === 0) return;
 
@@ -54,8 +54,8 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
             const baseScale = 0.5; // Render at 2x, scale down to 1x
 
             const radius = (isChild ? 10 : 20) * 2; // double size
-            const fontSize = (isChild ? 6 : 12) * 2;
-            const wrapWidth = (isChild ? 30 : 60) * 2;
+            const fontSize = (isChild ? 4 : 12) * 2;
+            const wrapWidth = (isChild ? 15 : 60) * 2;
             const offsetX = isChild ? 30 : 0; // Offset child to the right of parent
             const offsetY = isChild ? 0 : 0;
 
@@ -77,14 +77,11 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
             const graphics = createNodeGraphics(radius);
             nodeContainer.addChild(graphics);
 
-            // Only show label if zoom is above threshold (e.g., 0.5)
-            if (zoom >= 0.5) {
-                const label = row.name || row.Name || row.id || "Unknown";
-                const text = createNodeText(label, fontSize, wrapWidth);
-                text.anchor.set(0.5);
-                text.y = -radius - (isChild ? 8 : 20) * 2;
-                nodeContainer.addChild(text);
-            }
+            const label = row.name || row.Name || row.id || "Unknown";
+            const text = createNodeText(label, fontSize, wrapWidth);
+            text.anchor.set(0.5);
+            text.y = -radius - (isChild ? 8 : 20) * 2;
+            nodeContainer.addChild(text);
 
             // Drag logic (only for parent nodes)
             if (!isChild) {
@@ -169,29 +166,38 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
             }
         });
 
-    }, [container, rowData, updateNodePosition, dragStateRef, parentChildMap, zoom]);
+    }, [container, rowData, updateNodePosition, dragStateRef, parentChildMap]); // <-- removed zoom
 
-    // NEW EFFECT: update label visibility on zoom change
+    // Helper to get the current visible world rectangle
+    function getWorldViewport(container) {
+        if (!container || !container.parent || !container.parent.renderer) return null;
+        const renderer = container.parent.renderer;
+        const view = renderer.view;
+        const width = view.width / renderer.resolution;
+        const height = view.height / renderer.resolution;
+
+        // The container's position and scale define the transform from world to screen
+        // Invert that to get the visible world rectangle
+        const scale = container.scale.x;
+        const x = -container.x / scale;
+        const y = -container.y / scale;
+        return { x, y, width: width / scale, height: height / scale };
+    }
+
+    // Effect: update label visibility on zoom and viewport
     useEffect(() => {
-        nodesRef.current.forEach((nodeContainer, key) => {
-            // Find the text object (if any)
+        const viewport = getWorldViewport(container);
+
+        nodesRef.current.forEach((nodeContainer) => {
             const textObj = nodeContainer.children.find(
                 child => child instanceof PIXI.Text
             );
-            if (zoom >= 0.5) {
-                // If label should be visible but isn't, add it
-                if (!textObj) {
-                    // Recreate label (extract info from key or store label on container)
-                    // For simplicity, skip dynamic recreation here
-                } else {
-                    textObj.visible = true;
-                }
-            } else {
-                // Hide label if present
-                if (textObj) textObj.visible = false;
-            }
+            if (!textObj) return;
+
+            // Show label only if zoomed in and node is in view
+            textObj.visible = zoom >= 1
         });
-    }, [zoom]);
+    }, [zoom, container]);
 
     return {
         nodes: nodesRef.current
