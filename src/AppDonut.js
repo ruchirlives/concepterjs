@@ -363,16 +363,25 @@ const AppDonut = ({ targetId }) => {
       .attr("href", d => `#arc-label-${d.data.id}`)
       .attr("startOffset", "5%")
       .style("text-anchor", "left")
-      .style("font-size", "10px")
+      .style("font-size", "9px")
       .text(d => {
         const arcLength = Math.abs(d.x1 - d.x0);
         const minArc = 0.35;
-        const fontSize = 10;
+        const fontSize = 9;
         const r = (d.y0 + d.y1) / 2;
         const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.7));
-        if (arcLength < minArc || estMaxChars < 3) return "";
+        
         let label = d.data.name;
-        if (label.length > estMaxChars) label = label.substring(0, estMaxChars - 1) + "…";
+        
+        // If the segment would normally be blank, show first 5 chars
+        if (arcLength < minArc || estMaxChars < 3) {
+          return label.length >= 5 ? label.substring(0, 5) : label;
+        }
+        
+        // Normal truncation logic for segments that have enough space
+        if (label.length > estMaxChars) {
+          label = label.substring(0, estMaxChars - 1) + "…";
+        }
         return label;
       });
   }, [donutTree, rowData, colorByTag, handleSegmentClick, clickedSegmentId]); // Added clickedSegmentId to dependencies
