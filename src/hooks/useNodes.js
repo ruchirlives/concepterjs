@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { useAppContext } from '../AppContext';
 
-export const useNodes = (container, rowData, updateNodePosition, dragStateRef) => {
+export const useNodes = (container, rowData, updateNodePosition, dragStateRef, zoom = 1) => {
   const nodesRef = useRef(new Map());
   const { parentChildMap } = useAppContext();
 
@@ -14,15 +14,18 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef) =
     return graphics;
   };
 
-  const createNodeText = (label, fontSize = 12) => {
+  const createNodeText = (label, fontSize = 12, wrapWidth = 60) => {
     return new PIXI.Text(label, {
       fontFamily: "Arial",
       fontSize,
       fill: 0x000000,
       align: "center",
+      wordWrap: true,
+      wordWrapWidth: wrapWidth,
     });
   };
 
+  // Main effect: create nodes
   useEffect(() => {
     if (!container || !rowData || rowData.length === 0) return;
 
@@ -46,6 +49,7 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef) =
       const isChild = !!parentPos;
       const radius = isChild ? 10 : 20;
       const fontSize = isChild ? 6 : 12;
+      const wrapWidth = isChild ? 30 : 60;
       const offsetX = isChild ? 30 : 0; // Offset child to the right of parent
       const offsetY = isChild ? 0 : 0;
 
@@ -66,12 +70,14 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef) =
       const graphics = createNodeGraphics(radius);
       nodeContainer.addChild(graphics);
 
-      // Text
-      const label = row.Name || row.id || "Unknown";
-      const text = createNodeText(label, fontSize);
-      text.anchor.set(0.5);
-      text.y = -radius - (isChild ? 8 : 20); // Above the circle
-      nodeContainer.addChild(text);
+      // Only show label if zoom is above threshold (e.g., 0.5)
+      if (zoom >= 0.5) {
+        const label = row.name || row.Name || row.id || "Unknown";
+        const text = createNodeText(label, fontSize, wrapWidth);
+        text.anchor.set(0.5);
+        text.y = -radius - (isChild ? 8 : 20); // Above the circle
+        nodeContainer.addChild(text);
+      }
 
       // Drag logic (only for parent nodes)
       if (!isChild) {
@@ -117,7 +123,7 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef) =
         };
 
         const onNodeClick = () => {
-          console.log(`Clicked node: ${label}`);
+          console.log(`Clicked node: ${row.name || row.Name || row.id || "Unknown"}`);
         };
 
         nodeContainer.on("pointerdown", onNodeDragStart);
@@ -155,10 +161,29 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef) =
       }
     });
 
-  }, [container, rowData, updateNodePosition, dragStateRef, parentChildMap]);
+  }, [container, rowData, updateNodePosition, dragStateRef, parentChildMap, zoom]);
 
-  console.log("parentChildMap", parentChildMap);
-  console.log("rowData", rowData);
+  // NEW EFFECT: update label visibility on zoom change
+  useEffect(() => {
+    nodesRef.current.forEach((nodeContainer, key) => {
+      // Find the text object (if any)
+      const textObj = nodeContainer.children.find(
+        child => child instanceof PIXI.Text
+      );
+      if (zoom >= 0.5) {
+        // If label should be visible but isn't, add it
+        if (!textObj) {
+          // Recreate label (extract info from key or store label on container)
+          // For simplicity, skip dynamic recreation here
+        } else {
+          textObj.visible = true;
+        }
+      } else {
+        // Hide label if present
+        if (textObj) textObj.visible = false;
+      }
+    });
+  }, [zoom]);
 
   return {
     nodes: nodesRef.current
