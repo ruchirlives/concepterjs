@@ -92,6 +92,17 @@ function ContextMenu(props) {
       >
         Remove from Source
       </button>
+      {/* Select */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleSelect(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Select
+      </button>
     </div>
   );
 }
@@ -952,6 +963,7 @@ const AppKanban = () => {
           handleRemove={handleRemove}
           handleRemoveLayer={handleRemoveLayer}
           handleRemoveSource={handleRemoveSource}
+          handleSelect={handleSelect}
         />
       )}
       {columnContextMenu && (
