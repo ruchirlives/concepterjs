@@ -5,6 +5,7 @@ import './index.css';
 import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppLayers from './AppLayers';
+import AppMap from './AppMap';
 import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import { setPasscode } from './apiConfig';
@@ -49,11 +50,19 @@ const MemoizedStaticContent = React.memo(() => (
       </Suspense>
     </section>
 
+    {/* AppMap */}
+    <section id="map" className="h-[600px]">
+      <Suspense fallback={<div>Loading map...</div>}>
+        <AppMap />
+      </Suspense>
+    </section>
+
     <section id="mermaid" className="mb-28">
       <Suspense fallback={<div>Loading diagram...</div>}>
         <AppMermaid />
       </Suspense>
     </section>
+
   </>
 ));
 
