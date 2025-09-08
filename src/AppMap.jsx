@@ -1,193 +1,202 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import * as PIXI from "pixi.js";
 import { Viewport } from "pixi-viewport";
-import useAppMapData from "./hooks/useAppMapData";
+import { useAppContext } from "./AppContext";
 
 export default function AppMap() {
   const ref = useRef();
   const appRef = useRef();
   const viewportRef = useRef();
   const nodesRef = useRef(new Map());
-  const dragDataRef = useRef(null);
 
-  const { nodes, loadContainers, loadChildren, updateNodePosition } = useAppMapData();
+  // Use AppContext instead of useAppMapData
+  const { rowData, setRowData } = useAppContext();
 
-  // Initialize PIXI app and viewport
+  // Update node positions in rowData
+  const updateNodePosition = useCallback(
+    (id, x, y) => {
+      setRowData((prev) => prev.map((row) => (row.id === id ? { ...row, position: { x, y } } : row)));
+    },
+    [setRowData]
+  );
+
+  // Initialize PIXI app - only when we have data
   useEffect(() => {
-    if (!ref.current) return;
+    // Wait until we have data and DOM element is ready
+    if (!ref.current || !rowData || rowData.length === 0) return;
 
-    // Copy ref values at the beginning of the effect
-    const currentNodes = nodesRef.current;
     console.log("Initializing PIXI Application");
-    console.log("Current nodes count:", currentNodes.size);
+    console.log("Row data count:", rowData.length);
 
-    const app = new PIXI.Application({
-      resizeTo: window,
-      backgroundColor: 0xffffff,
-    });
+    const app = new PIXI.Application();
 
-    ref.current.appendChild(app.view);
-    appRef.current = app;
+    // Initialize the app (PIXI v8 async initialization)
+    app
+      .init({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundColor: 0xffffff,
+        antialias: true,
+        resolution: 1,
+      })
+      .then(() => {
+        ref.current.appendChild(app.canvas);
+        appRef.current = app;
 
-    // Wait for next frame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      const viewport = new Viewport({
-        screenWidth: window.innerWidth,
-        screenHeight: window.innerHeight,
-        worldWidth: 100000,
-        worldHeight: 100000,
-        // For PIXI v5, pass the interaction manager correctly
-        interaction: app.renderer.plugins.interaction,
-        // Don't pass ticker initially - let viewport manage its own
-        // ticker: app.ticker,
-        // Pass the canvas element for proper event handling
-        divWheel: app.view,
+        // Create viewport
+        const viewport = new Viewport({
+          screenWidth: window.innerWidth,
+          screenHeight: window.innerHeight,
+          worldWidth: 100000,
+          worldHeight: 100000,
+          events: app.renderer.events, // PIXI v8 events
+        });
+
+        app.stage.addChild(viewport);
+        viewportRef.current = viewport;
+
+        // Add viewport plugins
+        viewport
+          .drag({
+            mouseButtons: "left",
+          })
+          .pinch()
+          .wheel()
+          .decelerate();
+
+        // Create nodes after viewport is ready
+        createNodes();
       });
 
-      app.stage.addChild(viewport);
-      viewportRef.current = viewport;
+    const createNodes = () => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
 
-      viewport.drag().wheel().pinch().decelerate();
+      // Clear existing nodes
+      nodesRef.current.forEach((nodeContainer) => {
+        viewport.removeChild(nodeContainer);
+      });
+      nodesRef.current.clear();
 
-      // Load initial data
-      loadContainers();
-    });
+      // Create new nodes from rowData
+      rowData.forEach((row) => {
+        const nodeContainer = new PIXI.Container();
+        // Use existing position or generate random position
+        nodeContainer.x = row.position?.x ?? Math.random() * 1000 - 500;
+        nodeContainer.y = row.position?.y ?? Math.random() * 1000 - 500;
+        nodeContainer.eventMode = "static"; // PIXI v8 interaction
+        nodeContainer.cursor = "pointer";
+
+        // Create circle graphics (PIXI v8 syntax)
+        const graphics = new PIXI.Graphics().circle(0, 0, 15).fill(0x3498db).stroke({ width: 2, color: 0x2980b9 });
+
+        nodeContainer.addChild(graphics);
+
+        // Create text label
+        const label = row.Name || row.id || "Unknown";
+        if (label) {
+          const text = new PIXI.Text({
+            text: label,
+            style: {
+              fontFamily: "Arial",
+              fontSize: 12,
+              fill: 0x000000,
+              align: "center",
+            },
+          });
+          text.anchor.set(0.5);
+          text.y = -35;
+          nodeContainer.addChild(text);
+        }
+
+        // Event handlers for node dragging
+        let isDragging = false;
+        let dragOffset = null;
+
+        const onDragStart = (event) => {
+          event.stopPropagation();
+          isDragging = true;
+          const position = event.global;
+          const localPos = viewport.toLocal(position);
+          dragOffset = {
+            x: localPos.x - nodeContainer.x,
+            y: localPos.y - nodeContainer.y,
+          };
+          nodeContainer.alpha = 0.7;
+        };
+
+        const onDragEnd = () => {
+          if (isDragging) {
+            updateNodePosition(row.id, nodeContainer.x, nodeContainer.y);
+            isDragging = false;
+            dragOffset = null;
+            nodeContainer.alpha = 1;
+          }
+        };
+
+        const onDragMove = (event) => {
+          if (!isDragging || !dragOffset) return;
+
+          const position = event.global;
+          const localPos = viewport.toLocal(position);
+          nodeContainer.x = localPos.x - dragOffset.x;
+          nodeContainer.y = localPos.y - dragOffset.y;
+        };
+
+        const onNodeClick = () => {
+          console.log("Clicked node:", row.Name || row.id);
+        };
+
+        // Add event listeners (PIXI v8 events)
+        nodeContainer.on("pointerdown", onDragStart);
+        nodeContainer.on("pointerup", onDragEnd);
+        nodeContainer.on("pointerupoutside", onDragEnd);
+        nodeContainer.on("pointermove", onDragMove);
+        nodeContainer.on("click", onNodeClick);
+
+        viewport.addChild(nodeContainer);
+        nodesRef.current.set(row.id, nodeContainer);
+      });
+
+      // Center the view on the nodes
+      if (rowData.length > 0) {
+        viewport.fitWorld();
+      }
+    };
 
     return () => {
-      const viewport = viewportRef.current;
-      const currentApp = appRef.current;
-
-      // 1. Clear nodes first - use the captured reference
-      if (currentNodes) {
-        currentNodes.forEach((container) => {
-          if (container && viewport) {
-            viewport.removeChild(container);
-          }
-        });
-        currentNodes.clear();
+      // Cleanup
+      if (nodesRef.current) {
+        nodesRef.current.clear();
       }
 
-      // 2. Remove viewport from stage and destroy it
-      if (viewport && currentApp && currentApp.stage) {
-        currentApp.stage.removeChild(viewport);
-        viewport.destroy({ children: true });
-        viewportRef.current = null;
-      }
-
-      // 3. Destroy the app
-      if (currentApp && !currentApp.destroyed) {
-        currentApp.destroy(true, true);
+      if (appRef.current && !appRef.current.destroyed) {
+        appRef.current.destroy(true);
       }
 
       appRef.current = null;
+      viewportRef.current = null;
     };
-  }, [loadContainers]);
-
-  // Update nodes when data changes
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-
-    // Clear existing nodes
-    nodesRef.current.forEach((container) => {
-      viewport.removeChild(container);
-    });
-    nodesRef.current.clear();
-
-    // Create new nodes
-    nodes.forEach((node) => {
-      const container = new PIXI.Container();
-      container.x = node.x;
-      container.y = node.y;
-      container.interactive = true;
-      container.cursor = "pointer";
-
-      // Create circle graphics
-      const graphics = new PIXI.Graphics();
-      graphics.beginFill(0x3498db);
-      graphics.drawCircle(0, 0, 10);
-      graphics.endFill();
-      container.addChild(graphics);
-
-      // Create text label
-      const zoom = viewport.scale.x;
-      const label =
-        zoom < 0.2
-          ? ""
-          : zoom < 1
-          ? node.name
-          : `${node.name}${node.description ? " - " + node.description : ""}`;
-
-      if (label) {
-        const text = new PIXI.Text(label, {
-          fill: "black",
-          fontSize: 14 / Math.max(zoom, 0.5),
-        });
-        text.anchor.set(0.5);
-        text.y = -20;
-        container.addChild(text);
-      }
-
-      // Event handlers
-      const onDragStart = (event) => {
-        event.stopPropagation();
-        dragDataRef.current = { id: node.id, data: event.data };
-      };
-
-      const onDragEnd = () => {
-        if (dragDataRef.current?.id === node.id) {
-          updateNodePosition(node.id, container.x, container.y, true);
-          dragDataRef.current = null;
-        }
-      };
-
-      const onDragMove = (event) => {
-        if (!dragDataRef.current || dragDataRef.current.id !== node.id) return;
-
-        const newPosition = dragDataRef.current.data.getLocalPosition(viewport);
-        container.x = newPosition.x;
-        container.y = newPosition.y;
-        updateNodePosition(node.id, newPosition.x, newPosition.y, false);
-      };
-
-      const onNodeClick = async () => {
-        viewport.animate({
-          position: { x: node.x, y: node.y },
-          scale: Math.max(1, viewport.scale.x),
-        });
-        await loadChildren(node.id, { x: node.x, y: node.y });
-      };
-
-      // Add event listeners (PIXI v5 events)
-      container.on("mousedown", onDragStart);
-      container.on("touchstart", onDragStart);
-      container.on("mouseup", onDragEnd);
-      container.on("touchend", onDragEnd);
-      container.on("mouseupoutside", onDragEnd);
-      container.on("touchendoutside", onDragEnd);
-      container.on("mousemove", onDragMove);
-      container.on("touchmove", onDragMove);
-      container.on("click", onNodeClick);
-      container.on("tap", onNodeClick);
-
-      viewport.addChild(container);
-      nodesRef.current.set(node.id, container);
-    });
-  }, [nodes, loadChildren, updateNodePosition]);
+  }, [rowData, updateNodePosition]);
 
   return (
-  <>
-    {nodes.length === 0 && (
-      <div style={{
-        position: "absolute",
-        top: "50%", left: "50%",
-        transform: "translate(-50%, -50%)",
-        fontSize: "1.5rem"
-      }}>
-        Loading containers...
-      </div>
-    )}
-    <div ref={ref} style={{ width: "100vw", height: "100vh" }} />
-  </>
-);
+    <>
+      {(!rowData || rowData.length === 0) && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            fontSize: "1.5rem",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+        >
+          Loading data...
+        </div>
+      )}
+      <div ref={ref} style={{ width: "100vw", height: "100vh" }} />
+    </>
+  );
 }
