@@ -28,6 +28,9 @@ export default function AppMap() {
     console.log("Initializing PIXI Application");
     console.log("Row data count:", rowData.length);
 
+    // Capture refs for cleanup
+    const nodes = nodesRef.current;
+
     const app = new PIXI.Application();
 
     // Initialize the app (PIXI v8 async initialization)
@@ -166,8 +169,8 @@ export default function AppMap() {
 
     return () => {
       // Cleanup
-      if (nodesRef.current) {
-        nodesRef.current.clear();
+      if (nodes) {
+        nodes.clear();
       }
 
       if (appRef.current && !appRef.current.destroyed) {
