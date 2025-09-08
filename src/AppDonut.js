@@ -370,14 +370,14 @@ const AppDonut = ({ targetId }) => {
         const fontSize = 9;
         const r = (d.y0 + d.y1) / 2;
         const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.7));
-        
+
         let label = d.data.name;
-        
+
         // If the segment would normally be blank, show first 5 chars
         if (arcLength < minArc || estMaxChars < 3) {
           return label.length >= 5 ? label.substring(0, 5) : label;
         }
-        
+
         // Normal truncation logic for segments that have enough space
         if (label.length > estMaxChars) {
           label = label.substring(0, estMaxChars - 1) + "…";
