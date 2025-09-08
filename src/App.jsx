@@ -1,5 +1,5 @@
 import React from 'react';
-import AppMap from './AppMap/AppMap';
+import AppMap from './AppMap';
 
 // Simple demo rendering AppMap full screen
 const App = () => (
