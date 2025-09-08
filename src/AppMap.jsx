@@ -3,6 +3,7 @@ import { useAppContext } from "./AppContext";
 import { usePixiApp } from "./hooks/usePixiApp";
 import { usePanZoom } from "./hooks/usePanZoom";
 import { useNodes } from "./hooks/useNodes";
+import useZoomLevel from "./hooks/useZoomLevel";
 
 export default function AppMap() {
   const canvasRef = useRef();
@@ -26,11 +27,14 @@ export default function AppMap() {
     rowData && rowData.length > 0
   );
 
+  // Get zoom level from container
+  const zoom = useZoomLevel({ current: container });
+
   // Add pan/zoom functionality
   usePanZoom(app, container, dragStateRef);
 
-  // Manage nodes
-  useNodes(container, rowData, updateNodePosition, dragStateRef);
+  // Manage nodes, now passing zoom!
+  useNodes(container, rowData, updateNodePosition, dragStateRef, zoom);
 
   return (
     <>
