@@ -175,7 +175,7 @@ const AppDonut = ({ targetId }) => {
     const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
 
     // Step 2: Get the subtree starting from the clicked segment (but starting at level 0)
-    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 6, 0);
+    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 1, 0);
 
     // Step 3: Adjust subtree levels to be children of the clicked segment
     // Remove the root of subtree (which is the clicked segment itself) and shift all other levels
