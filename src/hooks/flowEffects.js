@@ -190,7 +190,6 @@ export const useSelectNode = (nodes, edges, setNodes, rowData, handleTransform, 
         centerNode(node);
 
         const descendants = findDescendants(node.id, edges, 2);
-        console.log("Descendants:", descendants);
 
         setNodes(nds =>
             nds.map(n => {

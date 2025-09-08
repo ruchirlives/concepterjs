@@ -3,7 +3,7 @@ import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 
-// Build ancestry tree as flat array: [{id, level, label}, ...]
+// Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
   const tree = [];
 
@@ -12,7 +12,8 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
     tree.push({
       id: nodeId,
       level: 0,
-      label: nameById[nodeId] || nodeId
+      label: nameById[nodeId] || nodeId,
+      parentId: null // Root has no parent
     });
   }
 
@@ -26,7 +27,8 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
       const startingItem = {
         id: nodeId,
         level: startingLevel,
-        label: nameById[nodeId] || nodeId
+        label: nameById[nodeId] || nodeId,
+        parentId: null // Will be set by the calling function if needed
       };
       tree.push(startingItem);
       // Update currentLevelItems to include the node we just added
@@ -57,10 +59,10 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
         const parentItem = {
           id: parentId,
           level: level + 1,
-          label: nameById[parentId] || parentId
+          label: nameById[parentId] || parentId,
+          parentId: firstItem.id // This parent's child is the firstItem
         };
         tree.push(parentItem);
-      } else {
       }
     });
 
@@ -163,27 +165,36 @@ const AppDonut = ({ targetId }) => {
     setIsInternalClick(true);
 
     // Broadcast the selected segment's id
-    console.log("Selecting ", clickedId);
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.postMessage({ nodeId: clickedId });
 
     // Set the clicked segment for highlighting
     setClickedSegmentId(clickedId);
 
-    // Step 1: Clear all items with level >= clickedLevel + 1 from donutTree
+    // Step 1: Clear all items with level > clickedLevel from donutTree (keep the clicked level)
     const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
 
-    // Step 2: Get the subtree starting from the clicked segment
-    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 6, clickedLevel);
+    // Step 2: Get the subtree starting from the clicked segment (but starting at level 0)
+    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 6, 0);
 
-    // Step 3: Merge the filtered tree with the new subtree
-    const mergedTree = [...filteredTree, ...subtree];
+    // Step 3: Adjust subtree levels to be children of the clicked segment
+    // Remove the root of subtree (which is the clicked segment itself) and shift all other levels
+    const adjustedSubtree = subtree
+      .filter(item => item.level > 0) // Remove the root (level 0) which duplicates clicked segment
+      .map((item, index, array) => ({
+        ...item,
+        level: item.level + clickedLevel, // Shift levels to be children of clicked segment
+        parentId: item.level === 1 ? clickedId : item.parentId // First level's parent is clicked segment
+      }));
 
-    // Step 4: Remove duplicates (keep items from subtree if there are conflicts)
+    // Step 4: Merge the filtered tree with the adjusted subtree
+    const mergedTree = [...filteredTree, ...adjustedSubtree];
+
+    // Step 5: Remove duplicates (keep items from adjustedSubtree if there are conflicts)
     const uniqueTree = [];
     const seen = new Set();
 
-    // Process in reverse order so subtree items take precedence
+    // Process in reverse order so adjustedSubtree items take precedence
     [...mergedTree].reverse().forEach(item => {
       const key = `${item.id}-${item.level}`;
       if (!seen.has(key)) {
@@ -211,37 +222,42 @@ const AppDonut = ({ targetId }) => {
     });
 
     // Build proper hierarchy: level 0 → level 1 as children → level 2 as children of first level 1, etc.
+    // Build proper hierarchy using parentId relationships
     function buildProperHierarchy() {
-      if (!levels[0] || levels[0].length === 0) return null;
+      if (donutTree.length === 0) return null;
 
-      // Start with level 0 (root)
-      const root = {
-        id: levels[0][0].id,
-        name: levels[0][0].label,
-        level: 0,
-        children: []
-      };
-
-      // Recursive function to add children at each level
-      function addChildrenAtLevel(parentNode, level) {
-        if (!levels[level] || levels[level].length === 0) return;
-
-        // Add all items at this level as children
-        parentNode.children = levels[level].map(item => ({
+      // Create a map of all items by id for easy lookup
+      const itemsById = {};
+      donutTree.forEach(item => {
+        itemsById[item.id] = {
           id: item.id,
           name: item.label,
-          level: level,
+          level: item.level,
+          parentId: item.parentId,
           children: []
-        }));
+        };
+      });
 
-        // Recursively add children to the first child (to maintain linear chain)
-        if (parentNode.children.length > 0) {
-          addChildrenAtLevel(parentNode.children[0], level + 1);
+      // Find the root (item with parentId === null or lowest level)
+      let root = null;
+      let minLevel = Infinity;
+      
+      donutTree.forEach(item => {
+        if (item.level < minLevel || item.parentId === null) {
+          minLevel = item.level;
+          root = itemsById[item.id];
         }
-      }
+      });
 
-      // Start adding children from level 1
-      addChildrenAtLevel(root, 1);
+      if (!root) return null;
+
+      // Build the hierarchy using parentId relationships
+      donutTree.forEach(item => {
+        if (item.parentId && itemsById[item.parentId]) {
+          // Add this item as a child of its parent
+          itemsById[item.parentId].children.push(itemsById[item.id]);
+        }
+      });
 
       return root;
     }
