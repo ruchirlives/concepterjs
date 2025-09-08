@@ -56,7 +56,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }), [setEdges]);
 
   useEffect(() => {
-    if (!keepLayout) return;
     const storedPositions = {};
     nodes.forEach(node => {
       storedPositions[node.id] = {
@@ -68,7 +67,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       };
     });
     setLayoutPositions(storedPositions);
-  }, [keepLayout, nodes, setLayoutPositions]);
+  }, [nodes, setLayoutPositions]);
 
   // Broadcast activeGroup to activeGroupChannel
   useEffect(() => {

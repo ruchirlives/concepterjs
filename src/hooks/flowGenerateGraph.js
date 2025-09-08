@@ -11,7 +11,6 @@ export async function generateNodesAndEdges(params) {
         groupByLayers,
         activeLayers,
         layerOptions,
-        keepLayout,         // <-- add this
         layoutPositions,    // <-- add this
     } = params;
 
@@ -37,7 +36,7 @@ export async function generateNodesAndEdges(params) {
 
     // Helper to get position
     const getNodePosition = (id, fallback) => {
-        if (keepLayout && layoutPositions && layoutPositions[id]) {
+        if (layoutPositions && layoutPositions[id]) {
             return layoutPositions[id];
         }
         return fallback;
@@ -146,7 +145,28 @@ export async function generateNodesAndEdges(params) {
                 const row = Math.floor(childIndex / 2);
                 fallbackPosition = { x: 40 + col * 120, y: 40 + row * 80 };
             } else {
-                fallbackPosition = { x: 100 * index, y: 100 * index };
+                const parsedPosition = (() => {
+                    const pos = item.Position;
+                    if (!pos) return null;
+                    if (typeof pos === 'string') {
+                        try {
+                            const obj = JSON.parse(pos);
+                            if (obj && typeof obj.x === 'number' && typeof obj.y === 'number') {
+                                return { x: obj.x, y: obj.y };
+                            }
+                            const [x, y] = pos.split(',').map(Number);
+                            if (!isNaN(x) && !isNaN(y)) return { x, y };
+                        } catch (e) {
+                            const [x, y] = pos.split(',').map(Number);
+                            if (!isNaN(x) && !isNaN(y)) return { x, y };
+                        }
+                    } else if (typeof pos === 'object' && pos !== null &&
+                        typeof pos.x === 'number' && typeof pos.y === 'number') {
+                        return { x: pos.x, y: pos.y };
+                    }
+                    return null;
+                })();
+                fallbackPosition = parsedPosition || { x: 100 * index, y: 100 * index };
             }
 
             return {
