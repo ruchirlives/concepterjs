@@ -241,7 +241,7 @@ const AppDonut = ({ targetId }) => {
       // Find the root (item with parentId === null or lowest level)
       let root = null;
       let minLevel = Infinity;
-      
+
       donutTree.forEach(item => {
         if (item.level < minLevel || item.parentId === null) {
           minLevel = item.level;
@@ -301,7 +301,7 @@ const AppDonut = ({ targetId }) => {
         if (d.data.id === clickedSegmentId) {
           return "#ff4444"; // Strong red color for clicked segment
         }
-        
+
         // Normal coloring for other segments
         const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
         return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
