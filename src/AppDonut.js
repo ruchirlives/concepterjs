@@ -226,36 +226,41 @@ const AppDonut = ({ targetId }) => {
     function buildProperHierarchy() {
       if (donutTree.length === 0) return null;
 
-      // Create a map of all items by id for easy lookup
-      const itemsById = {};
+      // Use composite key: id-level
+      const itemsByKey = {};
       donutTree.forEach(item => {
-        itemsById[item.id] = {
+        const key = `${item.id}-${item.level}`;
+        itemsByKey[key] = {
           id: item.id,
           name: item.label,
           level: item.level,
           parentId: item.parentId,
+          parentLevel: item.level > 0 ? item.level - 1 : null,
           children: []
         };
       });
 
-      // Find the root (item with parentId === null or lowest level)
+      // Find the root (lowest level, or parentId === null)
       let root = null;
       let minLevel = Infinity;
-
+      let rootKey = null;
       donutTree.forEach(item => {
-        if (item.level < minLevel || item.parentId === null) {
+        if ((item.level < minLevel || item.parentId === null)) {
           minLevel = item.level;
-          root = itemsById[item.id];
+          rootKey = `${item.id}-${item.level}`;
         }
       });
-
+      root = itemsByKey[rootKey];
       if (!root) return null;
 
-      // Build the hierarchy using parentId relationships
+      // Link children using composite keys
       donutTree.forEach(item => {
-        if (item.parentId && itemsById[item.parentId]) {
-          // Add this item as a child of its parent
-          itemsById[item.parentId].children.push(itemsById[item.id]);
+        if (item.parentId !== null && item.level > 0) {
+          const parentKey = `${item.parentId}-${item.level - 1}`;
+          const childKey = `${item.id}-${item.level}`;
+          if (itemsByKey[parentKey]) {
+            itemsByKey[parentKey].children.push(itemsByKey[childKey]);
+          }
         }
       });
 
