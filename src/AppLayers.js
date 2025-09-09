@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "./AppContext";
 import { handleWriteBack } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
-import { removeAction } from "./hooks/flowContextMenu";
+import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 
 // Excel export button
 function ExcelButton({ handleExportExcel }) {
@@ -14,66 +14,6 @@ function ExcelButton({ handleExportExcel }) {
     >
       Export to Excel
     </button>
-  );
-}
-
-// ContextMenu component
-function ContextMenu({ contextMenu, onRemove, setContextMenu }) {
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setContextMenu(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [contextMenu, setContextMenu]);
-
-  if (!contextMenu) return null;
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 bg-white border border-gray-300 rounded shadow"
-      style={{ top: contextMenu.y, left: contextMenu.x }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={() => {
-          onRemove(contextMenu.layer, contextMenu.cid);
-          setContextMenu(null);
-        }}
-      >
-        Remove
-      </button>
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={() => {
-          // Broadcast select event
-          const channel = new BroadcastChannel('rowSelectChannel');
-          const nodeId = contextMenu.cid;
-          channel.postMessage({ nodeId });
-          channel.close();
-          setContextMenu(null);
-        }}
-      >
-        Select
-      </button>
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={async () => {
-          await removeAction({ selectedIds: [contextMenu.cid] });
-          setContextMenu(null);
-        }}
-      >
-        Remove from Project
-      </button>
-    </div>
   );
 }
 
@@ -171,8 +111,6 @@ const AppLayers = () => {
     setDragItem(null);
   };
 
-  const handleRemove = removeFromLayer(setRowData);
-
   // Handle double click to open modal for adding a row to a layer
   const handleCellDoubleClick = (layer) => {
     setSelectedContentLayer(layer); // <-- set context value
@@ -236,6 +174,24 @@ const AppLayers = () => {
       alert(tsv);
     }
   };
+
+  const removeChildFromLayer = removeFromLayer(setRowData);
+
+  const menuHandlers = useMenuHandlers({
+    rowData,
+    setRowData,
+    removeChildFromLayer,
+    flipped: false, // AppLayers doesn't use flipped
+    childrenMap: {}, // Not needed here
+  });
+
+  const layerMenuOptions = [
+    { label: "Remove from Layer", onClick: menuHandlers.handleRemoveLayer },
+    { label: "Select", onClick: menuHandlers.handleSelect },
+    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
+    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
+    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+  ];
 
   return (
     <div className="bg-white rounded shadow">
@@ -405,8 +361,8 @@ const AppLayers = () => {
       </div>
       <ContextMenu
         contextMenu={contextMenu}
-        onRemove={handleRemove}
         setContextMenu={setContextMenu}
+        menuOptions={layerMenuOptions}
       />
       {/* Modal for adding a row to a layer */}
       <ModalAddRow
