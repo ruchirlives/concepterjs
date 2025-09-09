@@ -1,5 +1,5 @@
 // React imports
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useAppContext, rowInLayers } from "./AppContext";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry } from "ag-grid-community";
@@ -183,6 +183,16 @@ const App = () => {
     }
   };
 
+  const handleCellValueChanged = useCallback((params) => {
+    setRowData((prevData) =>
+      prevData.map((row) =>
+        row.id === params.data.id
+          ? { ...row, [params.colDef.field]: params.newValue }
+          : row
+      )
+    );
+  }, [setRowData]);
+
   // set up a useeffect that listens to const channel = new BroadcastChannel("idSelectChannel");
   // and calls onMenuItemClick with the selectedIds action hide unselected
 
@@ -287,6 +297,7 @@ const App = () => {
           onGridReady={onGridReady}
           onFilterChanged={onFilterChanged}
           onCellDoubleClicked={handleCellDoubleClick}
+          onCellValueChanged={handleCellValueChanged}
         />
       </div>
 
