@@ -1,8 +1,8 @@
 import React from "react";
 import toast from "react-hot-toast";
 import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
-import { get_docx, setNarrative, setPosition, addChildren, removeChildren, getPosition } from "../api";
-import { removeFromLayer } from "../AppLayers";
+import { get_docx } from "../api";
+import { removeChildren } from "../api";
 
 // Generic ContextMenu component
 export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
