@@ -33,7 +33,7 @@ export default function AppMap() {
     viewport.interactiveChildren = true;
 
 
-    
+
     app.stage.addChild(viewport);
     viewportRef.current = viewport;
   }, [app]);
@@ -72,7 +72,11 @@ export default function AppMap() {
           Loading data...
         </div>
       )}
-      <div ref={canvasRef} style={{ width: "100vw", height: "100vh" }} />
+      <div
+  ref={canvasRef}
+  style={{ width: "100vw", height: "100vh", overflow: "hidden" }}
+  onWheel={(e) => e.preventDefault()} // ✅ block browser scroll when mouse over canvas
+/>
     </>
   );
 }
