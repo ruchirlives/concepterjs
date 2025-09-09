@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
+import { get_onenote } from "../api";
 import { get_docx } from "../api";
 import { removeChildren } from "../api";
 
@@ -180,9 +181,26 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
     // Export Onenote
     const handleExportOnenote = async (context) => {
         const { cid } = context;
-        console.log("Exporting to Onenote:", cid);
+        const onenotetext = await get_onenote(cid);
 
-        toast.success("Exported to Onenote!");
+        toast((t) => (
+            <div className="max-w-[300px]">
+                <div className="font-semibold mb-1">OneNote Export</div>
+                <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">
+                    {onenotetext}
+                </div>
+                <button
+                    className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
+                    onClick={() => {
+                        navigator.clipboard.writeText(onenotetext);
+                        toast.success("Copied!");
+                        toast.dismiss(t.id);
+                    }}
+                >
+                    Copy to Clipboard
+                </button>
+            </div>
+        ), { duration: 8000 });
     };
 
     const exportMenu = [

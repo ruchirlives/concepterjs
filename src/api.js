@@ -141,6 +141,19 @@ export const get_docx = async (rowId) => {
     }
 };
 
+// Get OneNote content
+export const get_onenote = async (rowId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/get_onenote`, {
+            "container_id": rowId,
+        });
+        return response.data.onenote;
+    } catch (error) {
+        console.error("Error fetching OneNote content:", error);
+        return "";
+    }
+};
+
 // Fetch parent containers
 export const fetchParentContainers = async (rowId) => {
     try {
