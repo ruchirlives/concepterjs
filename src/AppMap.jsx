@@ -32,6 +32,8 @@ export default function AppMap() {
     viewport.isInteractive = true; // 👈 add this manually
     viewport.interactiveChildren = true;
 
+
+    
     app.stage.addChild(viewport);
     viewportRef.current = viewport;
   }, [app]);

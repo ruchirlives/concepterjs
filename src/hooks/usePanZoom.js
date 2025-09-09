@@ -1,40 +1,38 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export const usePanZoom = (app, viewport, dragStateRef) => {
     useEffect(() => {
         if (!app || !viewport) return;
 
-        // Add viewport to the stage if not already added
-        if (!app.stage.children.includes(viewport)) {
-            app.stage.addChild(viewport);
-        }
-
-        // Enable drag, pinch, and wheel zoom
         viewport
             .drag()
             .pinch()
-            .wheel()
+            .wheel({
+                preventDefault: true,
+                divWheel: app.view,
+            })
             .decelerate();
 
-        // Optionally, you can disable drag when dragging a node
+        // Force wheel events inside the canvas to never bubble to page scroll
+        const stopScroll = (e) => e.preventDefault();
+        app.view.addEventListener("wheel", stopScroll, { passive: false });
+
         const handleDragStart = () => {
             if (dragStateRef.current.isDraggingNode) {
-                viewport.plugins.pause('drag');
+                viewport.plugins.pause("drag");
             }
         };
         const handleDragEnd = () => {
-            viewport.plugins.resume('drag');
+            viewport.plugins.resume("drag");
         };
 
-        window.addEventListener('pointerdown', handleDragStart);
-        window.addEventListener('pointerup', handleDragEnd);
+        app.view.addEventListener("pointerdown", handleDragStart);
+        app.view.addEventListener("pointerup", handleDragEnd);
 
         return () => {
-            window.removeEventListener('pointerdown', handleDragStart);
-            window.removeEventListener('pointerup', handleDragEnd);
-            if (app.stage.children.includes(viewport)) {
-                app.stage.removeChild(viewport);
-            }
+            app.view.removeEventListener("wheel", stopScroll);
+            app.view.removeEventListener("pointerdown", handleDragStart);
+            app.view.removeEventListener("pointerup", handleDragEnd);
         };
     }, [app, viewport, dragStateRef]);
 };
