@@ -1,83 +1,40 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
-export const usePanZoom = (app, container, dragStateRef) => {
-    const panStateRef = useRef({
-        isPanning: false,
-        lastPosition: null
-    });
-
+export const usePanZoom = (app, viewport, dragStateRef) => {
     useEffect(() => {
-        if (!app || !container) return;
+        if (!app || !viewport) return;
 
-        const canvas = app.view;
+        // Add viewport to the stage if not already added
+        if (!app.stage.children.includes(viewport)) {
+            app.stage.addChild(viewport);
+        }
 
-        const startPan = (event) => {
-            if (dragStateRef.current.isDraggingNode) return;
+        // Enable drag, pinch, and wheel zoom
+        viewport
+            .drag()
+            .pinch()
+            .wheel()
+            .decelerate();
 
-            panStateRef.current.isPanning = true;
-            panStateRef.current.lastPosition = { x: event.clientX, y: event.clientY };
-            canvas.style.cursor = "grabbing";
-        };
-
-        const doPan = (event) => {
-            const { isPanning, lastPosition } = panStateRef.current;
-            if (!isPanning || !lastPosition || dragStateRef.current.isDraggingNode) return;
-
-            const deltaX = event.clientX - lastPosition.x;
-            const deltaY = event.clientY - lastPosition.y;
-
-            container.x += deltaX;
-            container.y += deltaY;
-
-            panStateRef.current.lastPosition = { x: event.clientX, y: event.clientY };
-        };
-
-        const endPan = () => {
-            if (panStateRef.current.isPanning) {
-                panStateRef.current.isPanning = false;
-                panStateRef.current.lastPosition = null;
-                canvas.style.cursor = "grab";
+        // Optionally, you can disable drag when dragging a node
+        const handleDragStart = () => {
+            if (dragStateRef.current.isDraggingNode) {
+                viewport.plugins.pause('drag');
             }
         };
-
-        const doZoom = (event) => {
-            event.preventDefault();
-
-            const scaleFactor = event.deltaY > 0 ? 0.9 : 1.1;
-            const newScale = container.scale.x * scaleFactor;
-
-            if (newScale < 0.1 || newScale > 5) return;
-
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = event.clientX - rect.left;
-            const mouseY = event.clientY - rect.top;
-
-            const beforeScale = container.scale.x;
-            container.scale.set(newScale);
-
-            const afterScale = container.scale.x;
-            const scaleChange = (afterScale - beforeScale) / beforeScale;
-
-            container.x -= (mouseX - container.x) * scaleChange;
-            container.y -= (mouseY - container.y) * scaleChange;
-
-            // Emit a custom 'zoomed' event so useZoomLevel can listen for it
-            if (typeof container.emit === "function") {
-                container.emit('zoomed');
-            }
+        const handleDragEnd = () => {
+            viewport.plugins.resume('drag');
         };
 
-        canvas.style.cursor = "grab";
-        canvas.addEventListener("mousedown", startPan);
-        window.addEventListener("mousemove", doPan);
-        window.addEventListener("mouseup", endPan);
-        canvas.addEventListener("wheel", doZoom, { passive: false });
+        window.addEventListener('pointerdown', handleDragStart);
+        window.addEventListener('pointerup', handleDragEnd);
 
         return () => {
-            canvas.removeEventListener("mousedown", startPan);
-            window.removeEventListener("mousemove", doPan);
-            window.removeEventListener("mouseup", endPan);
-            canvas.removeEventListener("wheel", doZoom);
+            window.removeEventListener('pointerdown', handleDragStart);
+            window.removeEventListener('pointerup', handleDragEnd);
+            if (app.stage.children.includes(viewport)) {
+                app.stage.removeChild(viewport);
+            }
         };
-    }, [app, container, dragStateRef]);
+    }, [app, viewport, dragStateRef]);
 };

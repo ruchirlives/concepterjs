@@ -10,7 +10,6 @@ export default function useZoomLevel(viewportRef) {
 
     const updateZoom = () => setZoom(viewport.scale.x);
 
-    // Listen to pixi-viewport's zoomed event
     viewport.on('zoomed', updateZoom);
     updateZoom();
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { useAppContext } from '../AppContext';
 
-export const useNodes = (container, rowData, updateNodePosition, dragStateRef, zoom = 1) => {
+export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zoom = 1) => {
     const nodesRef = useRef(new Map());
     const { parentChildMap } = useAppContext();
 
@@ -25,49 +25,44 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
         });
     };
 
-    // Main effect: create nodes (DO NOT depend on zoom)
+    // Main effect: create nodes
     useEffect(() => {
-        if (!container || !rowData || rowData.length === 0) return;
+        if (!viewport || !rowData || rowData.length === 0) return;
 
-        // Clear existing nodes
-        nodesRef.current.forEach((nodeContainer) => {
-            container.removeChild(nodeContainer);
+        // Remove old nodes
+        nodesRef.current.forEach(nodeContainer => {
+            viewport.removeChild(nodeContainer);
         });
         nodesRef.current.clear();
 
-        // Helper to find children for a parent id
+        // Helpers
         const getChildren = (parentId) => {
             const entry = parentChildMap?.find(e => e.container_id === parentId);
             return entry?.children || [];
         };
-
-        // Helper to find a node by id in rowData
         const getNodeById = (id) => rowData.find(r => r.id === id);
 
-        // Recursive function to add a node and its children
+        // Recursive node adder
         const addNode = (row, index, parentPos = null, visited = new Set()) => {
-            // Prevent infinite recursion on circular relationships
             if (visited.has(row.id)) return;
             visited.add(row.id);
 
             const isChild = !!parentPos;
-            const baseScale = 0.5; // Render at 2x, scale down to 1x
+            const baseScale = 0.5;
 
-            const radius = (isChild ? 10 : 20) * 2; // double size
+            const radius = (isChild ? 10 : 20) * 2;
             const fontSize = (isChild ? 4 : 12) * 2;
             const wrapWidth = (isChild ? 15 : 60) * 2;
-            const offsetX = isChild ? 30 : 0; // Offset child to the right of parent
-            const offsetY = isChild ? 0 : 0;
+            const offsetX = isChild ? 30 : 0;
 
             const nodeContainer = new PIXI.Container();
-            nodeContainer.scale.set(baseScale); // scale down
+            nodeContainer.scale.set(baseScale);
 
-            // Position: if child, position relative to parent; else grid or saved position
             nodeContainer.x = parentPos
                 ? parentPos.x + offsetX
                 : row.position?.x ?? 100 + (index % 5) * 150;
             nodeContainer.y = parentPos
-                ? parentPos.y + offsetY
+                ? parentPos.y
                 : row.position?.y ?? 100 + Math.floor(index / 5) * 100;
 
             nodeContainer.eventMode = "static";
@@ -77,6 +72,7 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
             const graphics = createNodeGraphics(radius);
             nodeContainer.addChild(graphics);
 
+            // Label
             const label = row.name || row.Name || row.id || "Unknown";
             const text = createNodeText(label, fontSize, wrapWidth);
             text.anchor.set(0.5);
@@ -94,7 +90,7 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
                     dragStateRef.current.isDraggingNode = true;
 
                     const globalPos = event.global;
-                    const localPos = container.toLocal(globalPos);
+                    const localPos = viewport.toLocal(globalPos);
                     nodeDragOffset = {
                         x: localPos.x - nodeContainer.x,
                         y: localPos.y - nodeContainer.y,
@@ -106,10 +102,8 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
 
                 const onNodeDragMove = (event) => {
                     if (!isNodeDragging || !nodeDragOffset) return;
-
                     const globalPos = event.global;
-                    const localPos = container.toLocal(globalPos);
-
+                    const localPos = viewport.toLocal(globalPos);
                     nodeContainer.x = localPos.x - nodeDragOffset.x;
                     nodeContainer.y = localPos.y - nodeDragOffset.y;
                 };
@@ -121,41 +115,35 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
                         nodeDragOffset = null;
                         nodeContainer.alpha = 1;
                         nodeContainer.cursor = "pointer";
-
                         updateNodePosition(row.id, nodeContainer.x, nodeContainer.y);
                     }
-                };
-
-                const onNodeClick = () => {
-                    console.log(`Clicked node: ${row.name || row.Name || row.id || "Unknown"}`);
                 };
 
                 nodeContainer.on("pointerdown", onNodeDragStart);
                 nodeContainer.on("pointermove", onNodeDragMove);
                 nodeContainer.on("pointerup", onNodeDragEnd);
                 nodeContainer.on("pointerupoutside", onNodeDragEnd);
-                nodeContainer.on("click", onNodeClick);
+                nodeContainer.on("click", () => {
+                    console.log(`Clicked node: ${label}`);
+                });
             }
 
-            container.addChild(nodeContainer);
-            // Note: we don't prevent duplicate nodes in nodesRef, as per your requirement
+            viewport.addChild(nodeContainer);
             nodesRef.current.set(`${row.id}_${isChild ? 'child' : 'parent'}_${Math.random()}`, nodeContainer);
 
-            // Render children from parentChildMap
+            // Render children
             const children = getChildren(row.id);
             if (Array.isArray(children)) {
                 children.forEach((child, childIdx) => {
-                    // If child is just an id, look up the node in rowData
                     const childRow = typeof child === "object" ? child : getNodeById(child);
                     if (childRow) {
-                        // Pass a new Set cloned from visited for each branch
                         addNode(childRow, childIdx, { x: nodeContainer.x, y: nodeContainer.y }, new Set(visited));
                     }
                 });
             }
         };
 
-        // Add all top-level nodes (those that are not children in parentChildMap)
+        // Add all top-level nodes (not children in parentChildMap)
         const childIds = new Set();
         parentChildMap?.forEach(entry => {
             (entry.children || []).forEach(child => childIds.add(child.id || child));
@@ -166,38 +154,19 @@ export const useNodes = (container, rowData, updateNodePosition, dragStateRef, z
             }
         });
 
-    }, [container, rowData, updateNodePosition, dragStateRef, parentChildMap]); // <-- removed zoom
+    }, [viewport, rowData, updateNodePosition, dragStateRef, parentChildMap]);
 
-    // Helper to get the current visible world rectangle
-    function getWorldViewport(container) {
-        if (!container || !container.parent || !container.parent.renderer) return null;
-        const renderer = container.parent.renderer;
-        const view = renderer.view;
-        const width = view.width / renderer.resolution;
-        const height = view.height / renderer.resolution;
-
-        // The container's position and scale define the transform from world to screen
-        // Invert that to get the visible world rectangle
-        const scale = container.scale.x;
-        const x = -container.x / scale;
-        const y = -container.y / scale;
-        return { x, y, width: width / scale, height: height / scale };
-    }
-
-    // Effect: update label visibility on zoom and viewport
+    // Effect: update label visibility on zoom
     useEffect(() => {
-        const viewport = getWorldViewport(container);
-
         nodesRef.current.forEach((nodeContainer) => {
             const textObj = nodeContainer.children.find(
                 child => child instanceof PIXI.Text
             );
-            if (!textObj) return;
-
-            // Show label only if zoomed in and node is in view
-            textObj.visible = zoom >= 1
+            if (textObj) {
+                textObj.visible = zoom >= 1;
+            }
         });
-    }, [zoom, container]);
+    }, [zoom, viewport]);
 
     return {
         nodes: nodesRef.current
