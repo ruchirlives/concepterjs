@@ -3,6 +3,7 @@ import EdgeMenu from "./hooks/flowEdgeMenu";
 import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import LayerDropdown from './components/LayerDropdown';
 import { useMatrixLogic } from './hooks/useMatrixLogic';
+import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 
 const AppMatrix = () => {
   const {
@@ -42,6 +43,7 @@ const AppMatrix = () => {
     filteredTargets,
     nameById,
     rowData,
+    setRowData,
     edgeMap,
     layerOptions,
     comparatorState,
@@ -72,6 +74,23 @@ const AppMatrix = () => {
 
   // Add state for children tooltip
   const [childrenTooltip, setChildrenTooltip] = React.useState(null);
+  const [headerContextMenu, setHeaderContextMenu] = React.useState(null);
+
+  const menuHandlers = useMenuHandlers({
+    rowData,
+    setRowData,
+    removeChildFromLayer: async () => { }, // Not used for headers
+    flipped,
+    childrenMap,
+  });
+
+  const headerMenuOptions = [
+    { label: "Rename", onClick: menuHandlers.handleRename },
+    { label: "Select", onClick: menuHandlers.handleSelect },
+    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
+    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
+    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+  ];
 
   // Color coding and tooltip functions
   const RelationshipTooltip = ({ text, position }) => {
@@ -268,6 +287,14 @@ const AppMatrix = () => {
                           <th
                             key={container.id}
                             className="p-2 bg-gray-100 border border-gray-300 text-xs font-medium text-left truncate whitespace-nowrap min-w-30 max-w-30 w-30"
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setHeaderContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                cid: container.id.toString(),
+                              });
+                            }}
                           >
                             <div title={container.Name}>{container.Name}</div>
                           </th>
@@ -314,6 +341,14 @@ const AppMatrix = () => {
                               setHoveredFrom(null);
                               setHoveredRowId(null);
                               setChildrenTooltip(null);
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setHeaderContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                cid: sourceContainer.id.toString(),
+                              });
                             }}
                           >
                             <div className="whitespace-normal text-xs">
@@ -477,6 +512,12 @@ const AppMatrix = () => {
 
       {/* Click outside to close dropdowns - add this near the end of the return statement */}
       {Object.values(showDropdowns).some(Boolean) && <div className="fixed inset-0 z-0" onClick={() => setShowDropdowns({})} />}
+
+      <ContextMenu
+        contextMenu={headerContextMenu}
+        setContextMenu={setHeaderContextMenu}
+        menuOptions={headerMenuOptions}
+      />
     </div>
   );
 };

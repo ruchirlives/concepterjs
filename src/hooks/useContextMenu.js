@@ -4,6 +4,7 @@ import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefre
 import { get_docx } from "../api";
 import { removeChildren } from "../api";
 
+
 // Generic ContextMenu component
 export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
     const menuRef = useRef(null);
