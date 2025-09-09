@@ -3,10 +3,9 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
-import { handleWriteBack, requestRefreshChannel, sendMermaidToChannel, sendGanttToChannel } from "hooks/effectsShared";
-import { get_docx } from "./api";
+import { requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
-import toast from 'react-hot-toast';
+import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 
 async function linkItems(sourceItem, targetItem, relationships) {
   // Get current label if it exists
@@ -36,110 +35,6 @@ function ExcelButton(props) {
   );
 }
 
-function ContextMenu(props) {
-  return (
-    <div
-      className="fixed z-50 bg-white border border-gray-300 rounded shadow"
-      style={{
-        top: props.contextMenu.y,
-        left: props.contextMenu.x,
-        maxHeight: "260px",
-        overflowY: "auto",
-        minWidth: "180px",
-      }}
-      onContextMenu={e => e.preventDefault()}
-    >
-      {/* Rename option */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={async e => {
-          e.stopPropagation();
-          props.handleRename(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Rename
-      </button>
-      {/* Remove from both layer and source */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleRemove(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Remove from Both
-      </button>
-      {/* Remove just from layer */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleRemoveLayer(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Remove from Layer
-      </button>
-      {/* Remove just from source */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleRemoveSource(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Remove from Source
-      </button>
-      {/* Select */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleSelect(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Select
-      </button>
-      {/* Export to Mermaid */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportMermaid(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Mermaid
-      </button>
-      {/* Export to Gantt */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportGantt(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Gantt
-      </button>
-      {/* Export to Docx */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportDocx(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Docx
-      </button>
-    </div>
-  );
-}
 
 function ColumnContextMenu(props) {
   return (
@@ -165,74 +60,7 @@ function ColumnContextMenu(props) {
   );
 }
 
-function RowContextMenu(props) {
-  return (
-    <div
-      className="fixed z-50 bg-white border border-gray-300 rounded shadow"
-      style={{
-        top: props.contextMenu.y,
-        left: props.contextMenu.x,
-      }}
-      onContextMenu={e => e.preventDefault()}
-    >
-      {/* Rename option */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={async e => {
-          e.stopPropagation();
-          props.handleRename(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Rename
-      </button>
-      {/* Select option */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleSelect(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Select
-      </button>
-      {/* Export to Mermaid */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportMermaid(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Mermaid
-      </button>
-      {/* Export to Gantt */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportGantt(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Gantt
-      </button>
-      {/* Export to Docx */}
-      <button
-        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-        onClick={e => {
-          e.stopPropagation();
-          props.handleExportDocx(props.contextMenu);
-          props.setContextMenu(null);
-        }}
-      >
-        Export to Docx
-      </button>
-    </div>
-  );
-}
+
 
 // Utility: assign a visually distinct background color to each item ID (with memoized cache)
 const __colorCache = new Map();
@@ -539,6 +367,15 @@ const AppKanban = () => {
   const columns = (selectedLayers && selectedLayers.length > 0) ? selectedLayers : layerOptions;
   const removeChildFromLayer = removeFromLayer(setRowData);
 
+  // Use the new menu handlers
+  const menuHandlers = useMenuHandlers({
+    rowData,
+    setRowData,
+    removeChildFromLayer,
+    flipped,
+    childrenMap,
+  });
+
   // Memoized helpers for quick lookup and tag checks
   const rowById = useMemo(() => {
     const m = new Map();
@@ -652,59 +489,6 @@ const AppKanban = () => {
         setRowData([...rowData]);
       }
     }
-  };
-
-  const handleRename = async (context) => {
-    const { cid } = context;
-    const currname = rowData.find(item => item.id === cid)?.Name || "";
-    const name = prompt("Enter new name:", currname);
-    if (name) {
-      // Update the nodes in rowData
-      const updatedRowData = rowData.map(row =>
-        row.id === cid ? { ...row, Name: name } : row
-      );
-      setRowData(updatedRowData);
-      handleWriteBack(updatedRowData);
-      toast.success("Node(s) renamed successfully!");
-      requestRefreshChannel();
-    }
-  }
-
-  const handleSelect = async (context) => {
-    const { cid } = context;
-    console.log("Selecting ", cid);
-    const channel = new BroadcastChannel('selectNodeChannel');
-    channel.postMessage({ nodeId: cid });
-    // Add a small delay before closing to ensure message is sent
-    setTimeout(() => channel.close(), 10);
-  }
-
-  // Remove a layer tag from a child in a source
-  const handleRemove = async (context) => {
-    const { sourceId, cid, layer } = context;
-    if (!flipped) {
-      await removeChildren(sourceId, [cid]);
-    } else {
-      await removeChildren(cid, [sourceId.toString()]);
-    }
-    await removeChildFromLayer(layer, cid);
-    requestRefreshChannel();
-  };
-
-  const handleRemoveLayer = async (context) => {
-    const { cid, layer } = context;
-    await removeChildFromLayer(layer, cid);
-    requestRefreshChannel();
-  };
-
-  const handleRemoveSource = async (context) => {
-    const { sourceId, cid } = context;
-    if (!flipped) {
-      await removeChildren(sourceId, [cid]);
-    } else {
-      await removeChildren(cid, [sourceId.toString()]);
-    }
-    requestRefreshChannel();
   };
 
   // Column header context menu
@@ -919,36 +703,28 @@ const AppKanban = () => {
       setRowData
     });
   }, [rowData, setRowData]);
-// Export Mermaid for a node
-const handleExportMermaid = async (context) => {
-  const { cid } = context;
-  await sendMermaidToChannel(cid);
-  toast.success("Exported to Mermaid!");
-};
 
-// Export Gantt for a node
-const handleExportGantt = async (context) => {
-  const { cid } = context;
-  await sendGanttToChannel(cid);
-  toast.success("Exported to Gantt!");
-};
+  // Cell context menu options
+  const cellMenuOptions = [
+    { label: "Rename", onClick: menuHandlers.handleRename },
+    { label: "Remove from Both", onClick: menuHandlers.handleRemove },
+    { label: "Remove from Layer", onClick: menuHandlers.handleRemoveLayer },
+    { label: "Remove from Source", onClick: menuHandlers.handleRemoveSource },
+    { label: "Select", onClick: menuHandlers.handleSelect },
+    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
+    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
+    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+  ];
 
-// Export Docx for a node
-const handleExportDocx = async (context) => {
-  const { cid } = context;
-  const blobUrl = await get_docx(cid);
-  if (blobUrl) {
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = "output.docx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Exported to Docx!");
-  } else {
-    toast.error("Failed to export Docx.");
-  }
-};
+  // Row header context menu options
+  const rowMenuOptions = [
+    { label: "Rename", onClick: menuHandlers.handleRename },
+    { label: "Select", onClick: menuHandlers.handleSelect },
+    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
+    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
+    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+  ];
+
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
@@ -1055,14 +831,7 @@ const handleExportDocx = async (context) => {
         <ContextMenu
           contextMenu={contextMenu}
           setContextMenu={setContextMenu}
-          handleRename={handleRename}
-          handleRemove={handleRemove}
-          handleRemoveLayer={handleRemoveLayer}
-          handleRemoveSource={handleRemoveSource}
-          handleSelect={handleSelect}
-          handleExportMermaid={handleExportMermaid}
-          handleExportGantt={handleExportGantt}
-          handleExportDocx={handleExportDocx}
+          menuOptions={cellMenuOptions}
         />
       )}
       {columnContextMenu && (
@@ -1073,14 +842,10 @@ const handleExportDocx = async (context) => {
         />
       )}
       {rowHeaderContextMenu && (
-        <RowContextMenu
+        <ContextMenu
           contextMenu={rowHeaderContextMenu}
           setContextMenu={setRowHeaderContextMenu}
-          handleRename={handleRename}
-          handleSelect={handleSelect}
-          handleExportMermaid={handleExportMermaid}
-          handleExportGantt={handleExportGantt}
-          handleExportDocx={handleExportDocx}
+          menuOptions={rowMenuOptions}
         />
       )}
     </div>
