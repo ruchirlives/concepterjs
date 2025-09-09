@@ -79,54 +79,61 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
             text.y = -radius - (isChild ? 8 : 20) * 2;
             nodeContainer.addChild(text);
 
+            // Replace Pixi v7 event system with v6:
+            nodeContainer.interactive = true;
+            nodeContainer.buttonMode = true;
+
             // Drag logic (only for parent nodes)
-            if (!isChild) {
-                let isNodeDragging = false;
-                let nodeDragOffset = null;
+            let isNodeDragging = false;
+            let nodeDragOffset = null;
 
-                const onNodeDragStart = (event) => {
-                    event.stopPropagation();
-                    isNodeDragging = true;
-                    dragStateRef.current.isDraggingNode = true;
+            const onNodeDragStart = (event) => {
+                event.stopPropagation();
+                isNodeDragging = true;
+                dragStateRef.current.isDraggingNode = true;
 
-                    const globalPos = event.global;
-                    const localPos = viewport.toLocal(globalPos);
-                    nodeDragOffset = {
-                        x: localPos.x - nodeContainer.x,
-                        y: localPos.y - nodeContainer.y,
-                    };
-
-                    nodeContainer.alpha = 0.7;
-                    nodeContainer.cursor = "grabbing";
+                // For Pixi v6, use event.data.global
+                const globalPos = event.data.global;
+                const localPos = viewport.toLocal(globalPos);
+                nodeDragOffset = {
+                    x: localPos.x - nodeContainer.x,
+                    y: localPos.y - nodeContainer.y,
                 };
 
-                const onNodeDragMove = (event) => {
-                    if (!isNodeDragging || !nodeDragOffset) return;
-                    const globalPos = event.global;
-                    const localPos = viewport.toLocal(globalPos);
-                    nodeContainer.x = localPos.x - nodeDragOffset.x;
-                    nodeContainer.y = localPos.y - nodeDragOffset.y;
-                };
+                nodeContainer.alpha = 0.7;
+                nodeContainer.cursor = "grabbing";
+            };
 
-                const onNodeDragEnd = () => {
-                    if (isNodeDragging) {
-                        isNodeDragging = false;
-                        dragStateRef.current.isDraggingNode = false;
-                        nodeDragOffset = null;
-                        nodeContainer.alpha = 1;
-                        nodeContainer.cursor = "pointer";
-                        updateNodePosition(row.id, nodeContainer.x, nodeContainer.y);
-                    }
-                };
+            const onNodeDragMove = (event) => {
+                if (!isNodeDragging || !nodeDragOffset) return;
+                const globalPos = event.data.global;
+                const localPos = viewport.toLocal(globalPos);
+                nodeContainer.x = localPos.x - nodeDragOffset.x;
+                nodeContainer.y = localPos.y - nodeDragOffset.y;
+            };
 
-                nodeContainer.on("pointerdown", onNodeDragStart);
-                nodeContainer.on("pointermove", onNodeDragMove);
-                nodeContainer.on("pointerup", onNodeDragEnd);
-                nodeContainer.on("pointerupoutside", onNodeDragEnd);
-                nodeContainer.on("click", () => {
-                    console.log(`Clicked node: ${label}`);
-                });
-            }
+            const onNodeDragEnd = () => {
+                if (isNodeDragging) {
+                    isNodeDragging = false;
+                    dragStateRef.current.isDraggingNode = false;
+                    nodeDragOffset = null;
+                    nodeContainer.alpha = 1;
+                    nodeContainer.cursor = "pointer";
+                    updateNodePosition(row.id, nodeContainer.x, nodeContainer.y);
+                }
+            };
+
+            nodeContainer.on("mousedown", onNodeDragStart);
+            nodeContainer.on("mousemove", onNodeDragMove);
+            nodeContainer.on("mouseup", onNodeDragEnd);
+            nodeContainer.on("mouseupoutside", onNodeDragEnd);
+            nodeContainer.on("touchstart", onNodeDragStart);
+            nodeContainer.on("touchmove", onNodeDragMove);
+            nodeContainer.on("touchend", onNodeDragEnd);
+            nodeContainer.on("touchendoutside", onNodeDragEnd);
+            nodeContainer.on("click", () => {
+                console.log(`Clicked node: ${label}`);
+            });
 
             viewport.addChild(nodeContainer);
             nodesRef.current.set(`${row.id}_${isChild ? 'child' : 'parent'}_${Math.random()}`, nodeContainer);
