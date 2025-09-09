@@ -22,6 +22,7 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
             align: "center",
             wordWrap: true,
             wordWrapWidth: wrapWidth,
+            resolution: 4, // Sharper text at high zoom
         });
     };
 
@@ -71,17 +72,35 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                     return 0x95a5a6;                       // Others: gray
                 };
 
-                const radius = (level === 0 ? 40 : level === 1 ? 20 : 10);
-                const color = getNodeColor(level);
+                // Parameters for scaling
+                const BASE_RADIUS = 100;      // Size for level 0 (root)
+                const RADIUS_SCALE = 0.2;     // Each level is 40% the size of the previous
+                const BASE_FONT_SIZE = 24;    // Font size for level 0
+                const FONT_SCALE = 0.1;       // Each level is 40% the font size of the previous
+                const BASE_WRAP = 200;        // Wrap width for level 0
+                const WRAP_SCALE = 0.5;       // Each level is 50% the wrap width of the previous
 
-                const angle = (index || 0) * (Math.PI * 2 / Math.max(1, Math.min(5, rowData.length)));
-                const offset = level === 1 ? 10 : 5;
-                const nodeX = parentPos
-                    ? parentPos.x + Math.cos(angle) * offset // Circular layout for children
+                // Calculate mathematically for each level
+                const radius = Math.max(8, BASE_RADIUS * Math.pow(RADIUS_SCALE, level));
+                const fontSize = Math.max(6, BASE_FONT_SIZE * Math.pow(FONT_SCALE, level));
+                const wrapWidth = Math.max(16, BASE_WRAP * Math.pow(WRAP_SCALE, level));
+
+                // For root nodes, use their own position or grid
+                let nodeX = parentPos
+                    ? parentPos.x
                     : row.position?.x ?? 100 + (index % 5) * 150;
-                const nodeY = parentPos
-                    ? parentPos.y + Math.sin(angle) * offset // Circular layout for children
+                let nodeY = parentPos
+                    ? parentPos.y
                     : row.position?.y ?? 100 + Math.floor(index / 5) * 100;
+
+                // For children/grandchildren, arrange in a circle inside parent
+                if (parentPos && parentPos.childCount > 1) {
+                    // Calculate orbit radius so children fit inside parent
+                    const orbit = Math.max(0, radius * 2, (BASE_RADIUS - radius - 4));
+                    const angle = (2 * Math.PI * index) / parentPos.childCount;
+                    nodeX = parentPos.x + Math.cos(angle) * orbit;
+                    nodeY = parentPos.y + Math.sin(angle) * orbit;
+                }
 
                 // Only render if in expanded bounds
                 if (
@@ -96,6 +115,8 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 // LOD: Only render grandchildren if zoomed in
                 // if (level === 2 && zoom < 1.2) return;
 
+                const color = getNodeColor(level);
+
                 const nodeContainer = new PIXI.Container();
                 nodeContainer.x = nodeX;
                 nodeContainer.y = nodeY;
@@ -108,8 +129,6 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
 
                 // Label
                 const label = row.name || row.Name || row.id || "Unknown";
-                const fontSize = (level === 0 ? 16 : level === 1 ? 10 : 8);
-                const wrapWidth = (level === 0 ? 80 : level === 1 ? 40 : 30);
                 const text = createNodeText(label, fontSize, wrapWidth);
                 text.anchor.set(0.5);
                 text.y = -radius - (isChild ? 8 : 20) * 2;
@@ -167,7 +186,7 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 nodesMap.set(`${row.id}_${isChild ? 'child' : 'parent'}_${Math.random()}`, nodeContainer);
 
                 // Render children (only if zoomed in enough and within level limit)
-                if (level < 3) {
+                if (level < 2) {
                     const children = getChildren(row.id);
                     children.forEach((child, childIdx) => {
                         let childRow;
@@ -175,14 +194,16 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                             childRow = child.id
                                 ? child
                                 : getNodeById(child.container_id); // fallback if no id, but has container_id
-
-                            } else {
-                                childRow = getNodeById(child);
-                            }
-                            if (childRow) {
-                                // Only render grandchildren if zoomed in
-                                // if (level === 1 && zoom < 1.2) return;
-                                addNode(childRow, childIdx, { x: nodeContainer.x, y: nodeContainer.y }, level + 1);
+                        } else {
+                            childRow = getNodeById(child);
+                        }
+                        if (childRow) {
+                            addNode(
+                                childRow,
+                                childIdx,
+                                { x: nodeContainer.x, y: nodeContainer.y, childCount: children.length },
+                                level + 1
+                            );
                         }
                     });
                 }
