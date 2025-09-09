@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import toast from "react-hot-toast";
 import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
 import { get_docx } from "../api";
@@ -6,9 +6,22 @@ import { removeChildren } from "../api";
 
 // Generic ContextMenu component
 export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleClick = (e) => {
+            if (menuRef.current && menuRef.current.contains(e.target)) return;
+            setContextMenu(null);
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [contextMenu, setContextMenu]);
+
     if (!contextMenu) return null;
     return (
         <div
+            ref={menuRef}
             className="fixed z-50 bg-white border border-gray-300 rounded shadow"
             style={{
                 top: contextMenu.y,

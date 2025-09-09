@@ -648,15 +648,6 @@ const AppKanban = () => {
   };
 
   useEffect(() => {
-    const handleClick = () => {
-      setContextMenu(null);
-      setColumnContextMenu(null);
-    };
-    window.addEventListener("click", handleClick);
-    return () => window.removeEventListener("click", handleClick);
-  }, []);
-
-  useEffect(() => {
     if (!ctrlDragging || !dragLine || manualMouseTracking) return;
     const handleMouseMove = (e) => {
       if (rafIdRef.current != null) return;
@@ -682,13 +673,6 @@ const AppKanban = () => {
     window.addEventListener("dragend", handleDragEnd);
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
-
-  useEffect(() => {
-    if (!rowHeaderContextMenu) return;
-    const handleClick = () => setRowHeaderContextMenu(null);
-    window.addEventListener("click", handleClick);
-    return () => window.removeEventListener("click", handleClick);
-  }, [rowHeaderContextMenu]);
 
   // Add this function inside AppKanban, before the return statement
   const handleCellContextMenu = useCallback((e, { sourceId, layer, item }) => {

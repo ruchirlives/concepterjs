@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
+import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
 
 // Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
@@ -77,7 +78,7 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
 const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
-  const { rowData } = useAppContext();
+  const { rowData, setRowData } = useAppContext();
   const { childrenMap, nameById } = useMatrixLogic();
 
   const [id, setId] = useState(
@@ -85,19 +86,38 @@ const AppDonut = ({ targetId }) => {
   );
   const [focusedNodeId, setFocusedNodeId] = useState(null);
   const [donutTree, setDonutTree] = useState([]);
-  const [clickedSegmentId, setClickedSegmentId] = useState(null); // New state for clicked segment
-  const [isInternalClick, setIsInternalClick] = useState(false); // Add this flag
+  const [clickedSegmentId, setClickedSegmentId] = useState(null);
+  const [isInternalClick, setIsInternalClick] = useState(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // Use menu handlers (no removeChildFromLayer or flipped needed here)
+  const menuHandlers = useMenuHandlers({
+    rowData,
+    setRowData,
+    removeChildFromLayer: async () => {},
+    flipped: false,
+    childrenMap,
+  });
+
+  // Menu options for donut segments
+  const donutMenuOptions = [
+    { label: "Rename", onClick: menuHandlers.handleRename },
+    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
+    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
+    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+  ];
 
   useEffect(() => {
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.onmessage = (event) => {
       const { nodeId } = event.data;
-      if (nodeId && !isInternalClick) { // Only respond to external broadcasts
+      if (nodeId && !isInternalClick) {
         setId(nodeId.toString());
-        setFocusedNodeId(null); // Reset focus when changing root
-        setClickedSegmentId(null); // Clear any clicked segment highlighting
+        setFocusedNodeId(null);
+        setClickedSegmentId(null);
       }
-      // Reset the flag after processing
       setIsInternalClick(false);
     };
     return () => channel.close();
@@ -161,14 +181,12 @@ const AppDonut = ({ targetId }) => {
     const clickedId = d.data.id;
     const clickedLevel = d.data.level;
 
-    // Set flag to indicate this is an internal click
     setIsInternalClick(true);
 
     // Broadcast the selected segment's id
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.postMessage({ nodeId: clickedId });
 
-    // Set the clicked segment for highlighting
     setClickedSegmentId(clickedId);
 
     // Step 1: Clear all items with level > clickedLevel from donutTree (keep the clicked level)
@@ -205,6 +223,16 @@ const AppDonut = ({ targetId }) => {
 
     setDonutTree(uniqueTree);
   }, [donutTree, nameById, childrenMap]);
+
+  // Add right-click handler for donut segments
+  const handleSegmentContextMenu = useCallback((event, d) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      cid: d.data.id,
+    });
+  }, []);
 
   useEffect(() => {
     if (donutTree.length === 0) return;
@@ -302,25 +330,17 @@ const AppDonut = ({ targetId }) => {
       .enter().append("path")
       .attr("d", arc)
       .attr("fill", d => {
-        // Check if this is the clicked segment
         if (d.data.id === clickedSegmentId) {
-          return "#ff4444"; // Strong red color for clicked segment
+          return "#ff4444";
         }
-
-        // Normal coloring for other segments
         const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
         return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
       })
-      .attr("stroke", d => {
-        // Add a thicker stroke to the clicked segment
-        return d.data.id === clickedSegmentId ? "#cc0000" : "#fff";
-      })
-      .attr("stroke-width", d => {
-        // Thicker stroke for clicked segment
-        return d.data.id === clickedSegmentId ? 3 : 1;
-      })
+      .attr("stroke", d => d.data.id === clickedSegmentId ? "#cc0000" : "#fff")
+      .attr("stroke-width", d => d.data.id === clickedSegmentId ? 3 : 1)
       .style("cursor", "pointer")
       .on("click", handleSegmentClick)
+      .on("contextmenu", handleSegmentContextMenu) // <-- Add this line
       .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
@@ -384,12 +404,23 @@ const AppDonut = ({ targetId }) => {
         }
         return label;
       });
-  }, [donutTree, rowData, colorByTag, handleSegmentClick, clickedSegmentId]); // Added clickedSegmentId to dependencies
+  }, [donutTree, rowData, colorByTag, handleSegmentClick, handleSegmentContextMenu, clickedSegmentId]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
   useEffect(() => {
     setClickedSegmentId(null);
   }, [id]);
+
+  // Close context menu on outside click
+  // useEffect(() => {
+  //   if (!contextMenu) return;
+  //   const handleClick = (e) => {
+  //     // Optionally: check if the click is inside the menu, but since menu is absolutely positioned and not focusable, just close
+  //     setContextMenu(null);
+  //   };
+  //   document.addEventListener("mousedown", handleClick);
+  //   return () => document.removeEventListener("mousedown", handleClick);
+  // }, [contextMenu]);
 
   if (!id) {
     return (
@@ -459,6 +490,12 @@ const AppDonut = ({ targetId }) => {
           display: "none",
           zIndex: 1000
         }}
+      />
+      {/* Context menu for donut segments */}
+      <ContextMenu
+        contextMenu={contextMenu}
+        setContextMenu={setContextMenu}
+        menuOptions={donutMenuOptions}
       />
     </div>
   );
