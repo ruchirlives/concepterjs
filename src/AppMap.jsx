@@ -73,10 +73,9 @@ export default function AppMap() {
         </div>
       )}
       <div
-  ref={canvasRef}
-  style={{ width: "100vw", height: "100vh", overflow: "hidden" }}
-  onWheel={(e) => e.preventDefault()} // ✅ block browser scroll when mouse over canvas
-/>
+        ref={canvasRef}
+        style={{ width: "100vw", height: "100vh", overflow: "hidden" }}
+      />
     </>
   );
 }

@@ -8,7 +8,6 @@ export const usePanZoom = (app, viewport, dragStateRef) => {
             .drag()
             .pinch()
             .wheel({
-                preventDefault: true,
                 divWheel: app.view,
             })
             .decelerate();

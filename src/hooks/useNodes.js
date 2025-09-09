@@ -51,6 +51,7 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 height: visibleBounds.height + margin * 2,
             };
 
+            // console.log("parentChildMap:", parentChildMap);
             // Helpers
             const getChildren = (parentId) => {
                 const entry = parentChildMap?.find(e => e.container_id === parentId);
@@ -61,20 +62,25 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
             // Recursive node adder, now with level limit
             const addNode = (row, index, parentPos = null, level = 0) => {
                 if (level > 2) return; // Only render up to grandchildren
-
                 const isChild = level > 0;
-                const baseScale = 0.5;
 
-                const radius = (isChild ? 10 : 20) * 2;
-                const fontSize = (isChild ? 4 : 12) * 2;
-                const wrapWidth = (isChild ? 15 : 60) * 2;
-                const offsetX = isChild ? 30 : 0;
+                const getNodeColor = (level) => {
+                    if (level === 0) return 0x3498db;      // Parent: blue
+                    if (level === 1) return 0xe67e22;      // Child: orange
+                    if (level === 2) return 0x27ae60;      // Grandchild: green
+                    return 0x95a5a6;                       // Others: gray
+                };
 
+                const radius = (level === 0 ? 40 : level === 1 ? 20 : 10);
+                const color = getNodeColor(level);
+
+                const angle = (index || 0) * (Math.PI * 2 / Math.max(1, Math.min(5, rowData.length)));
+                const offset = level === 1 ? 10 : 5;
                 const nodeX = parentPos
-                    ? parentPos.x + offsetX
+                    ? parentPos.x + Math.cos(angle) * offset // Circular layout for children
                     : row.position?.x ?? 100 + (index % 5) * 150;
                 const nodeY = parentPos
-                    ? parentPos.y
+                    ? parentPos.y + Math.sin(angle) * offset // Circular layout for children
                     : row.position?.y ?? 100 + Math.floor(index / 5) * 100;
 
                 // Only render if in expanded bounds
@@ -88,21 +94,22 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 }
 
                 // LOD: Only render grandchildren if zoomed in
-                if (level === 2 && zoom < 1.2) return;
+                // if (level === 2 && zoom < 1.2) return;
 
                 const nodeContainer = new PIXI.Container();
-                nodeContainer.scale.set(baseScale);
                 nodeContainer.x = nodeX;
                 nodeContainer.y = nodeY;
                 nodeContainer.interactive = true;
                 nodeContainer.buttonMode = true;
 
-                // Circle
-                const graphics = createNodeGraphics(radius);
+                // Circle with color by level
+                const graphics = createNodeGraphics(radius, color);
                 nodeContainer.addChild(graphics);
 
                 // Label
                 const label = row.name || row.Name || row.id || "Unknown";
+                const fontSize = (level === 0 ? 16 : level === 1 ? 10 : 8);
+                const wrapWidth = (level === 0 ? 80 : level === 1 ? 40 : 30);
                 const text = createNodeText(label, fontSize, wrapWidth);
                 text.anchor.set(0.5);
                 text.y = -radius - (isChild ? 8 : 20) * 2;
@@ -113,7 +120,6 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 let nodeDragOffset = null;
 
                 const onNodeDragStart = (event) => {
-                    event.stopPropagation();
                     isNodeDragging = true;
                     dragStateRef.current.isDraggingNode = true;
                     const globalPos = event.data.global;
@@ -161,16 +167,24 @@ export const useNodes = (viewport, rowData, updateNodePosition, dragStateRef, zo
                 nodesMap.set(`${row.id}_${isChild ? 'child' : 'parent'}_${Math.random()}`, nodeContainer);
 
                 // Render children (only if zoomed in enough and within level limit)
-                if (level < 2) {
+                if (level < 3) {
                     const children = getChildren(row.id);
-                    if (Array.isArray(children) && zoom >= 1.2) {
-                        children.forEach((child, childIdx) => {
-                            const childRow = typeof child === "object" ? child : getNodeById(child);
-                            if (childRow) {
-                                addNode(childRow, childIdx, { x: nodeContainer.x, y: nodeContainer.y }, level + 1);
+                    children.forEach((child, childIdx) => {
+                        let childRow;
+                        if (typeof child === "object") {
+                            childRow = child.id
+                                ? child
+                                : getNodeById(child.container_id); // fallback if no id, but has container_id
+
+                            } else {
+                                childRow = getNodeById(child);
                             }
-                        });
-                    }
+                            if (childRow) {
+                                // Only render grandchildren if zoomed in
+                                // if (level === 1 && zoom < 1.2) return;
+                                addNode(childRow, childIdx, { x: nodeContainer.x, y: nodeContainer.y }, level + 1);
+                        }
+                    });
                 }
             };
 
