@@ -188,9 +188,7 @@ const AppLayers = () => {
   const layerMenuOptions = [
     { label: "Remove from Layer", onClick: menuHandlers.handleRemoveLayer },
     { label: "Select", onClick: menuHandlers.handleSelect },
-    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
-    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
-    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+    { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
 
   return (

@@ -695,18 +695,14 @@ const AppKanban = () => {
     { label: "Remove from Layer", onClick: menuHandlers.handleRemoveLayer },
     { label: "Remove from Source", onClick: menuHandlers.handleRemoveSource },
     { label: "Select", onClick: menuHandlers.handleSelect },
-    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
-    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
-    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+    { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
 
   // Row header context menu options
   const rowMenuOptions = [
     { label: "Rename", onClick: menuHandlers.handleRename },
     { label: "Select", onClick: menuHandlers.handleSelect },
-    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
-    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
-    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+    { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
 
   return (

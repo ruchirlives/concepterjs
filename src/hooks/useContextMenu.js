@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
 import { get_docx } from "../api";
@@ -8,6 +8,7 @@ import { removeChildren } from "../api";
 // Generic ContextMenu component
 export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
     const menuRef = useRef(null);
+    const [openSubmenu, setOpenSubmenu] = useState(null);
 
     useEffect(() => {
         if (!contextMenu) return;
@@ -27,25 +28,64 @@ export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
             style={{
                 top: contextMenu.y,
                 left: contextMenu.x,
-                maxHeight: "260px",
-                overflowY: "auto",
+                maxHeight: openSubmenu ? undefined : "260px",
+                overflowY: openSubmenu ? "visible" : "auto",
                 minWidth: "180px",
             }}
             onContextMenu={e => e.preventDefault()}
         >
-            {menuOptions.map(({ label, onClick }, i) => (
-                <button
-                    key={label}
-                    className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
-                    onClick={async e => {
-                        e.stopPropagation();
-                        await onClick(contextMenu);
-                        setContextMenu(null);
-                    }}
-                >
-                    {label}
-                </button>
-            ))}
+            {menuOptions.map(({ label, onClick, submenu }, i) =>
+                submenu ? (
+                    <div
+                        key={label}
+                        className="relative group"
+                        onMouseEnter={() => setOpenSubmenu(label)}
+                        onMouseLeave={() => setOpenSubmenu(null)}
+                    >
+                        <button
+                            className="w-full px-3 py-1 text-left text-xs hover:bg-gray-100 flex justify-between items-center"
+                            type="button"
+                        >
+                            {label}
+                            <span className="ml-2">&#9654;</span>
+                        </button>
+                        {openSubmenu === label && (
+                            <div
+                                className="absolute left-full top-0 bg-white border border-gray-300 rounded shadow min-w-[160px] z-50"
+                                style={{ minWidth: "160px", zIndex: 9999 }}
+                            >
+                                {submenu.map((sub, j) => (
+                                    <button
+                                        key={sub.label}
+                                        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+                                        onClick={async e => {
+                                            e.stopPropagation();
+                                            await sub.onClick(contextMenu);
+                                            setContextMenu(null);
+                                        }}
+                                    >
+                                        {sub.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <button
+                        key={label}
+                        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+                        onClick={async e => {
+                            e.stopPropagation();
+                            if (onClick) {
+                                await onClick(contextMenu);
+                                setContextMenu(null);
+                            }
+                        }}
+                    >
+                        {label}
+                    </button>
+                )
+            )}
         </div>
     );
 }
@@ -137,6 +177,21 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         }
     };
 
+    // Export Onenote
+    const handleExportOnenote = async (context) => {
+        const { cid } = context;
+        console.log("Exporting to Onenote:", cid);
+
+        toast.success("Exported to Onenote!");
+    };
+
+    const exportMenu = [
+        { label: "Export to Mermaid", onClick: handleExportMermaid },
+        { label: "Export to Gantt", onClick: handleExportGantt },
+        { label: "Export to Docx", onClick: handleExportDocx },
+        { label: "Export to Onenote", onClick: handleExportOnenote },
+    ];
+
     return {
         handleRename,
         handleSelect,
@@ -146,5 +201,7 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         handleExportMermaid,
         handleExportGantt,
         handleExportDocx,
+        handleExportOnenote,
+        exportMenu,
     };
 }

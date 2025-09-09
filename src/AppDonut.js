@@ -104,9 +104,7 @@ const AppDonut = ({ targetId }) => {
   // Menu options for donut segments
   const donutMenuOptions = [
     { label: "Rename", onClick: menuHandlers.handleRename },
-    { label: "Export to Mermaid", onClick: menuHandlers.handleExportMermaid },
-    { label: "Export to Gantt", onClick: menuHandlers.handleExportGantt },
-    { label: "Export to Docx", onClick: menuHandlers.handleExportDocx },
+    { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
 
   useEffect(() => {
@@ -410,17 +408,6 @@ const AppDonut = ({ targetId }) => {
   useEffect(() => {
     setClickedSegmentId(null);
   }, [id]);
-
-  // Close context menu on outside click
-  // useEffect(() => {
-  //   if (!contextMenu) return;
-  //   const handleClick = (e) => {
-  //     // Optionally: check if the click is inside the menu, but since menu is absolutely positioned and not focusable, just close
-  //     setContextMenu(null);
-  //   };
-  //   document.addEventListener("mousedown", handleClick);
-  //   return () => document.removeEventListener("mousedown", handleClick);
-  // }, [contextMenu]);
 
   if (!id) {
     return (
