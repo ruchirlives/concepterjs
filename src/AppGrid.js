@@ -191,6 +191,7 @@ const App = () => {
           : row
       )
     );
+    handleWriteBack([params.data]); // Write back only the changed row
   }, [setRowData]);
 
   // set up a useeffect that listens to const channel = new BroadcastChannel("idSelectChannel");
