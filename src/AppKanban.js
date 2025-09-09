@@ -3,7 +3,8 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
 import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
-import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
+import { handleWriteBack, requestRefreshChannel, sendMermaidToChannel, sendGanttToChannel } from "hooks/effectsShared";
+import { get_docx } from "./api";
 import { removeFromLayer } from "./AppLayers";
 import toast from 'react-hot-toast';
 
@@ -103,6 +104,39 @@ function ContextMenu(props) {
       >
         Select
       </button>
+      {/* Export to Mermaid */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportMermaid(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Mermaid
+      </button>
+      {/* Export to Gantt */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportGantt(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Gantt
+      </button>
+      {/* Export to Docx */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportDocx(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Docx
+      </button>
     </div>
   );
 }
@@ -162,6 +196,39 @@ function RowContextMenu(props) {
         }}
       >
         Select
+      </button>
+      {/* Export to Mermaid */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportMermaid(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Mermaid
+      </button>
+      {/* Export to Gantt */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportGantt(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Gantt
+      </button>
+      {/* Export to Docx */}
+      <button
+        className="block w-full px-3 py-1 text-left text-xs hover:bg-gray-100"
+        onClick={e => {
+          e.stopPropagation();
+          props.handleExportDocx(props.contextMenu);
+          props.setContextMenu(null);
+        }}
+      >
+        Export to Docx
       </button>
     </div>
   );
@@ -852,7 +919,36 @@ const AppKanban = () => {
       setRowData
     });
   }, [rowData, setRowData]);
+// Export Mermaid for a node
+const handleExportMermaid = async (context) => {
+  const { cid } = context;
+  await sendMermaidToChannel(cid);
+  toast.success("Exported to Mermaid!");
+};
 
+// Export Gantt for a node
+const handleExportGantt = async (context) => {
+  const { cid } = context;
+  await sendGanttToChannel(cid);
+  toast.success("Exported to Gantt!");
+};
+
+// Export Docx for a node
+const handleExportDocx = async (context) => {
+  const { cid } = context;
+  const blobUrl = await get_docx(cid);
+  if (blobUrl) {
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "output.docx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Exported to Docx!");
+  } else {
+    toast.error("Failed to export Docx.");
+  }
+};
   return (
     <div ref={flowWrapperRef} className="bg-white rounded shadow">
       {/* Header */}
@@ -964,6 +1060,9 @@ const AppKanban = () => {
           handleRemoveLayer={handleRemoveLayer}
           handleRemoveSource={handleRemoveSource}
           handleSelect={handleSelect}
+          handleExportMermaid={handleExportMermaid}
+          handleExportGantt={handleExportGantt}
+          handleExportDocx={handleExportDocx}
         />
       )}
       {columnContextMenu && (
@@ -979,6 +1078,9 @@ const AppKanban = () => {
           setContextMenu={setRowHeaderContextMenu}
           handleRename={handleRename}
           handleSelect={handleSelect}
+          handleExportMermaid={handleExportMermaid}
+          handleExportGantt={handleExportGantt}
+          handleExportDocx={handleExportDocx}
         />
       )}
     </div>
