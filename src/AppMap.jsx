@@ -37,11 +37,38 @@ export default function AppMap() {
     ctx.fill();
 
     const handleResize = () => {
-      infiniteCanvas.resize();
+      if (!canvasRef.current) return;
+      // Set canvas width/height to match container
+      const parent = canvasRef.current.parentElement;
+      if (parent) {
+        canvasRef.current.width = parent.offsetWidth;
+        canvasRef.current.height = parent.offsetHeight;
+      }
+      // Optionally, you may want to re-initialize InfiniteCanvas or redraw here
+      // For now, just clear and redraw grid
+      const ctx = infiniteCanvas.getContext("2d");
+      ctx.clearRect(-1000, -1000, 2000, 2000);
+      ctx.strokeStyle = "#ccc";
+      for (let x = -1000; x <= 1000; x += 50) {
+        ctx.beginPath();
+        ctx.moveTo(x, -1000);
+        ctx.lineTo(x, 1000);
+        ctx.stroke();
+      }
+      for (let y = -1000; y <= 1000; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(-1000, y);
+        ctx.lineTo(1000, y);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.fillStyle = "red";
+      ctx.arc(0, 0, 40, 0, Math.PI * 2);
+      ctx.fill();
     };
 
     window.addEventListener("resize", handleResize);
-    infiniteCanvas.resize();
+    handleResize();
 
     return () => {
       window.removeEventListener("resize", handleResize);
