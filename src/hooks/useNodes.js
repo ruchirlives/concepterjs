@@ -18,6 +18,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     }, [nodes]);
 
     // Initialize node positions whenever incoming list changes
+    const BASE_RADIUS = 40;
+    const RADIUS_SCALE = 0.5;
+    const BASE_FONT_SIZE = 16;
+    const FONT_SCALE = 0.7;
+    const LEVELS = 4; // Parent, Child, Grandchild, Great-Grandchild
     useEffect(() => {
         if (!incomingNodes) return;
 
@@ -33,7 +38,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         // Recursive node adder for levels
         const positioned = [];
         const addNode = (row, index, parentPos = null, level = 0) => {
-            if (level > 2) return; // Only render up to grandchildren
+            if (level > LEVELS) return; // Only render up to grandchildren
 
             // Color and size by level
             const getNodeColor = (level) => {
@@ -42,10 +47,6 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
                 if (level === 2) return "#27ae60";      // Grandchild: green
                 return "#95a5a6";                       // Others: gray
             };
-            const BASE_RADIUS = 40;
-            const RADIUS_SCALE = 0.5;
-            const BASE_FONT_SIZE = 16;
-            const FONT_SCALE = 0.7;
 
             const radius = Math.max(8, BASE_RADIUS * Math.pow(RADIUS_SCALE, level));
             const fontSize = Math.max(8, BASE_FONT_SIZE * Math.pow(FONT_SCALE, level));
@@ -81,7 +82,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             });
 
             // Render children (only if within level limit)
-            if (level < 2) {
+            if (level < LEVELS) {
                 const children = getChildren(row.id);
                 children.forEach((child, childIdx) => {
                     let childRow;
@@ -137,7 +138,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
 
     const drawNodes = (ctx) => {
         ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
+        ctx.textBaseline = "middle";
         nodesRef.current.forEach((n) => {
             // Draw node circle
             ctx.beginPath();
