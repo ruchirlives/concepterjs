@@ -41,11 +41,20 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             if (level > LEVELS) return; // Only render up to grandchildren
 
             // Color and size by level
-            const getNodeColor = (level) => {
-                if (level === 0) return "#3498db";      // Parent: blue
-                if (level === 1) return "#e67e22";      // Child: orange
-                if (level === 2) return "#27ae60";      // Grandchild: green
-                return "#95a5a6";                       // Others: gray
+            // Programmatic color: use HSL for visually distinct colors by level
+            // Hash node id to generate a unique HSL color per node
+            const getNodeColor = (level, id) => {
+                // Simple hash function for string/number id
+                let hash = 0;
+                const str = String(id ?? "");
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                // Use hash to get hue (0-359)
+                const hue = Math.abs(hash) % 360;
+                const saturation = 70;
+                const lightness = 70;
+                return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
             };
 
             const radius = BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
@@ -60,23 +69,42 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
                 : row.y ?? row.position?.y ?? 100 + Math.floor(index / 5) * 100;
 
             // For children/grandchildren, arrange in a circle inside parent
-            if (parentPos && parentPos.childCount > 1) {
-                const orbit = Math.max(0, radius * 2, (BASE_RADIUS - radius - 4));
+            if (parentPos) {
+                // Orbit scales exponentially with level, just like radius
+                const orbit = BASE_RADIUS * 3 * Math.pow(RADIUS_SCALE, level);
                 const angle = (2 * Math.PI * index) / parentPos.childCount;
                 nodeX = parentPos.x + Math.cos(angle) * orbit;
                 nodeY = parentPos.y + Math.sin(angle) * orbit;
             }
 
-            // Label logic: prefer label, then name/Name, then id, trimmed to 20 chars
+            // Label logic: prefer label, then name/Name, then id, wrapped to multiple lines
             let label = row.label || row.name || row.Name || row.id || `Node ${index}`;
-            if (typeof label === "string") label = label.slice(0, 40);
+            // Wrap label into lines of max 16 chars, up to 6 lines
+            function wrapLabel(text, maxLen = 16, maxLines = 10) {
+                if (typeof text !== "string") return [String(text)];
+                const words = text.split(' ');
+                const lines = [];
+                let current = '';
+                for (const word of words) {
+                    if ((current + ' ' + word).trim().length > maxLen) {
+                        if (current) lines.push(current);
+                        current = word;
+                        if (lines.length >= maxLines - 1) break;
+                    } else {
+                        current = (current + ' ' + word).trim();
+                    }
+                }
+                if (current && lines.length < maxLines) lines.push(current);
+                return lines;
+            }
+            const labelLines = wrapLabel(label);
 
             positioned.push({
                 id: row.id ?? index,
-                label,
+                label: labelLines,
                 x: nodeX,
                 y: nodeY,
-                color: getNodeColor(level),
+                color: getNodeColor(level, row.id ?? index),
                 radius,
                 fontSize,
                 level
@@ -117,7 +145,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         // Center and radius for the circle
         const centerX = 0;
         const centerY = 0;
-        const circleRadius = 350;
+        // Scale radius so nodes don't overlap: base radius + extra per node
+        const minSpacing = BASE_RADIUS * 2.5;
+        const circleRadius = Math.max(350, (N * minSpacing) / (2 * Math.PI));
         topLevelNodes.forEach((row, index) => {
             const angle = (2 * Math.PI * index) / N;
             const x = centerX + Math.cos(angle) * circleRadius;
@@ -157,12 +187,23 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             ctx.lineWidth = (n.radius || 30) * 0.02; // Border width scales with radius
             ctx.strokeStyle = "#222";
             ctx.stroke();
-            // Draw label above node in black, with smaller font and offset scaled by radius
+            // Draw wrapped label above node, each line stacked
             const labelFontSize = n.fontSize * 0.2;
             ctx.font = `${labelFontSize}px sans-serif`;
             ctx.fillStyle = "#000";
-            const textOffset = (n.radius || 30) * 1.15; // Offset above node, scales with radius
-            ctx.fillText(n.label, n.x, n.y - textOffset);
+            const textOffset = 0;
+            if (Array.isArray(n.label)) {
+                const totalHeight = n.label.length * labelFontSize;
+                n.label.forEach((line, i) => {
+                    ctx.fillText(
+                        line,
+                        n.x,
+                        n.y - textOffset - totalHeight / 2 + i * labelFontSize + labelFontSize / 2
+                    );
+                });
+            } else {
+                ctx.fillText(n.label, n.x, n.y - textOffset);
+            }
         });
     };
 
