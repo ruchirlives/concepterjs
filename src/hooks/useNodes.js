@@ -154,7 +154,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             ctx.arc(n.x, n.y, n.radius || 30, 0, 2 * Math.PI);
             ctx.fillStyle = n.color || "blue";
             ctx.fill();
-            ctx.lineWidth = Math.max(1, (n.radius || 30) * 0.12); // Border width scales with radius
+            ctx.lineWidth = (n.radius || 30) * 0.02; // Border width scales with radius
             ctx.strokeStyle = "#222";
             ctx.stroke();
             // Draw label above node in black, with smaller font and offset scaled by radius
