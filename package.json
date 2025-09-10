@@ -27,6 +27,7 @@
     "autoprefixer": "^9",
     "axios": "^1.7.9",
     "bootstrap": "^5.3.3",
+    "d3-geo": "^3.1.1",
     "dagre": "^0.8.5",
     "docx": "^9.5.1",
     "ef-infinite-canvas": "^0.6.9",
@@ -43,6 +44,7 @@
     "react-modal": "^3.16.3",
     "react-scripts": "^5.0.1",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.0.2",
+    "topojson-client": "^3.1.0",
     "web-vitals": "^2.1.0"
   },
   "scripts": {

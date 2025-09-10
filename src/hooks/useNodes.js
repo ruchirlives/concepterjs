@@ -6,7 +6,7 @@ import { useAppContext } from "../AppContext";
  * @param {InfiniteCanvas} infiniteCanvas - instance returned from `new InfiniteCanvas(canvas)`
  * @param {Array} incomingNodes - array of node objects with optional { id, label, x, y }
  */
-export const useNodes = (infiniteCanvas, incomingNodes = []) => {
+export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
@@ -221,11 +221,14 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         const ctx = infiniteCanvas.getContext("2d");
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(-Infinity, -Infinity, Infinity, Infinity);
+        ctx.clearRect(-Infinity, -Infinity, Infinity, Infinity);
         ctx.restore();
+        if (typeof drawUnderlay === "function") {
+            drawUnderlay(ctx);
+        }
         drawGrid(ctx);
         drawNodes(ctx);
-    }, [infiniteCanvas]);
+    }, [infiniteCanvas, drawUnderlay]);
 
     // Redraw whenever nodes or canvas change
     useEffect(() => {

@@ -2,14 +2,20 @@ import React, { useEffect, useRef } from "react";
 import { useAppContext } from "./AppContext";
 import InfiniteCanvas from "ef-infinite-canvas";
 import { useNodes } from "./hooks/useNodes";
+import { useBackdropMap } from "./hooks/useBackdropMap";
 
 export default function AppMap() {
   const canvasRef = useRef(null);
   const infiniteCanvasRef = useRef(null);
   const redrawRef = useRef(() => {});
   const { rowData } = useAppContext();
+  const { drawMap } = useBackdropMap("/maps/topo_lad.json");
 
-  const { redraw } = useNodes(infiniteCanvasRef.current, rowData);
+  const { redraw } = useNodes(
+    infiniteCanvasRef.current,
+    rowData && rowData.length > 0 ? rowData : undefined,
+    drawMap
+  );
   redrawRef.current = redraw;
 
   useEffect(() => {
