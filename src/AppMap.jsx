@@ -1,59 +1,53 @@
-import React, { useRef, useCallback, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useAppContext } from "./AppContext";
-import { usePixiApp } from "./hooks/usePixiApp";
-import { usePanZoom } from "./hooks/usePanZoom";
-import { useNodes } from "./hooks/useNodes";
-import useZoomLevel from "./hooks/useZoomLevel";
-import { Viewport } from "pixi-viewport";
+import InfiniteCanvas from "ef-infinite-canvas";
 
 export default function AppMap() {
-  const canvasRef = useRef();
-  const dragStateRef = useRef({ isDraggingNode: false });
-  const viewportRef = useRef(null);
-  const { rowData, setRowData } = useAppContext();
-  const { app } = usePixiApp(canvasRef, rowData && rowData.length > 0);
+  const canvasRef = useRef(null);
+  const infiniteCanvasRef = useRef(null);
+  const { rowData } = useAppContext();
 
-  // Create viewport only once
   useEffect(() => {
-    if (!app || viewportRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const viewport = new Viewport({
-      screenWidth: window.innerWidth,
-      screenHeight: window.innerHeight,
-      worldWidth: 100000,
-      worldHeight: 100000,
-      interaction: app.renderer.plugins.interaction,
-      ticker: app.ticker,
-      divWheel: app.view,
-    });
+    const infiniteCanvas = new InfiniteCanvas(canvas);
+    infiniteCanvasRef.current = infiniteCanvas;
+    const ctx = infiniteCanvas.getContext("2d");
 
-    viewport.eventMode = "static";
-    viewport.interactive = true; // legacy flag
-    viewport.isInteractive = true; // 👈 add this manually
-    viewport.interactiveChildren = true;
+    ctx.strokeStyle = "#ccc";
 
+    for (let x = -1000; x <= 1000; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, -1000);
+      ctx.lineTo(x, 1000);
+      ctx.stroke();
+    }
 
+    for (let y = -1000; y <= 1000; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(-1000, y);
+      ctx.lineTo(1000, y);
+      ctx.stroke();
+    }
 
-    app.stage.addChild(viewport);
-    viewportRef.current = viewport;
-  }, [app]);
+    ctx.beginPath();
+    ctx.fillStyle = "red";
+    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Update node positions in rowData
-  const updateNodePosition = useCallback(
-    (id, x, y) => {
-      setRowData((prev) => prev.map((row) => (row.id === id ? { ...row, position: { x, y } } : row)));
-    },
-    [setRowData]
-  );
+    const handleResize = () => {
+      infiniteCanvas.resize();
+    };
 
-  // Get zoom level from viewport
-  const zoom = useZoomLevel(viewportRef);
+    window.addEventListener("resize", handleResize);
+    infiniteCanvas.resize();
 
-  // Add pan/zoom functionality
-  usePanZoom(app, viewportRef.current, dragStateRef);
-
-  // Manage nodes, now passing viewport as container
-  useNodes(viewportRef.current, rowData, updateNodePosition, dragStateRef, zoom);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      infiniteCanvasRef.current = null;
+    };
+  }, []);
 
   return (
     <>
@@ -72,10 +66,14 @@ export default function AppMap() {
           Loading data...
         </div>
       )}
-      <div
-        ref={canvasRef}
-        style={{ width: "100vw", height: "100vh", overflow: "hidden" }}
-      />
+      <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+        <canvas
+          id="canvas"
+          ref={canvasRef}
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
     </>
   );
 }
+
