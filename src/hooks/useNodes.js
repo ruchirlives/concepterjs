@@ -21,7 +21,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     const BASE_RADIUS = 40;
     const RADIUS_SCALE = 0.4;
     const BASE_FONT_SIZE = 16;
-    const LEVELS = 5; // Parent, Child, Grandchild, Great-Grandchild
+    const LEVELS = 6; // Parent, Child, Grandchild, Great-Grandchild
     useEffect(() => {
         const FONT_SCALE = RADIUS_SCALE;
         if (!incomingNodes) return;
