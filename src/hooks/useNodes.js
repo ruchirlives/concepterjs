@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAppContext } from "../AppContext";
 
 /**
  * Hook integrating nodes rendering and dragging with an InfiniteCanvas instance.
@@ -9,6 +10,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
+    const { parentChildMap } = useAppContext() || {};
 
     // Keep refs in sync
     useEffect(() => {
@@ -18,17 +20,103 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     // Initialize node positions whenever incoming list changes
     useEffect(() => {
         if (!incomingNodes) return;
-        const positioned = incomingNodes.map((n, idx) => {
-            console.log('useNodes: node object', n);
-            return {
-                id: n.id ?? idx,
-                label: n.label || n.Name || `Node ${idx}`,
-                x: n.x ?? n.position?.x ?? 100 + idx * 80,
-                y: n.y ?? n.position?.y ?? 100 + idx * 80,
+
+        const safeParentChildMap = parentChildMap || [];
+        // Helper: get children for a parent node
+        const getChildren = (parentId) => {
+            const entry = safeParentChildMap.find(e => e.container_id === parentId);
+            return entry?.children || [];
+        };
+        // Helper: get node by id
+        const getNodeById = (id) => incomingNodes.find(r => r.id === id);
+
+        // Recursive node adder for levels
+        const positioned = [];
+        const addNode = (row, index, parentPos = null, level = 0) => {
+            if (level > 2) return; // Only render up to grandchildren
+
+            // Color and size by level
+            const getNodeColor = (level) => {
+                if (level === 0) return "#3498db";      // Parent: blue
+                if (level === 1) return "#e67e22";      // Child: orange
+                if (level === 2) return "#27ae60";      // Grandchild: green
+                return "#95a5a6";                       // Others: gray
             };
+            const BASE_RADIUS = 40;
+            const RADIUS_SCALE = 0.5;
+            const BASE_FONT_SIZE = 16;
+            const FONT_SCALE = 0.7;
+
+            const radius = Math.max(8, BASE_RADIUS * Math.pow(RADIUS_SCALE, level));
+            const fontSize = Math.max(8, BASE_FONT_SIZE * Math.pow(FONT_SCALE, level));
+
+            // For root nodes, use their own position or grid
+            let nodeX = parentPos
+                ? parentPos.x
+                : row.x ?? row.position?.x ?? 100 + (index % 5) * 150;
+            let nodeY = parentPos
+                ? parentPos.y
+                : row.y ?? row.position?.y ?? 100 + Math.floor(index / 5) * 100;
+
+            // For children/grandchildren, arrange in a circle inside parent
+            if (parentPos && parentPos.childCount > 1) {
+                const orbit = Math.max(0, radius * 2, (BASE_RADIUS - radius - 4));
+                const angle = (2 * Math.PI * index) / parentPos.childCount;
+                nodeX = parentPos.x + Math.cos(angle) * orbit;
+                nodeY = parentPos.y + Math.sin(angle) * orbit;
+            }
+
+            // Label logic: prefer label, then name/Name, then id
+            const label = row.label || row.name || row.Name || row.id || `Node ${index}`;
+
+            positioned.push({
+                id: row.id ?? index,
+                label,
+                x: nodeX,
+                y: nodeY,
+                color: getNodeColor(level),
+                radius,
+                fontSize,
+                level
+            });
+
+            // Render children (only if within level limit)
+            if (level < 2) {
+                const children = getChildren(row.id);
+                children.forEach((child, childIdx) => {
+                    let childRow;
+                    if (typeof child === "object") {
+                        childRow = child.id
+                            ? child
+                            : getNodeById(child.container_id);
+                    } else {
+                        childRow = getNodeById(child);
+                    }
+                    if (childRow) {
+                        addNode(
+                            childRow,
+                            childIdx,
+                            { x: nodeX, y: nodeY, childCount: children.length },
+                            level + 1
+                        );
+                    }
+                });
+            }
+        };
+
+        // Add all top-level nodes (not children in parentChildMap)
+        const childIds = new Set();
+        safeParentChildMap.forEach(entry => {
+            (entry.children || []).forEach(child => childIds.add(child.id || child));
         });
+        incomingNodes.forEach((row, index) => {
+            if (!childIds.has(row.id)) {
+                addNode(row, index, null, 0);
+            }
+        });
+
         setNodes(positioned);
-    }, [incomingNodes]);
+    }, [incomingNodes, parentChildMap]);
 
     // Drawing helpers
     const drawGrid = (ctx) => {
@@ -48,17 +136,21 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     };
 
     const drawNodes = (ctx) => {
-        ctx.fillStyle = "blue";
         ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.font = "16px sans-serif";
+        ctx.textBaseline = "bottom";
         nodesRef.current.forEach((n) => {
+            // Draw node circle
             ctx.beginPath();
-            ctx.arc(n.x, n.y, 30, 0, 2 * Math.PI);
+            ctx.arc(n.x, n.y, n.radius || 30, 0, 2 * Math.PI);
+            ctx.fillStyle = n.color || "blue";
             ctx.fill();
-            ctx.fillStyle = "white";
-            ctx.fillText(n.label, n.x, n.y + 35);
-            ctx.fillStyle = "blue"; // reset for next node
+            ctx.strokeStyle = "#222";
+            ctx.stroke();
+            // Draw label above node in black, with smaller font
+            const labelFontSize = n.fontSize * 0.2;
+            ctx.font = `${labelFontSize}px sans-serif`;
+            ctx.fillStyle = "#000";
+            ctx.fillText(n.label, n.x, n.y - (n.radius || 30) - 4);
         });
     };
 
@@ -96,7 +188,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         const onDown = (e) => {
             const pos = getPos(e);
             const hit = nodesRef.current.find(
-                (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= 30
+                (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
             if (hit) {
                 selectedRef.current = hit.id;
