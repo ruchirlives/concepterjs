@@ -1,11 +1,16 @@
 import React, { useEffect, useRef } from "react";
 import { useAppContext } from "./AppContext";
 import InfiniteCanvas from "ef-infinite-canvas";
+import { useNodes } from "./hooks/useNodes";
 
 export default function AppMap() {
   const canvasRef = useRef(null);
   const infiniteCanvasRef = useRef(null);
+  const redrawRef = useRef(() => {});
   const { rowData } = useAppContext();
+
+  const { redraw } = useNodes(infiniteCanvasRef.current, rowData);
+  redrawRef.current = redraw;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -13,58 +18,16 @@ export default function AppMap() {
 
     const infiniteCanvas = new InfiniteCanvas(canvas);
     infiniteCanvasRef.current = infiniteCanvas;
-    const ctx = infiniteCanvas.getContext("2d");
-
-    ctx.strokeStyle = "#ccc";
-
-    for (let x = -1000; x <= 1000; x += 50) {
-      ctx.beginPath();
-      ctx.moveTo(x, -1000);
-      ctx.lineTo(x, 1000);
-      ctx.stroke();
-    }
-
-    for (let y = -1000; y <= 1000; y += 50) {
-      ctx.beginPath();
-      ctx.moveTo(-1000, y);
-      ctx.lineTo(1000, y);
-      ctx.stroke();
-    }
-
-    ctx.beginPath();
-    ctx.fillStyle = "red";
-    ctx.arc(0, 0, 40, 0, Math.PI * 2);
-    ctx.fill();
 
     const handleResize = () => {
       if (!canvasRef.current) return;
-      // Set canvas width/height to match container
       const parent = canvasRef.current.parentElement;
       if (parent) {
         canvasRef.current.width = parent.offsetWidth;
         canvasRef.current.height = parent.offsetHeight;
       }
-      // Optionally, you may want to re-initialize InfiniteCanvas or redraw here
-      // For now, just clear and redraw grid
-      const ctx = infiniteCanvas.getContext("2d");
-      ctx.clearRect(-1000, -1000, 2000, 2000);
-      ctx.strokeStyle = "#ccc";
-      for (let x = -1000; x <= 1000; x += 50) {
-        ctx.beginPath();
-        ctx.moveTo(x, -1000);
-        ctx.lineTo(x, 1000);
-        ctx.stroke();
-      }
-      for (let y = -1000; y <= 1000; y += 50) {
-        ctx.beginPath();
-        ctx.moveTo(-1000, y);
-        ctx.lineTo(1000, y);
-        ctx.stroke();
-      }
-      ctx.beginPath();
-      ctx.fillStyle = "red";
-      ctx.arc(0, 0, 40, 0, Math.PI * 2);
-      ctx.fill();
+      // redraw grid and nodes after resize
+      if (redrawRef.current) redrawRef.current();
     };
 
     window.addEventListener("resize", handleResize);
