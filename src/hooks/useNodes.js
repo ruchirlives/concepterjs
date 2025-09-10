@@ -256,12 +256,16 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         };
 
         const onDown = (e) => {
+            if (!e.altKey) return;
             const pos = getPos(e);
+            console.log("Alt+drag to move nodes", pos);
             const hit = nodesRef.current.find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
             if (hit) {
+                e.preventDefault(); // This cancels InfiniteCanvas pan
                 selectedRef.current = hit.id;
+                // Optionally: e.stopPropagation();
             }
         };
 
@@ -279,14 +283,14 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             selectedRef.current = null;
         };
 
-        canvas.addEventListener("mousedown", onDown);
-        canvas.addEventListener("mousemove", onMove);
-        canvas.addEventListener("mouseup", onUp);
+        infiniteCanvas.addEventListener("mousedown", onDown);
+        infiniteCanvas.addEventListener("mousemove", onMove);
+        infiniteCanvas.addEventListener("mouseup", onUp);
 
         return () => {
-            canvas.removeEventListener("mousedown", onDown);
-            canvas.removeEventListener("mousemove", onMove);
-            canvas.removeEventListener("mouseup", onUp);
+            infiniteCanvas.removeEventListener("mousedown", onDown);
+            infiniteCanvas.removeEventListener("mousemove", onMove);
+            infiniteCanvas.removeEventListener("mouseup", onUp);
         };
     }, [infiniteCanvas]);
 
