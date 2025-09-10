@@ -9,7 +9,7 @@ export default function AppMap() {
   const infiniteCanvasRef = useRef(null);
   const redrawRef = useRef(() => {});
   const { rowData } = useAppContext();
-  const { drawMap } = useBackdropMap("/maps/topo_lad.json");
+  const { drawMap, refreshMap } = useBackdropMap("/maps/topo_lad.json");
 
   const { redraw } = useNodes(
     infiniteCanvasRef.current,
@@ -84,6 +84,19 @@ export default function AppMap() {
           style={{ width: "100%", height: "100%" }}
         />
       </div>
+      <button
+        style={{ position: "absolute", top: 10, right: 10, zIndex: 20 }}
+        onClick={() => {
+          const ctx = infiniteCanvasRef.current?.getContext("2d");
+          if (ctx) {
+            const transform = ctx.getTransform();
+            refreshMap(transform);
+            redrawRef.current();
+          }
+        }}
+      >
+        Refresh Map
+      </button>
     </>
   );
 }

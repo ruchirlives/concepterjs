@@ -1,5 +1,5 @@
 // hooks/useBackdropMap.js
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { geoMercator, geoPath, geoCentroid } from "d3-geo";
 import { feature } from "topojson-client";
 
@@ -12,9 +12,9 @@ import { feature } from "topojson-client";
  */
 export function useBackdropMap(geojsonUrl) {
     const [data, setData] = useState(null);
+    const [offscreen, setOffscreen] = useState(null);
     const projectionRef = useRef(null);
     const pathRef = useRef(null);
-    const offscreenRef = useRef(null);
 
     useEffect(() => {
         async function load() {
@@ -48,53 +48,47 @@ export function useBackdropMap(geojsonUrl) {
         projectionRef.current = projection;
         pathRef.current = geoPath(projection);
 
-        // --- Offscreen canvas caching ---
-        const OFF_W = 2000, OFF_H = 2000;
-        const offscreen = document.createElement("canvas");
-        offscreen.width = OFF_W;
-        offscreen.height = OFF_H;
-        const offCtx = offscreen.getContext("2d");
-        offCtx.save();
-        // Center the map in the offscreen canvas
-        offCtx.translate(OFF_W / 2, OFF_H / 2);
-        offCtx.lineWidth = 1;
-        offCtx.strokeStyle = "#6b7280";
-        offCtx.fillStyle = "#e5e7eb";
-        const path = geoPath(projection).context(offCtx);
+    // --- Offscreen canvas caching ---
+    const OFF_W = 2000, OFF_H = 2000;
+    const canvas = document.createElement("canvas");
+    canvas.width = OFF_W;
+    canvas.height = OFF_H;
+    const offCtx = canvas.getContext("2d");
+    offCtx.save();
+    // Center the map in the offscreen canvas
+    offCtx.translate(OFF_W / 2, OFF_H / 2);
+    offCtx.lineWidth = 1;
+    offCtx.strokeStyle = "#6b7280";
+    offCtx.fillStyle = "#e5e7eb";
+    const path = geoPath(projection).context(offCtx);
+    path(data);
+    offCtx.fill();
+    offCtx.stroke();
+    offCtx.restore();
+    setOffscreen(canvas);
+    }, [data]);
+
+
+    const drawMap = (ctx) => {
+        if (!offscreen) return;
+        ctx.drawImage(offscreen, -offscreen.width / 2, -offscreen.height / 2);
+    };
+
+    const refreshMap = (transform) => {
+        if (!data || !pathRef.current || !offscreen) return;
+        const ctx = offscreen.getContext("2d");
+        ctx.save();
+        ctx.clearRect(0, 0, offscreen.width, offscreen.height);
+        ctx.translate(offscreen.width / 2, offscreen.height / 2);
+        ctx.scale(transform.a, transform.d); // InfiniteCanvas transform
+        const path = pathRef.current.context(ctx);
         path(data);
-        offCtx.fill();
-        offCtx.stroke();
-        offCtx.restore();
-        offscreenRef.current = offscreen;
-    }, [data]);
+        ctx.fillStyle = "#e5e7eb";
+        ctx.fill();
+        ctx.strokeStyle = "#6b7280";
+        ctx.stroke();
+        ctx.restore();
+    };
 
-
-    const drawMap = useMemo(() => {
-        return (ctx) => {
-            if (offscreenRef.current) {
-                // Blit cached map, centered at (0,0)
-                ctx.save();
-                ctx.drawImage(
-                    offscreenRef.current,
-                    -offscreenRef.current.width / 2,
-                    -offscreenRef.current.height / 2
-                );
-                ctx.restore();
-                return;
-            }
-            // Fallback: draw directly if cache not ready
-            if (!data || !pathRef.current) return;
-            ctx.save();
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = "#6b7280";
-            ctx.fillStyle = "#e5e7eb";
-            const path = pathRef.current.context(ctx);
-            path(data);
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-        };
-    }, [data]);
-
-    return { drawMap, isLoaded: !!data };
+    return { drawMap, refreshMap, isLoaded: !!data };
 }
