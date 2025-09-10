@@ -5,12 +5,13 @@ import { useAppContext } from "../AppContext";
  * Hook integrating nodes rendering and dragging with an InfiniteCanvas instance.
  * @param {InfiniteCanvas} infiniteCanvas - instance returned from `new InfiniteCanvas(canvas)`
  * @param {Array} incomingNodes - array of node objects with optional { id, label, x, y }
+ * @param {string} selectedLayer - (optional) filter for top-level nodes by this layer/tag
  */
-export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay) => {
+export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayer) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
-    const { parentChildMap } = useAppContext() || {};
+    const { parentChildMap, rowData } = useAppContext() || {};
 
     // Keep refs in sync
     useEffect(() => {
@@ -23,11 +24,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay) => {
     const BASE_FONT_SIZE = 16;
     // Dynamically set LEVELS based on node count
     let LEVELS = 1;
-    if (incomingNodes.length < 80) LEVELS = 6;
-    else if (incomingNodes.length < 100) LEVELS = 5;
-    else if (incomingNodes.length < 150) LEVELS = 4;
-    else if (incomingNodes.length < 200) LEVELS = 3;
-    else if (incomingNodes.length < 250) LEVELS = 2;
+    if (rowData.length < 80) LEVELS = 6;
+    else if (rowData.length < 100) LEVELS = 5;
+    else if (rowData.length < 150) LEVELS = 4;
+    else if (rowData.length < 200) LEVELS = 3;
+    else if (rowData.length < 250) LEVELS = 2;
     else LEVELS = 1;
 
 
@@ -149,7 +150,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay) => {
             (entry.children || []).forEach(child => childIds.add(child.id || child));
         });
         // Find top-level nodes
-        const topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
+        let topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
+        // If selectedLayer is set, filter only top-level nodes by tag
+        if (selectedLayer) {
+            topLevelNodes = topLevelNodes.filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
+        }
         const N = topLevelNodes.length;
         // Center and radius for the circle
         const centerX = 0;
@@ -165,7 +170,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay) => {
         });
 
         setNodes(positioned);
-    }, [incomingNodes, parentChildMap, LEVELS]);
+    }, [incomingNodes, parentChildMap, LEVELS, selectedLayer]);
 
     // Drawing helpers
     const drawGrid = (ctx) => {

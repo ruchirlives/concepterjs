@@ -8,12 +8,21 @@ export default function AppMap() {
   const canvasRef = useRef(null);
   const infiniteCanvasRef = useRef(null);
   const redrawRef = useRef(() => {});
-  const { rowData } = useAppContext();
+  const { rowData, layerOptions = [] } = useAppContext();
   const { drawMap, refreshMap } = useBackdropMap("/maps/topo_lad.json");
+
+  // Layer filter state
+  const [selectedLayer, setSelectedLayer] = React.useState("");
+
+  // Optionally filter rowData by selectedLayer
+  const filteredRowData = React.useMemo(() => {
+    if (!selectedLayer) return rowData;
+    return (rowData || []).filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
+  }, [rowData, selectedLayer]);
 
   const { redraw } = useNodes(
     infiniteCanvasRef.current,
-    rowData && rowData.length > 0 ? rowData : undefined,
+    filteredRowData && filteredRowData.length > 0 ? filteredRowData : undefined,
     drawMap
   );
   redrawRef.current = redraw;
@@ -78,6 +87,20 @@ export default function AppMap() {
         </div>
       )}
       <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+        {/* Layer filter dropdown in top-right, below Refresh Map button */}
+        <div style={{ position: "absolute", top: 50, right: 10, zIndex: 19, background: "rgba(255,255,255,0.95)", borderRadius: 6, padding: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}>
+          <label style={{ fontSize: 13, marginRight: 6 }}>Layer:</label>
+          <select
+            value={selectedLayer}
+            onChange={e => setSelectedLayer(e.target.value)}
+            style={{ fontSize: 13, padding: "2px 8px", borderRadius: 4, border: "1px solid #ccc" }}
+          >
+            <option value="">All Layers</option>
+            {layerOptions.map(layer => (
+              <option key={layer} value={layer}>{layer}</option>
+            ))}
+          </select>
+        </div>
         <canvas
           id="canvas"
           ref={canvasRef}
