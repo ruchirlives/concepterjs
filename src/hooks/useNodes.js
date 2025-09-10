@@ -21,7 +21,16 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
     const BASE_RADIUS = 40;
     const RADIUS_SCALE = 0.4;
     const BASE_FONT_SIZE = 16;
-    const LEVELS = 6; // Parent, Child, Grandchild, Great-Grandchild
+    // Dynamically set LEVELS based on node count
+    let LEVELS = 1;
+    if (incomingNodes.length < 80) LEVELS = 6;
+    else if (incomingNodes.length < 100) LEVELS = 5;
+    else if (incomingNodes.length < 150) LEVELS = 4;
+    else if (incomingNodes.length < 200) LEVELS = 3;
+    else if (incomingNodes.length < 250) LEVELS = 2;
+    else LEVELS = 1;
+
+
     useEffect(() => {
         const FONT_SCALE = RADIUS_SCALE;
         if (!incomingNodes) return;
@@ -156,7 +165,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         });
 
         setNodes(positioned);
-    }, [incomingNodes, parentChildMap]);
+    }, [incomingNodes, parentChildMap, LEVELS]);
 
     // Drawing helpers
     const drawGrid = (ctx) => {
