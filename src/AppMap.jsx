@@ -13,6 +13,13 @@ export default function AppMap() {
   redrawRef.current = redraw;
 
   useEffect(() => {
+    // Prevent unwanted scroll warnings: only allow ctrl+wheel for zoom
+    const preventScroll = (e) => {
+      if (!e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -33,8 +40,16 @@ export default function AppMap() {
     window.addEventListener("resize", handleResize);
     handleResize();
 
+    // Add wheel event listener to canvas
+    if (canvas) {
+      canvas.addEventListener("wheel", preventScroll, { passive: false });
+    }
+
     return () => {
       window.removeEventListener("resize", handleResize);
+      if (canvas) {
+        canvas.removeEventListener("wheel", preventScroll);
+      }
       infiniteCanvasRef.current = null;
     };
   }, []);

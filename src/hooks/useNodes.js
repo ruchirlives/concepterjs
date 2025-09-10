@@ -19,11 +19,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
 
     // Initialize node positions whenever incoming list changes
     const BASE_RADIUS = 40;
-    const RADIUS_SCALE = 0.5;
+    const RADIUS_SCALE = 0.4;
     const BASE_FONT_SIZE = 16;
-    const FONT_SCALE = 0.7;
-    const LEVELS = 4; // Parent, Child, Grandchild, Great-Grandchild
+    const LEVELS = 5; // Parent, Child, Grandchild, Great-Grandchild
     useEffect(() => {
+        const FONT_SCALE = RADIUS_SCALE;
         if (!incomingNodes) return;
 
         const safeParentChildMap = parentChildMap || [];
@@ -48,8 +48,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
                 return "#95a5a6";                       // Others: gray
             };
 
-            const radius = Math.max(8, BASE_RADIUS * Math.pow(RADIUS_SCALE, level));
-            const fontSize = Math.max(8, BASE_FONT_SIZE * Math.pow(FONT_SCALE, level));
+            const radius = BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
+            const fontSize = BASE_FONT_SIZE * Math.pow(FONT_SCALE, level);
 
             // For root nodes, use their own position or grid
             let nodeX = parentPos
@@ -67,8 +67,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
                 nodeY = parentPos.y + Math.sin(angle) * orbit;
             }
 
-            // Label logic: prefer label, then name/Name, then id
-            const label = row.label || row.name || row.Name || row.id || `Node ${index}`;
+            // Label logic: prefer label, then name/Name, then id, trimmed to 20 chars
+            let label = row.label || row.name || row.Name || row.id || `Node ${index}`;
+            if (typeof label === "string") label = label.slice(0, 40);
 
             positioned.push({
                 id: row.id ?? index,
@@ -105,15 +106,23 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             }
         };
 
-        // Add all top-level nodes (not children in parentChildMap)
+        // Add all top-level nodes (not children in parentChildMap) in a circular arrangement
         const childIds = new Set();
         safeParentChildMap.forEach(entry => {
             (entry.children || []).forEach(child => childIds.add(child.id || child));
         });
-        incomingNodes.forEach((row, index) => {
-            if (!childIds.has(row.id)) {
-                addNode(row, index, null, 0);
-            }
+        // Find top-level nodes
+        const topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
+        const N = topLevelNodes.length;
+        // Center and radius for the circle
+        const centerX = 0;
+        const centerY = 0;
+        const circleRadius = 350;
+        topLevelNodes.forEach((row, index) => {
+            const angle = (2 * Math.PI * index) / N;
+            const x = centerX + Math.cos(angle) * circleRadius;
+            const y = centerY + Math.sin(angle) * circleRadius;
+            addNode({ ...row, x, y }, index, null, 0);
         });
 
         setNodes(positioned);
@@ -145,13 +154,15 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
             ctx.arc(n.x, n.y, n.radius || 30, 0, 2 * Math.PI);
             ctx.fillStyle = n.color || "blue";
             ctx.fill();
+            ctx.lineWidth = Math.max(1, (n.radius || 30) * 0.12); // Border width scales with radius
             ctx.strokeStyle = "#222";
             ctx.stroke();
-            // Draw label above node in black, with smaller font
+            // Draw label above node in black, with smaller font and offset scaled by radius
             const labelFontSize = n.fontSize * 0.2;
             ctx.font = `${labelFontSize}px sans-serif`;
             ctx.fillStyle = "#000";
-            ctx.fillText(n.label, n.x, n.y - (n.radius || 30) - 4);
+            const textOffset = (n.radius || 30) * 1.15; // Offset above node, scales with radius
+            ctx.fillText(n.label, n.x, n.y - textOffset);
         });
     };
 
@@ -160,7 +171,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = []) => {
         const ctx = infiniteCanvas.getContext("2d");
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.clearRect(-Infinity, -Infinity, Infinity, Infinity);
         ctx.restore();
         drawGrid(ctx);
         drawNodes(ctx);
