@@ -11,7 +11,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
-    const { parentChildMap, rowData } = useAppContext() || {};
+    const { parentChildMap, rowData, setRowData } = useAppContext() || {};
 
     // Keep refs in sync
     useEffect(() => {
@@ -297,6 +297,21 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         };
 
         const onUp = () => {
+            // Save positions back to original incomingNodes array
+            if (selectedRef.current != null) {
+                const n = nodesRef.current.find(n => n.id === selectedRef.current);
+                if (n) {
+                    // Find the matching row in incomingNodes and update its Position
+                    const row = incomingNodes.find(r => r.id === n.id);
+                    if (row) {
+                        row.Position = { x: n.x, y: n.y };
+                    }
+                    // Also use setRowData if available
+                        setRowData((prev) => {
+                            return prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r);
+                        });
+                }
+            }
             selectedRef.current = null;
         };
 
@@ -309,7 +324,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             infiniteCanvas.removeEventListener("mousemove", onMove);
             infiniteCanvas.removeEventListener("mouseup", onUp);
         };
-    }, [infiniteCanvas]);
+    }, [infiniteCanvas, incomingNodes, setRowData]);
 
     return { nodes, setNodes, redraw };
 };
