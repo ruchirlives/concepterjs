@@ -36,7 +36,6 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
 
     useEffect(() => {
-        const FONT_SCALE = RADIUS_SCALE;
         if (!incomingNodes) return;
 
         const safeParentChildMap = parentChildMap || [];
