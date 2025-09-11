@@ -341,14 +341,34 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             dragStartRef.current = null;
         };
 
+        // Right-click handler for nodes
+        const onContextMenu = (e) => {
+            const pos = { x: e.offsetX, y: e.offsetY };
+            // Find the topmost node (last drawn = topmost)
+            const hit = [...nodesRef.current].reverse().find(
+                (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
+            );
+            if (hit) {
+                // Prevent default context menu
+                e.preventDefault();
+                // You can trigger your custom context menu logic here
+                // For now, just log the node
+                // Replace this with your own handler as needed
+                // eslint-disable-next-line no-console
+                console.log('Right-clicked node:', hit);
+            }
+        };
+
         infiniteCanvas.addEventListener("mousedown", onDown);
         infiniteCanvas.addEventListener("mousemove", onMove);
         infiniteCanvas.addEventListener("mouseup", onUp);
+        infiniteCanvas.addEventListener("contextmenu", onContextMenu);
 
         return () => {
             infiniteCanvas.removeEventListener("mousedown", onDown);
             infiniteCanvas.removeEventListener("mousemove", onMove);
             infiniteCanvas.removeEventListener("mouseup", onUp);
+            infiniteCanvas.removeEventListener("contextmenu", onContextMenu);
         };
     }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef]);
 
