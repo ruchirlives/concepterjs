@@ -50,7 +50,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         // Recursive node adder for levels
         const positioned = [];
-        const addNode = (row, index, parentPos = null, level = 0) => {
+        const addNode = (row, index, parentPos = null, level = 0, parentRadius = null) => {
             if (level > LEVELS) return; // Only render up to grandchildren
 
             // Color and size by level
@@ -70,10 +70,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
             };
 
-            const radius = level === 0 && row.MapRadius != null
-                ? row.MapRadius
-                : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
-            const fontSize = BASE_FONT_SIZE * Math.pow(FONT_SCALE, level);
+            const radius =
+                level === 0 && row.MapRadius != null ? row.MapRadius
+                    : parentRadius != null ? parentRadius * Math.pow(RADIUS_SCALE, level)
+                        : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
+            const fontSize = BASE_FONT_SIZE * radius / BASE_RADIUS
 
             // For root nodes, use their own Position or grid
             let nodeX = parentPos
@@ -142,7 +143,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                             childRow,
                             childIdx,
                             { x: nodeX, y: nodeY, childCount: children.length },
-                            level + 1
+                            level + 1,
+                            radius
                         );
                     }
                 });
