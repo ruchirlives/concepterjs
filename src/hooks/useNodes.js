@@ -27,11 +27,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const BASE_FONT_SIZE = 16;
     // Dynamically set LEVELS based on node count
     let LEVELS = 1;
-    if (rowData.length < 80) LEVELS = 6;
-    else if (rowData.length < 100) LEVELS = 5;
-    else if (rowData.length < 150) LEVELS = 4;
-    else if (rowData.length < 200) LEVELS = 3;
-    else if (rowData.length < 250) LEVELS = 2;
+    if (rowData.length < 40) LEVELS = 6;
+    else if (rowData.length < 60) LEVELS = 5;
+    else if (rowData.length < 80) LEVELS = 4;
+    else if (rowData.length < 100) LEVELS = 3;
+    else if (rowData.length < 150) LEVELS = 2;
     else LEVELS = 1;
 
 
@@ -71,8 +71,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             };
 
             const radius = level === 0 && row.MapRadius != null
-              ? row.MapRadius
-              : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
+                ? row.MapRadius
+                : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
             const fontSize = BASE_FONT_SIZE * Math.pow(FONT_SCALE, level);
 
             // For root nodes, use their own Position or grid
