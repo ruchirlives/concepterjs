@@ -71,7 +71,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
             const radius =
                 level === 0 && row.MapRadius != null ? row.MapRadius
-                    : parentRadius != null ? parentRadius * Math.pow(RADIUS_SCALE, level)
+                    : parentRadius != null ? parentRadius * RADIUS_SCALE
                         : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
             const fontSize = BASE_FONT_SIZE * radius / BASE_RADIUS
 
