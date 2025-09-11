@@ -161,7 +161,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
         }
 
-        console.log("Top-level nodes for layout:", topLevelNodes[0]);
+        // Defensive: if no nodes, don't update state
+        if (!topLevelNodes || topLevelNodes.length === 0) return;
 
         const N = topLevelNodes.length;
         // Center and radius for the circle
@@ -260,26 +261,17 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     // Event handling for dragging
     useEffect(() => {
         if (!infiniteCanvas) return;
-        const canvas = infiniteCanvas.canvas;
-        const ctx = infiniteCanvas.getContext("2d");
-
-        const getPos = (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const inv = ctx.getTransform().invertSelf();
-            const pt = new DOMPoint(x, y).matrixTransform(inv);
-            return { x: pt.x, y: pt.y };
-        };
 
         const onDown = (e) => {
             if (!e.altKey) return;
-            const pos = getPos(e);
+            const pos = { x: e.offsetX, y: e.offsetY };
             console.log("Alt+drag to move nodes", pos);
+            console.log("Nodes:", nodesRef.current);
             const hit = nodesRef.current.find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
             if (hit) {
+                console.log("Node drag started", hit.id);
                 e.preventDefault(); // This cancels InfiniteCanvas pan
                 selectedRef.current = hit.id;
                 // Optionally: e.stopPropagation();
@@ -288,7 +280,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         const onMove = (e) => {
             if (selectedRef.current == null) return;
-            const pos = getPos(e);
+            const pos = { x: e.offsetX, y: e.offsetY };
             setNodes((ns) =>
                 ns.map((n) =>
                     n.id === selectedRef.current ? { ...n, x: pos.x, y: pos.y } : n
@@ -298,6 +290,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         const onUp = () => {
             // Save positions back to original incomingNodes array
+            console.log("Node drag ended", selectedRef.current);
             if (selectedRef.current != null) {
                 const n = nodesRef.current.find(n => n.id === selectedRef.current);
                 if (n) {

@@ -22,9 +22,12 @@ export default function AppMap() {
     return (rowData || []).filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
   }, [rowData, selectedLayer]);
 
+  // Memoize the nodes array to ensure stable reference
+  const memoizedNodes = React.useMemo(() => filteredRowData && filteredRowData.length > 0 ? filteredRowData : undefined, [filteredRowData]);
+
   const { redraw } = useNodes(
     infiniteCanvasRef.current,
-    filteredRowData && filteredRowData.length > 0 ? filteredRowData : undefined,
+    memoizedNodes,
     drawMap,
     selectedLayerRef
   );
