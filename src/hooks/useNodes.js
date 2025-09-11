@@ -7,12 +7,11 @@ import { useAppContext } from "../AppContext";
  * @param {Array} incomingNodes - array of node objects with optional { id, label, x, y }
  * @param {string} selectedLayer - (optional) filter for top-level nodes by this layer/tag
  */
-export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayerRef) => {
+export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayerRef, dragModeRef) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
-    // Drag mode and drag start refs must be at the top level
-    const dragModeRef = useRef(null); // 'move' or 'scale'
+
     const dragStartRef = useRef(null); // { x, y, radius }
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
 
@@ -351,7 +350,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             infiniteCanvas.removeEventListener("mousemove", onMove);
             infiniteCanvas.removeEventListener("mouseup", onUp);
         };
-    }, [infiniteCanvas, incomingNodes, setRowData]);
+    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef]);
 
     return { nodes, setNodes, redraw };
 };

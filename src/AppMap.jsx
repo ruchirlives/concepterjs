@@ -8,8 +8,9 @@ export default function AppMap() {
   const canvasRef = useRef(null);
   const infiniteCanvasRef = useRef(null);
   const redrawRef = useRef(() => {});
+  const dragModeRef = useRef(null); // 'move' or 'scale'
   const { rowData, layerOptions = [] } = useAppContext();
-  const { drawMap, refreshMap } = useBackdropMap("/maps/topo_lad.json");
+  const { drawMap, refreshMap } = useBackdropMap("/maps/topo_lad.json", dragModeRef);
 
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
@@ -29,7 +30,8 @@ export default function AppMap() {
     infiniteCanvasRef.current,
     memoizedNodes,
     drawMap,
-    selectedLayerRef
+    selectedLayerRef,
+    dragModeRef
   );
   redrawRef.current = redraw;
 

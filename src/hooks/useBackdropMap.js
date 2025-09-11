@@ -1,5 +1,5 @@
 // hooks/useBackdropMap.js
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { geoMercator, geoPath, geoCentroid } from "d3-geo";
 import { feature } from "topojson-client";
 
@@ -10,7 +10,7 @@ import { feature } from "topojson-client";
  *
  * World coordinates: centered at (0,0) so it plays nicely with InfiniteCanvas.
  */
-export function useBackdropMap(geojsonUrl) {
+export function useBackdropMap(geojsonUrl, dragModeRef) {
     const [data, setData] = useState(null);
     const [offscreen, setOffscreen] = useState(null);
     const projectionRef = useRef(null);
@@ -74,7 +74,8 @@ export function useBackdropMap(geojsonUrl) {
         ctx.drawImage(offscreen, -offscreen.width / 2, -offscreen.height / 2);
     };
 
-    const refreshMap = (transform) => {
+    const refreshMap = useCallback((transform) => {
+        if (dragModeRef.current !== null) return;
         if (!data || !pathRef.current || !offscreen) return;
         const ctx = offscreen.getContext("2d");
         ctx.save();
@@ -88,7 +89,7 @@ export function useBackdropMap(geojsonUrl) {
         ctx.strokeStyle = "#6b7280";
         ctx.stroke();
         ctx.restore();
-    };
+    }, [data, dragModeRef, offscreen]);
 
     return { drawMap, refreshMap, isLoaded: !!data };
 }
