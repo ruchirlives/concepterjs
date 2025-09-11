@@ -301,6 +301,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             if (selectedRef.current != null) {
                 const n = nodesRef.current.find(n => n.id === selectedRef.current);
                 if (n) {
+                    console.log("Node moved and being updated:", n);
                     // Find the matching row in incomingNodes and update its Position
                     const row = incomingNodes.find(r => r.id === n.id);
                     if (row) {
