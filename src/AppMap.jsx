@@ -26,7 +26,10 @@ export default function AppMap() {
   // Memoize the nodes array to ensure stable reference
   const memoizedNodes = React.useMemo(() => filteredRowData && filteredRowData.length > 0 ? filteredRowData : undefined, [filteredRowData]);
 
-  const { redraw } = useNodes(
+  const {
+    redraw,
+    contextMenuElement
+  } = useNodes(
     infiniteCanvasRef.current,
     memoizedNodes,
     drawMap,
@@ -140,6 +143,8 @@ export default function AppMap() {
             style={{ width: "100%", height: "100%" }}
           />
         </div>
+        {/* Render the context menu portal */}
+        {contextMenuElement}
       </div>
     </>
   );

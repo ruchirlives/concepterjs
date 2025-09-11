@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ContextMenu, useMenuHandlers } from "./useContextMenu";
 import { useAppContext } from "../AppContext";
 
 /**
@@ -11,6 +13,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState(null);
 
     const dragStartRef = useRef(null); // { x, y, radius }
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
@@ -121,7 +125,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 color: getNodeColor(level, row.id ?? index),
                 radius,
                 fontSize,
-                level
+                level,
+                parentId: parentPos ? parentPos.id : null,
             });
 
             // Render children (only if within level limit)
@@ -140,7 +145,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                         addNode(
                             childRow,
                             childIdx,
-                            { x: nodeX, y: nodeY, childCount: children.length },
+                            { x: nodeX, y: nodeY, childCount: children.length, id: row.id },
                             level + 1,
                             radius
                         );
@@ -344,18 +349,18 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         // Right-click handler for nodes
         const onContextMenu = (e) => {
             const pos = { x: e.offsetX, y: e.offsetY };
-            // Find the topmost node (last drawn = topmost)
             const hit = [...nodesRef.current].reverse().find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
             if (hit) {
-                // Prevent default context menu
                 e.preventDefault();
-                // You can trigger your custom context menu logic here
-                // For now, just log the node
-                // Replace this with your own handler as needed
-                // eslint-disable-next-line no-console
-                console.log('Right-clicked node:', hit);
+                // Find parentId for the node (implement getParentId as needed)
+                setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    cid: hit.id,
+                    parentId: hit.parentId,
+                });
             }
         };
 
@@ -372,7 +377,38 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         };
     }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef]);
 
-    return { nodes, setNodes, redraw };
+
+    const { handleSelect, handleRename, exportMenu } = useMenuHandlers({ rowData, setRowData });
+    // Example menu options for demonstration
+    const menuOptions = [
+        {
+            label: "Select Node",
+            onClick: handleSelect
+        },
+        {
+            label: "Rename Node",
+            onClick: handleRename
+        },
+        {
+            label: "Export Menu",
+            submenu: exportMenu
+        }
+    ];
+
+
+    // Render ContextMenu in a portal to document.body
+    const contextMenuElement = contextMenu
+        ? createPortal(
+            <ContextMenu
+                contextMenu={contextMenu}
+                setContextMenu={setContextMenu}
+                menuOptions={menuOptions}
+            />,
+            typeof window !== "undefined" && window.document && window.document.body ? window.document.body : null
+        )
+        : null;
+
+    return { nodes, setNodes, redraw, contextMenuElement };
 };
 
 export default useNodes;
