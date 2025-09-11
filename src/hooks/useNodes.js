@@ -23,7 +23,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
     // Initialize node Positions whenever incoming list changes
     const BASE_RADIUS = 40;
-    const RADIUS_SCALE = 0.4;
+    const RADIUS_SCALE = 0.3;
     const BASE_FONT_SIZE = 16;
     // Dynamically set LEVELS based on node count
     let LEVELS = 1;
@@ -86,7 +86,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             // For children/grandchildren, arrange in a circle inside parent
             if (parentPos) {
                 // Orbit scales exponentially with level, just like radius
-                const orbit = BASE_RADIUS * 3 * Math.pow(RADIUS_SCALE, level);
+                const orbit = radius * 3;
                 const angle = (2 * Math.PI * index) / parentPos.childCount;
                 nodeX = parentPos.x + Math.cos(angle) * orbit;
                 nodeY = parentPos.y + Math.sin(angle) * orbit;
