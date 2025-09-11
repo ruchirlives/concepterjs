@@ -7,7 +7,7 @@ import { useAppContext } from "../AppContext";
  * @param {Array} incomingNodes - array of node objects with optional { id, label, x, y }
  * @param {string} selectedLayer - (optional) filter for top-level nodes by this layer/tag
  */
-export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayer) => {
+export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayerRef) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
@@ -18,7 +18,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         nodesRef.current = nodes;
     }, [nodes]);
 
-    // Initialize node positions whenever incoming list changes
+    // Initialize node Positions whenever incoming list changes
     const BASE_RADIUS = 40;
     const RADIUS_SCALE = 0.4;
     const BASE_FONT_SIZE = 16;
@@ -70,13 +70,13 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             const radius = BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
             const fontSize = BASE_FONT_SIZE * Math.pow(FONT_SCALE, level);
 
-            // For root nodes, use their own position or grid
+            // For root nodes, use their own Position or grid
             let nodeX = parentPos
                 ? parentPos.x
-                : row.x ?? row.position?.x ?? 100 + (index % 5) * 150;
+                : row.x ?? row.Position?.x ?? 100 + (index % 5) * 150;
             let nodeY = parentPos
                 ? parentPos.y
-                : row.y ?? row.position?.y ?? 100 + Math.floor(index / 5) * 100;
+                : row.y ?? row.Position?.y ?? 100 + Math.floor(index / 5) * 100;
 
             // For children/grandchildren, arrange in a circle inside parent
             if (parentPos) {
@@ -144,33 +144,50 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             }
         };
 
+
         // Add all top-level nodes (not children in parentChildMap) in a circular arrangement
         const childIds = new Set();
         safeParentChildMap.forEach(entry => {
             (entry.children || []).forEach(child => childIds.add(child.id || child));
         });
-        // Find top-level nodes
-        let topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
-        // If selectedLayer is set, filter only top-level nodes by tag
+
+        let topLevelNodes;
+        const selectedLayer = selectedLayerRef && selectedLayerRef.current;
         if (selectedLayer) {
-            topLevelNodes = topLevelNodes.filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
+            // If filtering by layer, include all nodes with the tag, regardless of child/parent status
+            topLevelNodes = incomingNodes.filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
+        } else {
+            // Default: only nodes not children in parentChildMap
+            topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
         }
+
+        console.log("Top-level nodes for layout:", topLevelNodes[0]);
+
         const N = topLevelNodes.length;
         // Center and radius for the circle
         const centerX = 0;
         const centerY = 0;
         // Scale radius so nodes don't overlap: base radius + extra per node
-        const minSpacing = BASE_RADIUS * 2.5;
+        const minSpacing = topLevelNodes.length > 0 && topLevelNodes[0].MapRadius
+            ? topLevelNodes[0].MapRadius
+            : BASE_RADIUS * 2.5;
         const circleRadius = Math.max(350, (N * minSpacing) / (2 * Math.PI));
         topLevelNodes.forEach((row, index) => {
-            const angle = (2 * Math.PI * index) / N;
-            const x = centerX + Math.cos(angle) * circleRadius;
-            const y = centerY + Math.sin(angle) * circleRadius;
+            // If the node already has a Position (x/y or Position.x/Position.y), use it; otherwise, lay out in a circle
+            let x = row.x;
+            let y = row.y;
+            if (x == null && row.Position && row.Position.x != null) x = row.Position.x;
+            if (y == null && row.Position && row.Position.y != null) y = row.Position.y;
+            if (x == null || y == null) {
+                const angle = (2 * Math.PI * index) / N;
+                x = centerX + Math.cos(angle) * circleRadius;
+                y = centerY + Math.sin(angle) * circleRadius;
+            }
             addNode({ ...row, x, y }, index, null, 0);
         });
 
         setNodes(positioned);
-    }, [incomingNodes, parentChildMap, LEVELS, selectedLayer]);
+    }, [incomingNodes, parentChildMap, LEVELS, selectedLayerRef]);
 
     // Drawing helpers
     const drawGrid = (ctx) => {

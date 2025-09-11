@@ -13,6 +13,8 @@ export default function AppMap() {
 
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
+  const selectedLayerRef = React.useRef(selectedLayer);
+  useEffect(() => { selectedLayerRef.current = selectedLayer; }, [selectedLayer]);
 
   // Optionally filter rowData by selectedLayer
   const filteredRowData = React.useMemo(() => {
@@ -23,7 +25,8 @@ export default function AppMap() {
   const { redraw } = useNodes(
     infiniteCanvasRef.current,
     filteredRowData && filteredRowData.length > 0 ? filteredRowData : undefined,
-    drawMap
+    drawMap,
+    selectedLayerRef
   );
   redrawRef.current = redraw;
 
@@ -86,40 +89,53 @@ export default function AppMap() {
           Loading data...
         </div>
       )}
-      <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-        {/* Layer filter dropdown in top-right, below Refresh Map button */}
-        <div style={{ position: "absolute", top: 50, right: 10, zIndex: 19, background: "rgba(255,255,255,0.95)", borderRadius: 6, padding: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}>
-          <label style={{ fontSize: 13, marginRight: 6 }}>Layer:</label>
-          <select
-            value={selectedLayer}
-            onChange={e => setSelectedLayer(e.target.value)}
-            style={{ fontSize: 13, padding: "2px 8px", borderRadius: 4, border: "1px solid #ccc" }}
-          >
-            <option value="">All Layers</option>
-            {layerOptions.map(layer => (
-              <option key={layer} value={layer}>{layer}</option>
-            ))}
-          </select>
+      <div style={{ width: "100vw", height: "100vh", overflow: "hidden", position: "relative" }}>
+        {/* Integrated container for Headings tab and canvas */}
+        <div style={{ position: "absolute", top: 0, right: 0, width: 340, height: "100%", zIndex: 20, display: "flex", flexDirection: "column", pointerEvents: "none" }}>
+          <div style={{ margin: 10, pointerEvents: "auto" }}>
+            <div style={{ display: "flex", background: "#f7f7f7", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", border: "1px solid #e0e0e0" }}>
+              <div style={{ padding: "8px 16px", fontWeight: 600, fontSize: 15, borderBottom: "2px solid #0078d4", borderRadius: "8px 8px 0 0", background: "#fff" }}>
+                Headings
+              </div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.97)", borderRadius: "0 0 8px 8px", padding: 12, border: "1px solid #e0e0e0", borderTop: "none" }}>
+              <button
+                style={{ marginBottom: 10, width: "100%", padding: "6px 0", borderRadius: 4, border: "1px solid #ccc", background: "#f5f5f5", fontWeight: 500, fontSize: 14, cursor: "pointer" }}
+                onClick={() => {
+                  const ctx = infiniteCanvasRef.current?.getContext("2d");
+                  if (ctx) {
+                    const transform = ctx.getTransform();
+                    refreshMap(transform);
+                    redrawRef.current();
+                  }
+                }}
+              >
+                Refresh Map
+              </button>
+              <div style={{ marginTop: 6 }}>
+                <label style={{ fontSize: 13, marginRight: 6 }}>Layer:</label>
+                <select
+                  value={selectedLayer}
+                  onChange={e => setSelectedLayer(e.target.value)}
+                  style={{ fontSize: 13, padding: "2px 8px", borderRadius: 4, border: "1px solid #ccc" }}
+                >
+                  <option value="">All Layers</option>
+                  {layerOptions.map(layer => (
+                    <option key={layer} value={layer}>{layer}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
-        <canvas
-          id="canvas"
-          ref={canvasRef}
-          style={{ width: "100%", height: "100%" }}
-        />
+        <div style={{ width: "100%", height: "100%" }}>
+          <canvas
+            id="canvas"
+            ref={canvasRef}
+            style={{ width: "100%", height: "100%" }}
+          />
+        </div>
       </div>
-      <button
-        style={{ position: "absolute", top: 10, right: 10, zIndex: 20 }}
-        onClick={() => {
-          const ctx = infiniteCanvasRef.current?.getContext("2d");
-          if (ctx) {
-            const transform = ctx.getTransform();
-            refreshMap(transform);
-            redrawRef.current();
-          }
-        }}
-      >
-        Refresh Map
-      </button>
     </>
   );
 }
