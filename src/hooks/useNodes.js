@@ -11,6 +11,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
+    // Drag mode and drag start refs must be at the top level
+    const dragModeRef = useRef(null); // 'move' or 'scale'
+    const dragStartRef = useRef(null); // { x, y, radius }
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
 
     // Keep refs in sync
@@ -67,7 +70,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
             };
 
-            const radius = BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
+            const radius = level === 0 && row.MapRadius != null
+              ? row.MapRadius
+              : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
             const fontSize = BASE_FONT_SIZE * Math.pow(FONT_SCALE, level);
 
             // For root nodes, use their own Position or grid
@@ -184,7 +189,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 x = centerX + Math.cos(angle) * circleRadius;
                 y = centerY + Math.sin(angle) * circleRadius;
             }
-            addNode({ ...row, x, y }, index, null, 0);
+            // Use MapRadius if present, otherwise fallback to BASE_RADIUS
+            const nodeRadius = row.MapRadius != null ? row.MapRadius : BASE_RADIUS;
+            addNode({ ...row, x, y, radius: nodeRadius }, index, null, 0);
         });
 
         setNodes(positioned);
@@ -263,50 +270,75 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         if (!infiniteCanvas) return;
 
         const onDown = (e) => {
-            if (!e.altKey) return;
             const pos = { x: e.offsetX, y: e.offsetY };
-            console.log("Alt+drag to move nodes", pos);
-            console.log("Nodes:", nodesRef.current);
             const hit = nodesRef.current.find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
             if (hit) {
-                console.log("Node drag started", hit.id);
-                e.preventDefault(); // This cancels InfiniteCanvas pan
-                selectedRef.current = hit.id;
-                // Optionally: e.stopPropagation();
+                if (e.altKey) {
+                    dragModeRef.current = 'move';
+                    selectedRef.current = hit.id;
+                    e.preventDefault();
+                } else if (e.shiftKey) {
+                    dragModeRef.current = 'scale';
+                    selectedRef.current = hit.id;
+                    dragStartRef.current = {
+                        x: pos.x,
+                        y: pos.y,
+                        radius: hit.radius || 30,
+                        center: { x: hit.x, y: hit.y }
+                    };
+                    e.preventDefault();
+                } else {
+                    dragModeRef.current = null;
+                    selectedRef.current = null;
+                }
             }
         };
 
         const onMove = (e) => {
-            if (selectedRef.current == null) return;
+            if (selectedRef.current == null || !dragModeRef.current) return;
             const pos = { x: e.offsetX, y: e.offsetY };
-            setNodes((ns) =>
-                ns.map((n) =>
-                    n.id === selectedRef.current ? { ...n, x: pos.x, y: pos.y } : n
-                )
-            );
+            if (dragModeRef.current === 'move') {
+                setNodes((ns) =>
+                    ns.map((n) =>
+                        n.id === selectedRef.current ? { ...n, x: pos.x, y: pos.y } : n
+                    )
+                );
+            } else if (dragModeRef.current === 'scale' && dragStartRef.current) {
+                // Calculate new radius based on distance from center
+                const { center } = dragStartRef.current;
+                const newRadius = Math.max(10, Math.hypot(pos.x - center.x, pos.y - center.y));
+                setNodes((ns) =>
+                    ns.map((n) =>
+                        n.id === selectedRef.current ? { ...n, radius: newRadius } : n
+                    )
+                );
+            }
         };
 
         const onUp = () => {
-            // Save positions back to original incomingNodes array
-            console.log("Node drag ended", selectedRef.current);
+            // Save positions or radius back to original incomingNodes array
             if (selectedRef.current != null) {
                 const n = nodesRef.current.find(n => n.id === selectedRef.current);
                 if (n) {
-                    console.log("Node moved and being updated:", n);
-                    // Find the matching row in incomingNodes and update its Position
                     const row = incomingNodes.find(r => r.id === n.id);
-                    if (row) {
-                        row.Position = { x: n.x, y: n.y };
+                    if (dragModeRef.current === 'move') {
+                        if (row) {
+                            row.Position = { x: n.x, y: n.y };
+                        }
+                        setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r));
+                    } else if (dragModeRef.current === 'scale') {
+                        if (row) {
+                            row.MapRadius = n.radius;
+                        }
+                        setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, MapRadius: n.radius } : r));
                     }
-                    // Also use setRowData if available
-                        setRowData((prev) => {
-                            return prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r);
-                        });
                 }
             }
             selectedRef.current = null;
+            dragModeRef.current = null;
+            dragStartRef.current = null;
         };
 
         infiniteCanvas.addEventListener("mousedown", onDown);
