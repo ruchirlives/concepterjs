@@ -183,6 +183,34 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         const { cid } = context;
         const onenotetext = await get_onenote(cid);
 
+        // Convert plain text to HTML (basic, preserving line breaks)
+        const htmlContent = `<pre>${onenotetext.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</pre>`;
+
+        // CF_HTML header construction (see MSDN docs)
+        function createCFHtml(html) {
+            const startHTML = 97; // header length, will be replaced
+            const htmlPrefix =
+                "Version:1.0\r\n" +
+                "StartHTML:00000097\r\n" +
+                "EndHTML:{{end}}\r\n" +
+                "StartFragment:00000131\r\n" +
+                "EndFragment:{{fragend}}\r\n";
+            const htmlFrag = `<!--StartFragment-->${html}<!--EndFragment-->`;
+            const fullHtml = htmlPrefix + htmlFrag;
+            // Calculate offsets
+            const startHTMLIdx = htmlPrefix.length;
+            const endHTMLIdx = fullHtml.length;
+            const startFragmentIdx = fullHtml.indexOf("<!--StartFragment-->") + 20;
+            const endFragmentIdx = fullHtml.indexOf("<!--EndFragment-->") ;
+            // Replace placeholders
+            let result = fullHtml
+                .replace("00000097", String(startHTMLIdx).padStart(8, '0'))
+                .replace("{{end}}", String(endHTMLIdx).padStart(8, '0'))
+                .replace("00000131", String(startFragmentIdx).padStart(8, '0'))
+                .replace("{{fragend}}", String(endFragmentIdx).padStart(8, '0'));
+            return result;
+        }
+
         toast((t) => (
             <div className="max-w-[300px]">
                 <div className="font-semibold mb-1">OneNote Export</div>
@@ -191,13 +219,23 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
                 </div>
                 <button
                     className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
-                    onClick={() => {
-                        navigator.clipboard.writeText(onenotetext);
-                        toast.success("Copied!");
+                    onClick={async () => {
+                        try {
+                            const cfHtml = createCFHtml(htmlContent);
+                            await navigator.clipboard.write([
+                                new window.ClipboardItem({
+                                    'text/html': new Blob([cfHtml], { type: 'text/html' }),
+                                    'text/plain': new Blob([onenotetext], { type: 'text/plain' })
+                                })
+                            ]);
+                            toast.success("Copied as CF_HTML!");
+                        } catch (err) {
+                            toast.error("Clipboard copy failed");
+                        }
                         toast.dismiss(t.id);
                     }}
                 >
-                    Copy to Clipboard
+                    Copy to Clipboard (CF_HTML)
                 </button>
             </div>
         ), { duration: 8000 });
