@@ -181,53 +181,70 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
     // Export Onenote
     const handleExportOnenote = async (context) => {
         const { cid } = context;
-        const onenotetext = await get_onenote(cid);
+        const htmlFragment = await get_onenote(cid);
 
-        // Convert plain text to HTML (basic, preserving line breaks)
-        const htmlContent = `<pre>${onenotetext.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</pre>`;
+        // CF_HTML header construction (strict, single header, correct offsets)
+        function createCFHtml(htmlFragment) {
+            // Wrap in html/body and fragment markers, no extra <body> tags
+            const preHtml = '<html><body>';
+            const postHtml = '</body></html>';
+            const startFragment = '<!--StartFragment-->';
+            const endFragment = '<!--EndFragment-->';
+            const html = preHtml + startFragment + htmlFragment + endFragment + postHtml;
 
-        // CF_HTML header construction (see MSDN docs)
-        function createCFHtml(html) {
-            const startHTML = 97; // header length, will be replaced
-            const htmlPrefix =
-                "Version:1.0\r\n" +
-                "StartHTML:00000097\r\n" +
-                "EndHTML:{{end}}\r\n" +
-                "StartFragment:00000131\r\n" +
-                "EndFragment:{{fragend}}\r\n";
-            const htmlFrag = `<!--StartFragment-->${html}<!--EndFragment-->`;
-            const fullHtml = htmlPrefix + htmlFrag;
-            // Calculate offsets
-            const startHTMLIdx = htmlPrefix.length;
-            const endHTMLIdx = fullHtml.length;
-            const startFragmentIdx = fullHtml.indexOf("<!--StartFragment-->") + 20;
-            const endFragmentIdx = fullHtml.indexOf("<!--EndFragment-->") ;
-            // Replace placeholders
-            let result = fullHtml
-                .replace("00000097", String(startHTMLIdx).padStart(8, '0'))
-                .replace("{{end}}", String(endHTMLIdx).padStart(8, '0'))
-                .replace("00000131", String(startFragmentIdx).padStart(8, '0'))
-                .replace("{{fragend}}", String(endFragmentIdx).padStart(8, '0'));
-            return result;
+            // Header template (offsets as 0, will be replaced)
+            const header =
+                'Version:1.0\r\n' +
+                'StartHTML:00000000\r\n' +
+                'EndHTML:00000000\r\n' +
+                'StartFragment:00000000\r\n' +
+                'EndFragment:00000000\r\n';
+
+            // Calculate offsets using UTF-8 byte length for CF_HTML spec
+            function utf8ByteLen(str) {
+                return new TextEncoder().encode(str).length;
+            }
+            const startHTML = utf8ByteLen(header);
+            const endHTML = startHTML + utf8ByteLen(html);
+            const startFragmentOffset = startHTML + utf8ByteLen(html.substring(0, html.indexOf(startFragment) + startFragment.length));
+            const endFragmentOffset = startHTML + utf8ByteLen(html.substring(0, html.indexOf(endFragment)));
+
+            // Fill in offsets (8 digits, zero-padded)
+            const finalHeader =
+                'Version:1.0\r\n' +
+                `StartHTML:${String(startHTML).padStart(8, '0')}\r\n` +
+                `EndHTML:${String(endHTML).padStart(8, '0')}\r\n` +
+                `StartFragment:${String(startFragmentOffset).padStart(8, '0')}\r\n` +
+                `EndFragment:${String(endFragmentOffset).padStart(8, '0')}\r\n`;
+
+            const cfHtml = finalHeader + html;
+            // Debug: log the generated CF_HTML string
+            return cfHtml;
         }
 
         toast((t) => (
             <div className="max-w-[300px]">
                 <div className="font-semibold mb-1">OneNote Export</div>
                 <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">
-                    {onenotetext}
+                    {htmlFragment}
                 </div>
                 <button
                     className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
                     onClick={async () => {
                         try {
-                            const cfHtml = createCFHtml(htmlContent);
+                            // Always rewrap as Version:1.0 CF_HTML for clipboard
+                            const cfHtml = createCFHtml(htmlFragment);
                             await navigator.clipboard.write([
                                 new window.ClipboardItem({
                                     'text/html': new Blob([cfHtml], { type: 'text/html' }),
-                                    'text/plain': new Blob([onenotetext], { type: 'text/plain' })
+                                    'text/plain': new Blob([htmlFragment], { type: 'text/plain' })
                                 })
                             ]);
+                            // Try to read back from clipboard (if supported)
+                            if (navigator.clipboard.readText) {
+                                const clipText = await navigator.clipboard.readText();
+                                console.log('Clipboard text/plain after write:', clipText);
+                            }
                             toast.success("Copied as CF_HTML!");
                         } catch (err) {
                             toast.error("Clipboard copy failed");
@@ -237,6 +254,15 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
                 >
                     Copy to Clipboard (CF_HTML)
                 </button>
+            {/* Manual copy fallback for debugging */}
+            <textarea
+                className="w-full text-xs font-mono mt-2 border border-gray-300 rounded"
+                rows={4}
+                value={createCFHtml(htmlFragment)}
+                readOnly
+                onFocus={e => e.target.select()}
+                style={{ fontSize: '10px' }}
+            />
             </div>
         ), { duration: 8000 });
     };
