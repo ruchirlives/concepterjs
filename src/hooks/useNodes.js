@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, useMenuHandlers } from "./useContextMenu";
+import { handleWriteBack } from "./effectsShared";
 import { useAppContext } from "../AppContext";
 
 /**
@@ -322,8 +323,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             }
         };
 
-        const onUp = () => {
+        const onUp = async () => {
             // Save positions or radius back to original incomingNodes array
+            let updated = false;
             if (selectedRef.current != null) {
                 const n = nodesRef.current.find(n => n.id === selectedRef.current);
                 if (n) {
@@ -333,13 +335,21 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                             row.Position = { x: n.x, y: n.y };
                         }
                         setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r));
+                        updated = true;
                     } else if (dragModeRef.current === 'scale') {
                         if (row) {
                             row.MapRadius = n.radius;
                         }
                         setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, MapRadius: n.radius } : r));
+                        updated = true;
                     }
                 }
+            }
+            if (updated) {
+                // Persist changes to backend
+                await handleWriteBack(
+                    typeof rowData === 'function' ? rowData() : rowData
+                );
             }
             selectedRef.current = null;
             dragModeRef.current = null;
@@ -375,7 +385,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             infiniteCanvas.removeEventListener("mouseup", onUp);
             infiniteCanvas.removeEventListener("contextmenu", onContextMenu);
         };
-    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef]);
+    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
 
 
     const { handleSelect, handleRename, exportMenu } = useMenuHandlers({ rowData, setRowData });
