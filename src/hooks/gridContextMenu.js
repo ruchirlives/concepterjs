@@ -1,8 +1,56 @@
 import React, { useRef, useState } from "react";
-import { fetchParentContainers, addChildren, removeChildren, deleteContainers, get_docx, mergeContainers, fetchContainerById, fetchChildren } from "../api"; // Import API function
-import { sendGanttToChannel, sendMermaidToChannel, writeBackUpdatedData } from "./effectsShared";
+import { fetchParentContainers, addChildren, removeChildren, deleteContainers, mergeContainers, fetchContainerById, fetchChildren } from "../api";
+import { writeBackUpdatedData } from "./effectsShared";
 import { addTagToNodes, removeTagFromNodes } from "./gridEffects";
-// Context menu rendering
+import { useMenuHandlers } from "./useContextMenu"
+import { useAppContext } from "../AppContext";
+
+
+// Helper to render a menu item
+const MenuItem = ({ label, onClick, children, ...props }) => (
+    <div onClick={onClick} style={{ padding: "8px", cursor: "pointer", position: "relative" }} {...props}>
+        {label}
+        {children}
+    </div>
+);
+
+// Helper to render a submenu
+const SubMenu = ({ label, show, setShow, options, onMenuItemClick, gridApiRef, setRowData, type }) => (
+    <MenuItem
+        label={label}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+    >
+        {show && (
+            <div style={{ position: "absolute", left: "100%", top: 0, backgroundColor: "#fff", border: "1px solid #ccc", zIndex: 1000 }}>
+                {options.map((l) => (
+                    <div key={l} style={{ padding: "4px 8px", cursor: "pointer" }} onClick={() => onMenuItemClick(type, gridApiRef, setRowData, null, l)}>
+                        {l}
+                    </div>
+                ))}
+            </div>
+        )}
+    </MenuItem>
+);
+
+const menuConfig = [
+    { label: "View Details", action: "view" },
+    { label: "Delay by Days", action: "delay by days" },
+    { label: "Update Gantt", action: "update gantt" },
+    { label: "Update Mermaid", action: "update mermaid" },
+    { label: "Hide Unselected", action: "hide unselected" },
+    { label: "Delete", action: "delete" },
+    { label: "Parent Containers", action: "parents" },
+    { label: "Add Children", action: "add children" },
+    { label: "Create Children", action: "create children" },
+    { label: "Remove Children", action: "remove children" },
+    { label: "Select Children", action: "select children" },
+    { label: "Add Tag", action: "add tag" },
+    // Layer submenus handled separately
+    { label: "Merge Selected", action: "merge selected" },
+    { label: "Export to App", action: "export to app" },
+];
+
 const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData, handleAddRow, activeLayers = [], layerOptions = [] }, ref) => {
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [showRemoveMenu, setShowRemoveMenu] = useState(false);
@@ -17,148 +65,45 @@ const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData,
                 border: "1px solid #ccc",
                 zIndex: 1000,
                 boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+                padding: "8px",
             }}
         >
             <div
-                onClick={() => onMenuItemClick("view", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+                    gap: "4px",
+                    alignItems: "stretch",
+                }}
             >
-                View Details
+                {menuConfig.map(({ label, action }) => (
+                    <MenuItem
+                        key={action}
+                        label={label}
+                        onClick={() => onMenuItemClick(action, gridApiRef, setRowData, handleAddRow)}
+                    />
+                ))}
+                <SubMenu
+                    label="Add to Layer"
+                    show={showAddMenu}
+                    setShow={setShowAddMenu}
+                    options={layerOptions}
+                    onMenuItemClick={onMenuItemClick}
+                    gridApiRef={gridApiRef}
+                    setRowData={setRowData}
+                    type="add layer"
+                />
+                <SubMenu
+                    label="Remove from Layer"
+                    show={showRemoveMenu}
+                    setShow={setShowRemoveMenu}
+                    options={layerOptions}
+                    onMenuItemClick={onMenuItemClick}
+                    gridApiRef={gridApiRef}
+                    setRowData={setRowData}
+                    type="remove layer"
+                />
             </div>
-            {/* Delay by days */}
-            <div
-                onClick={() => onMenuItemClick("delay by days", gridApiRef, setRowData)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Delay by Days
-            </div>
-            {/* Update gantt */}
-            <div
-                onClick={() => onMenuItemClick("update gantt", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Update Gantt
-            </div>
-            {/* Update mermaid */}
-            <div
-                onClick={() => onMenuItemClick("update mermaid", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Update Mermaid
-            </div>
-            <div
-                onClick={() => onMenuItemClick("hide unselected", gridApiRef, setRowData)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Hide Unselected
-            </div>
-            <div
-                onClick={() => onMenuItemClick("delete", gridApiRef, setRowData)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Delete
-            </div>
-            <div
-                onClick={() => onMenuItemClick("parents", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Parent Containers
-            </div>
-            <div
-                onClick={() => onMenuItemClick("add children", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Add Children
-            </div>
-            <div
-                onClick={() => onMenuItemClick("create children", gridApiRef, setRowData, handleAddRow)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Create Children
-            </div>
-            <div
-                onClick={() => onMenuItemClick("remove children", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Remove Children
-            </div>
-            {/* Select children */}
-            <div
-                onClick={() => onMenuItemClick("select children", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Select Children
-            </div>
-            {/* Add tag */}
-            <div
-                onClick={() => onMenuItemClick("add tag", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Add Tag
-            </div>
-            {/* Add to layer */}
-            <div
-                onMouseEnter={() => setShowAddMenu(true)}
-                onMouseLeave={() => setShowAddMenu(false)}
-                style={{ padding: "8px", cursor: "pointer", position: "relative" }}
-            >
-                Add to Layer
-                {showAddMenu && (
-                    <div style={{ position: "absolute", left: "100%", top: 0, backgroundColor: "#fff", border: "1px solid #ccc", zIndex: 1000 }}>
-                        {layerOptions.map((l) => (
-                            <div key={l} style={{ padding: "4px 8px", cursor: "pointer" }} onClick={() => onMenuItemClick("add layer", gridApiRef, setRowData, null, l)}>
-                                {l}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            {/* Remove from layer */}
-            <div
-                onMouseEnter={() => setShowRemoveMenu(true)}
-                onMouseLeave={() => setShowRemoveMenu(false)}
-                style={{ padding: "8px", cursor: "pointer", position: "relative" }}
-            >
-                Remove from Layer
-                {showRemoveMenu && (
-                    <div style={{ position: "absolute", left: "100%", top: 0, backgroundColor: "#fff", border: "1px solid #ccc", zIndex: 1000 }}>
-                        {layerOptions.map((l) => (
-                            <div key={l} style={{ padding: "4px 8px", cursor: "pointer" }} onClick={() => onMenuItemClick("remove layer", gridApiRef, setRowData, null, l)}>
-                                {l}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            {/* Export to mermaid */}
-            <div
-                onClick={() => onMenuItemClick("export mermaid", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Export to Mermaid
-            </div>
-            {/* Export gantt */}
-            <div
-                onClick={() => onMenuItemClick("export gantt", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Export to Gantt
-            </div>
-            {/* Export docx */}
-            <div
-                onClick={() => onMenuItemClick("export docx", gridApiRef)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Export to Docx
-            </div>
-            {/* Merge selected */}
-            <div
-                onClick={() => onMenuItemClick("merge selected", gridApiRef, setRowData)}
-                style={{ padding: "8px", cursor: "pointer" }}
-            >
-                Merge Selected
-            </div>
-
         </div>
     );
 });
@@ -166,256 +111,140 @@ const ContextMenu = React.forwardRef(({ onMenuItemClick, gridApiRef, setRowData,
 // Custom hook for managing context menu logic
 export const useContextMenu = () => {
     const menuRef = useRef(null);
-    const prevID = useRef(null); // Store the previous mermaid code
+    const prevID = useRef(null);
+    const { rowData, setRowData } = useAppContext();
+    const {exportApp} = useMenuHandlers(rowData, setRowData);
+
+    // Helper for getting selected nodes/ids
+    const getSelection = (gridApi) => {
+        const selectedNodes = gridApi.getSelectedNodes();
+        const selectedIds = selectedNodes.map((node) => node.data.id);
+        return { selectedNodes, selectedIds };
+    };
 
     const handleContextMenu = (params) => {
         params.event.preventDefault();
         const rowId = params.node.data.id;
-
         const menu = menuRef.current;
         if (menu) {
             const x = params.event.clientX || (params.event.touches && params.event.touches[0].clientX);
             const y = params.event.clientY || (params.event.touches && params.event.touches[0].clientY);
-
             menu.style.left = `${x}px`;
             menu.style.top = `${y}px`;
             menu.style.display = "block";
-
-            // Attach rowId to the menu for later use
             menu.dataset.rowId = rowId;
         }
     };
 
-    const onMenuItemClick = async (action, gridApiRef, setRowData, handleAddRow, layer) => {
-        // const { setRowData, handleAddRow } = options;
-        const menu = menuRef.current;
-        const rowId = menu ? menu.dataset.rowId : null;
-
-        const gridApi = gridApiRef.current;
-
-        const selectedNodes = gridApi.getSelectedNodes();
-        const selectedIds = selectedNodes.map((node) => node.data.id);
-
-        if (action === "view") {
-            console.log(`View details for Row ID: ${action}`);
-            alert(`View details for Row ID: ${rowId}`);
-        } else if (action === "delete") {
-            // Prompt user to confirm deletion
-            const isConfirmed = window.confirm("Are you sure you want to delete these rows?");
-            if (isConfirmed) {
-                // Get selected rows
-                // Delete the rows
-                selectedNodes.forEach((node) => {
-                    gridApi.applyTransaction({ remove: [node.data] });
-                });
-
-                // Update the rowData state by filtering out the removed rows
+    // Action handlers
+    const actionHandlers = {
+        "export to app": ({ rowId }) => exportApp(rowId),
+        "view": ({ rowId }) => alert(`View details for Row ID: ${rowId}`),
+        "delete": async ({ gridApi, setRowData, selectedNodes, selectedIds }) => {
+            if (window.confirm("Are you sure you want to delete these rows?")) {
+                selectedNodes.forEach((node) => gridApi.applyTransaction({ remove: [node.data] }));
                 setRowData((prevData) => prevData.filter((row) => !selectedIds.includes(row.id)));
-
-                // Delete using api
-                const response = await deleteContainers(selectedNodes.map((node) => node.data.id));
-                if (response) {
-                    console.log("Rows deleted successfully.");
-                } else {
-                    alert("Failed to delete rows.");
-                }
+                const response = await deleteContainers(selectedIds);
+                if (!response) alert("Failed to delete rows.");
             }
-        } else if (action === "parents") {
+        },
+        "parents": async ({ rowId, gridApi }) => {
             try {
-                const data = await fetchParentContainers(rowId); // Assume this is imported or accessible
-                // Select the parent containers in the grid
-                const parentIds = data.map((container) => container.id);
-                parentIds.forEach((parentId) => {
+                const data = await fetchParentContainers(rowId);
+                data.map((container) => container.id).forEach((parentId) => {
                     const parentNode = gridApi.getRowNode(parentId);
-                    if (parentNode) {
-                        parentNode.setSelected(true); // Select the parent node
-                    }
+                    if (parentNode) parentNode.setSelected(true);
                 });
-                console.log("Parent containers fetched successfully:", data);
-            } catch (error) {
-                console.error("Error fetching parent containers:", error);
+            } catch {
                 alert("Failed to fetch parent containers.");
             }
-        }
-        else if (action === "add children") {
-            // Add children to the selected row
-            const parentId = rowId;
-            // Call the API to add children
-            const response = await addChildren(parentId, selectedIds);
-            if (response) {
-                console.log("Children added successfully.");
-            } else {
-                alert("Failed to add children.");
-            }
-        } else if (action === "create children") {
-            const parentId = rowId;
-            console.log("Creating children for Row ID:", parentId);
-
-            // Create new children — returns array
+        },
+        "add children": async ({ rowId, selectedIds }) => {
+            const response = await addChildren(rowId, selectedIds);
+            if (!response) alert("Failed to add children.");
+        },
+        "create children": async ({ rowId, handleAddRow }) => {
             const newRows = await handleAddRow();
-
-            if (!Array.isArray(newRows) || newRows.length === 0) {
-                alert("No children created.");
-                return;
-            }
-
+            if (!Array.isArray(newRows) || newRows.length === 0) return alert("No children created.");
             const newRowIds = newRows.map((row) => row.id);
-
-            const response = await addChildren(parentId, newRowIds);
-
-            if (response) {
-                console.log("Children created successfully.");
-            } else {
-                alert("Failed to create children.");
-            }
-        } else if (action === "remove children") {
-            // Remove children from the selected row
-            const parentId = rowId;
-            // Call the API to remove children
-            const response = await removeChildren(parentId, selectedIds);
-            if (response) {
-                alert("Children removed successfully.");
-            } else {
-                alert("Failed to remove children.");
-            }
-        } else if (action === "hide unselected") {
-            // Hide unselected rows
+            const response = await addChildren(rowId, newRowIds);
+            if (!response) alert("Failed to create children.");
+        },
+        "remove children": async ({ rowId, selectedIds }) => {
+            const response = await removeChildren(rowId, selectedIds);
+            if (response) alert("Children removed successfully.");
+            else alert("Failed to remove children.");
+        },
+        "hide unselected": ({ gridApi, setRowData, selectedIds }) => {
             gridApi.forEachNode((node) => {
                 if (!selectedIds.includes(node.data.id)) {
-                    //remove node using setRowData
                     setRowData((prevData) => prevData.filter((row) => row.id !== node.data.id));
-                    //remove node using gridApi
-                    // gridApi.applyTransaction({ remove: [node.data] });
                 }
             });
-        } else if (action === "add tag") {
-            // Add tag to the selected row
-            const selectedNodes = gridApi.getSelectedNodes();
-            // Prompt user for tag input
+        },
+        "add tag": ({ gridApi, selectedNodes }) => {
             const tag = window.prompt("Enter a tag for the selected rows:");
-            if (tag) {
-                // Loop through selected rows and add tag
-                addTagToNodes(selectedNodes, tag, gridApi);
-            }
-        } else if (action === "add layer") {
-            const selectedNodes = gridApi.getSelectedNodes();
-            if (layer) {
-                addTagToNodes(selectedNodes, layer, gridApi);
-            }
-        } else if (action === "remove layer") {
-            const selectedNodes = gridApi.getSelectedNodes();
-            if (layer) {
-                removeTagFromNodes(selectedNodes, layer, gridApi);
-            }
-        }
-        else if (action === "export mermaid") {
-            // Export the current flowchart as a Mermaid diagram using export_mermaid api for container name field
-
-            const firstItemId = selectedIds[0];
-
-            await sendMermaidToChannel(firstItemId); // Close the channel after sending the message
-            prevID.current = firstItemId; // Store the previous mermaid code
-            console.log(prevID.current);
-        }
-        else if (action === "export gantt") {
-            // Export the current flowchart as a Gantt chart using export_gantt api for container name field
-
-            const firstItemId = selectedIds[0];
-            await sendGanttToChannel(firstItemId); // Close the channel after sending the message
-            prevID.current = firstItemId; // Store the previous mermaid code
-            console.log(prevID.current);
-        }
-        else if (action === "update gantt") {
-            await writeBackUpdatedData(gridApi, prevID, 'gantt'); // Write back the updated data to the server
-        }
-        else if (action === "update mermaid") {
-            await writeBackUpdatedData(gridApi, prevID, 'mermaid'); // Write back the updated data to the server
-        }
-        else if (action === "export docx") {
-            // Export the current flowchart as a docx file using export_docx API for container name field
-            const firstItemId = selectedIds[0];
-            const blobUrl = await get_docx(firstItemId);
-            console.log(blobUrl);
-
-            // Create a temporary download link and trigger the download
-            const link = document.createElement("a");
-            link.href = blobUrl;
-            link.download = "output.docx";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-        else if (action === "merge selected") {
-            // Merge selected rows
-            // Perform merge operation here
-            console.log("Merging rows with IDs:", selectedIds);
-
+            if (tag) addTagToNodes(selectedNodes, tag, gridApi);
+        },
+        "add layer": ({ gridApi, selectedNodes }, layer) => {
+            if (layer) addTagToNodes(selectedNodes, layer, gridApi);
+        },
+        "remove layer": ({ gridApi, selectedNodes }, layer) => {
+            if (layer) removeTagFromNodes(selectedNodes, layer, gridApi);
+        },
+        "merge selected": async ({ selectedIds, setRowData }) => {
             const response = await mergeContainers(selectedIds);
             if (response) {
-                const mergedRowId = response.id; // Assuming the API returns the merged row data
-                console.log("Rows merged successfully.", mergedRowId);
-                // Add the new merged row to the grid by fetching the updated data
-                const mergedRowData = await fetchContainerById(mergedRowId); // Fetch the merged row data which returns an array with one object
-                console.log(mergedRowData[0]);
-                const mergedRow = mergedRowData[0]; // Get the first object from the array
-
-                // Update the rowData state with the new merged row
+                const mergedRowId = response.id;
+                const mergedRowData = await fetchContainerById(mergedRowId);
+                const mergedRow = mergedRowData[0];
                 setRowData((prevData) => {
                     const updatedData = prevData.filter((row) => !selectedIds.includes(row.id));
-                    return [...updatedData, mergedRow]; // Add the new merged row
+                    return [...updatedData, mergedRow];
                 });
-
             } else {
                 alert("Failed to merge rows.");
             }
-        }
-        else if (action === "select children") {
-            // Select children of the selected row
-            const selectedNodes = gridApi.getSelectedNodes();
-            selectedNodes.forEach(async (node) => {
-                // Get the children of the selected node using fetchChildren API
+        },
+        "select children": async ({ gridApi, selectedNodes }) => {
+            for (const node of selectedNodes) {
                 const children = await fetchChildren(node.data.id);
                 children.forEach((childNode) => {
-                    const targetId = childNode.id;
-                    // Find the child node in the grid
-                    const childNodeInGrid = gridApi.getRowNode(targetId);
-                    // Add the child node to the selected nodes
-                    childNodeInGrid.setSelected(true);
-                });
-            });
-        }
-        else if (action === "delay by days") {
-            // Delay selected rows by a specified number of days
-            const selectedNodes = gridApi.getSelectedNodes();
-            const delayDays = window.prompt("Enter the number of days to delay:");
-
-            function delaySelectedRows(selectedNodes) {
-                selectedNodes.forEach((node) => {
-                    node.data.StartDate = new Date(node.data.StartDate); // Convert DueDate to Date object
-                    node.data.StartDate.setDate(node.data.StartDate.getDate() + parseInt(delayDays)); // Delay by specified days
-                    node.data.EndDate = new Date(node.data.EndDate); // Convert DueDate to Date object
-                    node.data.EndDate.setDate(node.data.EndDate.getDate() + parseInt(delayDays)); // Delay by specified days
-
-
-                    // Update the row using applyTransaction
-                    gridApi.applyTransaction({ update: [node.data] });
-
-                    // Write back the updated data to the server
-
-
+                    const childNodeInGrid = gridApi.getRowNode(childNode.id);
+                    if (childNodeInGrid) childNodeInGrid.setSelected(true);
                 });
             }
-            delaySelectedRows(selectedNodes);
-
-            // Gather all updated row data from the grid
+        },
+        "delay by days": async ({ gridApi, selectedNodes, setRowData, prevID }) => {
+            const delayDays = window.prompt("Enter the number of days to delay:");
+            selectedNodes.forEach((node) => {
+                node.data.StartDate = new Date(node.data.StartDate);
+                node.data.StartDate.setDate(node.data.StartDate.getDate() + parseInt(delayDays));
+                node.data.EndDate = new Date(node.data.EndDate);
+                node.data.EndDate.setDate(node.data.EndDate.getDate() + parseInt(delayDays));
+                gridApi.applyTransaction({ update: [node.data] });
+            });
             await writeBackUpdatedData(gridApi, prevID);
+        },
+        "update gantt": async ({ gridApi, prevID }) => {
+            await writeBackUpdatedData(gridApi, prevID, 'gantt');
+        },
+        "update mermaid": async ({ gridApi, prevID }) => {
+            await writeBackUpdatedData(gridApi, prevID, 'mermaid');
+        },
+    };
+
+    const onMenuItemClick = async (action, gridApiRef, setRowData, handleAddRow, layer) => {
+        const menu = menuRef.current;
+        const rowId = menu ? menu.dataset.rowId : null;
+        const gridApi = gridApiRef.current;
+        const { selectedNodes, selectedIds } = getSelection(gridApi);
+        const ctx = { gridApi, setRowData, handleAddRow, rowId, selectedNodes, selectedIds, prevID };
+        if (actionHandlers[action]) {
+            await actionHandlers[action](ctx, layer);
         }
-
-
         // Hide menu after action
-        if (menu) {
-            menu.style.display = "none";
-        }
+        if (menu) menu.style.display = "none";
     };
 
     const hideMenu = () => {
