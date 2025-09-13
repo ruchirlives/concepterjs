@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
-import { useExportApp } from "./useExportApp";
 import * as api from "../api";
 import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
@@ -539,7 +538,6 @@ function getDynamicHandler(action, {exportApp}) {
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
     const { layerOptions, activeLayers, addLayer } = useAppContext();
-    const exportApp = useExportApp();
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
         { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
@@ -575,7 +573,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer };
         const handler = getDynamicHandler(action, ctx);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);

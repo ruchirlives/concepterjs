@@ -301,6 +301,31 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         { label: "Export to Editor", onClick: handleExportEditor },
     ];
 
+    const exportApp = async (cid) => {
+        if (!cid) {
+            toast.error("No containers selected.");
+            return;
+        }
+        toast((t) => (
+            <div>
+                <div className="font-semibold mb-2">Export to App</div>
+                {exportMenu.map((item, i) => (
+                    <button
+                        key={item.label}
+                        className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                        onClick={async () => {
+                            await item.onClick({ cid });
+                            toast.dismiss(t.id);
+                        }}
+                    >
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+        ), { duration: 8000 });
+    };
+
+    
     return {
         handleRename,
         handleSelect,
@@ -312,5 +337,6 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         handleExportDocx,
         handleExportOnenote,
         exportMenu,
+        exportApp
     };
 }
