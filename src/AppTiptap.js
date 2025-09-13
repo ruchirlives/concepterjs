@@ -68,7 +68,7 @@ const AppTiptap = () => {
     const handleExport = useCallback(() => {
         if (!editor) return;
         const html = editor.getHTML();
-        const wrappedHtml = `<html><body>${html}</body></html>`;
+        const wrappedHtml = `<html>${html}</html>`;
         toast((t) => (
             <div className="max-w-[400px]">
                 <div className="font-semibold mb-1">Copy HTML for Word</div>
@@ -79,7 +79,12 @@ const AppTiptap = () => {
                     className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
                     onClick={async () => {
                         try {
-                            await navigator.clipboard.writeText(wrappedHtml);
+                            await navigator.clipboard.write([
+                                new window.ClipboardItem({
+                                    "text/html": new Blob([wrappedHtml], { type: "text/html" }),
+                                    "text/plain": new Blob([wrappedHtml], { type: "text/plain" })
+                                })
+                            ]);
                             toast.success("Copied HTML to clipboard!");
                         } catch (err) {
                             toast.error("Clipboard copy failed");
@@ -89,14 +94,6 @@ const AppTiptap = () => {
                 >
                     Copy to Clipboard
                 </button>
-                <textarea
-                    className="w-full text-xs font-mono mt-2 border border-gray-300 rounded"
-                    rows={4}
-                    value={wrappedHtml}
-                    readOnly
-                    onFocus={e => e.target.select()}
-                    style={{ fontSize: '10px' }}
-                />
             </div>
         ), { duration: 8000 });
     }, [editor]);
@@ -200,11 +197,11 @@ const AppTiptap = () => {
                 {!collapsed && (
                     <>
                         <div className="font-semibold mb-2">Live Document Preview</div>
-                            <div
-                                className="prose prose-sm"
-                                style={{ border: '1px solid #ccc', marginBottom: 12, padding: 8, minHeight: 120 }}
-                                dangerouslySetInnerHTML={{ __html: liveHtml }}
-                            />
+                        <div
+                            className="prose prose-xs"
+                            style={{ border: '1px solid #ccc', marginBottom: 12, padding: 8, minHeight: 120, fontSize: '0.75rem' }}
+                            dangerouslySetInnerHTML={{ __html: liveHtml }}
+                        />
                     </>
                 )}
             </div>
