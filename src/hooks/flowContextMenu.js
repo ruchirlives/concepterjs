@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
+import { useMenuHandlers } from "./useContextMenu";
 import {
     deleteContainers,
     removeContainers,
@@ -68,8 +69,35 @@ export const menuItems = [
     { handler: "embedPositionsAction", label: "Embed Positions" },
     { handler: "findSimilarPositionsAction", label: "Find Similar Positions" },
     { handler: "searchPositionZAction", label: "Search Position Z" },
+    { handler: "exportApp", label: "Export to App" }
 ];
 /* eslint-disable no-unused-vars */
+
+
+async function exportApp({selectedIds, exportMenu}) {
+    const cid = selectedIds[0];
+    if (!cid) {
+        toast.error("No containers selected.");
+        return;
+    }
+    toast((t) => (
+        <div>
+            <div className="font-semibold mb-2">Export to App</div>
+            {exportMenu.map((item, i) => (
+                <button
+                    key={item.label}
+                    className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
+                    onClick={async () => {
+                        await item.onClick({ cid });
+                        toast.dismiss(t.id);
+                    }}
+                >
+                    {item.label}
+                </button>
+            ))}
+        </div>
+    ), { duration: 8000 });
+}
 
 async function getContainerBudgetAction({ selectedIds }) {
     if (!selectedIds.length) {
@@ -562,6 +590,7 @@ function getDynamicHandler(action) {
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
     const { layerOptions, activeLayers, addLayer } = useAppContext();
+    const { exportMenu } = useMenuHandlers(rowData, setRowData);
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
         { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
@@ -597,7 +626,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportMenu };
         const handler = handlersByName[action] || getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
