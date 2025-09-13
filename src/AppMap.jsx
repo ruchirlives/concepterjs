@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useAppContext } from "./AppContext";
 import InfiniteCanvas from "ef-infinite-canvas";
-import { useNodes } from "./hooks/useNodes";
+import { useNodes } from "./hooks/useMapNodes";
 import { useBackdropMap } from "./hooks/useBackdropMap";
 
 export default function AppMap() {
