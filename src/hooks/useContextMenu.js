@@ -166,8 +166,8 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         toast.success("Exported to Gantt!");
     };
 
-    // Export Docx
-    const handleExportDocx = async (context) => {
+    // Export Editor
+    const handleExportEditor = async (context) => {
         const { cid } = context;
         try {
             const blobUrl = await get_docx(cid);
@@ -183,6 +183,23 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
             toast.success("Exported to Docx!");
         } catch (error) {
             console.error("Failed to load Docx", error);
+            toast.error("Failed to export Docx.");
+        }
+    };
+
+    // Export Docx
+    const handleExportDocx = async (context) => {
+        const { cid } = context;
+        const blobUrl = await get_docx(cid);
+        if (blobUrl) {
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = "output.docx";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Exported to Docx!");
+        } else {
             toast.error("Failed to export Docx.");
         }
     };
@@ -281,6 +298,7 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         { label: "Export to Gantt", onClick: handleExportGantt },
         { label: "Export to Docx", onClick: handleExportDocx },
         { label: "Export to Onenote", onClick: handleExportOnenote },
+        { label: "Export to Editor", onClick: handleExportEditor },
     ];
 
     return {
