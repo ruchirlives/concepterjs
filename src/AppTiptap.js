@@ -15,6 +15,7 @@ const AppTiptap = () => {
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);
     const previewRef = useRef(null);
+    const PREVIEW_MARKER_TOP_OFFSET = -16; // fine-tune vertical alignment (px)
 
     // Handle all sync logic
     useTiptapSync(editor, tiptapContent, setTiptapContent);
@@ -149,7 +150,25 @@ const AppTiptap = () => {
         const MARKER = "[[[__TTCURSOR_MARK__]]]"; // unlikely to exist in content
         try {
             const tmpState = EditorState.create({ schema: editor.schema, doc: editor.state.doc });
-            const tr = tmpState.tr.insertText(MARKER, from, from);
+
+            // Collect anchor positions at start of each textblock for mapping clicks back to editor positions
+            const posAnchors = [];
+            editor.state.doc.descendants((node, pos) => {
+                if (node.isTextblock) {
+                    posAnchors.push(pos + 1);
+                }
+            });
+
+            // Prepare inserts in descending order to avoid shifting
+            const inserts = [
+                { pos: from, token: MARKER, type: 'cursor' },
+                ...posAnchors.map(p => ({ pos: p, token: `[[[__POS_${p}__]]]`, type: 'anchor' })),
+            ].sort((a, b) => b.pos - a.pos);
+
+            let tr = tmpState.tr;
+            for (const ins of inserts) {
+                tr = tr.insertText(ins.token, ins.pos, ins.pos);
+            }
             const newDoc = tr.doc;
 
             const serializer = DOMSerializer.fromSchema(editor.schema);
@@ -158,11 +177,15 @@ const AppTiptap = () => {
             container.appendChild(fragment);
             const htmlWithMarker = container.innerHTML;
 
-            // Insert a zero-impact anchor we will measure and then replace with an overlay
-            return htmlWithMarker.replace(
+            // Replace cursor marker and position anchors with zero-impact spans
+            let htmlOut = htmlWithMarker.replace(
                 MARKER,
                 '<span id="tiptap-cursor-anchor" style="display:inline;width:0;overflow:hidden;font-size:0;line-height:0;">\u200b</span>'
             );
+            htmlOut = htmlOut.replace(/\[\[\[__POS_(\d+)__\]\]\]/g, (_m, p1) =>
+                `<span class="tt-pos-anchor" data-pos="${p1}" style="display:inline;width:0;overflow:hidden;font-size:0;line-height:0;">\u200b</span>`
+            );
+            return htmlOut;
         } catch (e) {
             // Fallback to plain HTML without marker if anything goes wrong
             return editor.getHTML();
@@ -194,20 +217,42 @@ const AppTiptap = () => {
         }
 
         const containerRect = container.getBoundingClientRect();
-        const anchorRect = anchor.getBoundingClientRect();
-        const top = (anchorRect.top - containerRect.top) + container.scrollTop;
-        const left = (anchorRect.left - containerRect.left) + container.scrollLeft;
-        const height = Math.max(16, anchorRect.height || parseFloat(getComputedStyle(container).fontSize));
+
+        // Use a Range to get more accurate line box rect for zero-width anchors
+        let rect;
+        try {
+            const range = document.createRange();
+            range.selectNode(anchor);
+            const rects = range.getClientRects();
+            rect = rects && rects.length ? rects[0] : anchor.getBoundingClientRect();
+        } catch {
+            rect = anchor.getBoundingClientRect();
+        }
+
+        const top = (rect.top - containerRect.top) + container.scrollTop;
+        const left = (rect.left - containerRect.left) + container.scrollLeft;
+
+        // Derive a better line height from the anchor's parent
+        const parent = anchor.parentElement || container;
+        const cs = getComputedStyle(parent);
+        let lineHeightPx = parseFloat(cs.lineHeight);
+        if (!Number.isFinite(lineHeightPx)) {
+            const fontSizePx = parseFloat(cs.fontSize) || 12;
+            lineHeightPx = fontSizePx * 1.25;
+        }
+        const lineH = Math.max(10, lineHeightPx);
+        const topAdjusted = top + ((rect.height || lineH) - lineH) / 2 + PREVIEW_MARKER_TOP_OFFSET;
+        const height = lineH;
 
         // Remove inline anchor to avoid any layout side-effects
         anchor.parentNode && anchor.parentNode.removeChild(anchor);
 
-        setMarkerPos({ top, left, height });
+        setMarkerPos({ top: topAdjusted, left, height });
 
         const targetScrollTop = top - (container.clientHeight / 2) + (height / 2);
         const maxScroll = container.scrollHeight - container.clientHeight;
         container.scrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-    }, [liveHtml, collapsed]);
+    }, [liveHtml, collapsed, PREVIEW_MARKER_TOP_OFFSET]);
 
     return (
         <div
@@ -266,6 +311,34 @@ const AppTiptap = () => {
                         <div
                             className="prose prose-xs"
                             style={{ border: '1px solid #ccc', marginBottom: 12, padding: 8, minHeight: 120, fontSize: '0.75rem' }}
+                            onClick={(e) => {
+                                if (!editor || !previewRef.current) return;
+                                const container = previewRef.current;
+                                const anchors = Array.from(container.querySelectorAll('.tt-pos-anchor'));
+                                if (!anchors.length) return;
+
+                                const clickX = e.clientX;
+                                const clickY = e.clientY;
+                                let best = null;
+                                let bestDist = Infinity;
+                                for (const el of anchors) {
+                                    const r = el.getBoundingClientRect();
+                                    const dx = (r.left + r.width / 2) - clickX;
+                                    const dy = (r.top + r.height / 2) - clickY;
+                                    const d2 = dx * dx + dy * dy;
+                                    if (d2 < bestDist) {
+                                        bestDist = d2;
+                                        best = el;
+                                    }
+                                }
+                                if (best) {
+                                    const pos = parseInt(best.getAttribute('data-pos'), 10);
+                                    if (Number.isFinite(pos)) {
+                                        editor.chain().focus().setTextSelection(pos).run();
+                                        editor.commands.scrollIntoView();
+                                    }
+                                }
+                            }}
                             dangerouslySetInnerHTML={{ __html: liveHtml }}
                         />
                         {markerPos && (
