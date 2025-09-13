@@ -4,6 +4,7 @@ import { useAppContext } from '../AppContext';
 import * as api from "../api";
 import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
+import { useMenuHandlers } from "./useContextMenu";
 
 export const menuItems = [
     { handler: "view", label: "View Details" },
@@ -514,9 +515,9 @@ async function searchPositionZAction({ nodeId, selectedNodes }) {
 /* eslint-enable no-unused-vars */
 
 /* DYNAMIC HANDLER ******************************************/
-function getDynamicHandler(action, {exportApp}) {
+function getDynamicHandler(action) {
     if (action.startsWith('exportApp')) {
-        return (ctx) => exportApp(ctx);
+        return (ctx) => ctx.exportApp(ctx.nodeId);
     } else if (action.startsWith('addLayer:')) {
         const layer = action.split(':')[1];
         return (ctx) => addLayerTag(ctx, layer);
@@ -538,6 +539,7 @@ function getDynamicHandler(action, {exportApp}) {
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
     const { layerOptions, activeLayers, addLayer } = useAppContext();
+    const { exportApp } = useMenuHandlers(rowData, setRowData);
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
         { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
@@ -573,8 +575,8 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer };
-        const handler = getDynamicHandler(action, ctx);
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp };
+        const handler = getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
         if (m) m.style.setProperty("display", "none", "important");
