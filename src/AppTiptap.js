@@ -3,7 +3,7 @@ import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor
 import { fetchAutoComplete } from "api";
 import { useAppContext } from "AppContext";
 import { useTiptapSync } from './hooks/useTiptapSync';
-import htmlDocx from 'html-docx-js/dist/html-docx';
+import toast from 'react-hot-toast';
 
 const AppTiptap = () => {
     const { tiptapContent, setTiptapContent } = useAppContext();
@@ -65,25 +65,40 @@ const AppTiptap = () => {
         }
     }, [showGhostText, clearGhostText]);
 
-    const handleExport = useCallback(async () => {
+    const handleExport = useCallback(() => {
         if (!editor) return;
-        try {
-            // Get HTML from the editor
-            const html = editor.getHTML();
-            // Convert HTML to a Word document Blob
-            const docxBlob = htmlDocx.asBlob(html);
-            // Create a download link
-            const url = URL.createObjectURL(docxBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'editor.docx';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Failed to export DOCX', err);
-        }
+        const html = editor.getHTML();
+        const wrappedHtml = `<html><body>${html}</body></html>`;
+        toast((t) => (
+            <div className="max-w-[400px]">
+                <div className="font-semibold mb-1">Copy HTML for Word</div>
+                <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono border p-1 bg-gray-50">
+                    {wrappedHtml}
+                </div>
+                <button
+                    className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
+                    onClick={async () => {
+                        try {
+                            await navigator.clipboard.writeText(wrappedHtml);
+                            toast.success("Copied HTML to clipboard!");
+                        } catch (err) {
+                            toast.error("Clipboard copy failed");
+                        }
+                        toast.dismiss(t.id);
+                    }}
+                >
+                    Copy to Clipboard
+                </button>
+                <textarea
+                    className="w-full text-xs font-mono mt-2 border border-gray-300 rounded"
+                    rows={4}
+                    value={wrappedHtml}
+                    readOnly
+                    onFocus={e => e.target.select()}
+                    style={{ fontSize: '10px' }}
+                />
+            </div>
+        ), { duration: 8000 });
     }, [editor]);
 
     const onKeyDown = useCallback(
