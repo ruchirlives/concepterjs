@@ -32,7 +32,6 @@
     "docx": "^9.5.1",
     "ef-infinite-canvas": "^0.6.9",
     "html-docx-js": "^0.3.1",
-    "html-to-docx": "^1.8.0",
     "jquery": "^3.7.1",
     "mammoth": "^1.6.0",
     "mermaid": "^11.6.0",
