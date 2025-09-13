@@ -3,6 +3,7 @@ import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor
 import { fetchAutoComplete } from "api";
 import { useAppContext } from "AppContext";
 import { useTiptapSync } from './hooks/useTiptapSync';
+import { Document, Packer, Paragraph } from "docx";
 
 const AppTiptap = () => {
     const { tiptapContent, setTiptapContent } = useAppContext();
@@ -64,6 +65,31 @@ const AppTiptap = () => {
         }
     }, [showGhostText, clearGhostText]);
 
+    const handleExport = useCallback(async () => {
+        if (!editor) return;
+        try {
+            const doc = new Document({
+                sections: [
+                    {
+                        properties: {},
+                        children: [new Paragraph(editor.getText())],
+                    },
+                ],
+            });
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'editor.docx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to export DOCX', err);
+        }
+    }, [editor]);
+
     const onKeyDown = useCallback(
         (e) => {
             if (!editor) return;
@@ -110,12 +136,23 @@ const AppTiptap = () => {
                 onClick={() => setCollapsed(!collapsed)}
             >
                 <span className="font-semibold text-lg">Editor</span>
-                <button
-                    aria-label={collapsed ? "Expand editor" : "Collapse editor"}
-                    className="text-xl font-bold"
-                >
-                    {collapsed ? "▼" : "▲"}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleExport();
+                        }}
+                        className="px-2 py-1 border rounded"
+                    >
+                        Export Word
+                    </button>
+                    <button
+                        aria-label={collapsed ? "Expand editor" : "Collapse editor"}
+                        className="text-xl font-bold"
+                    >
+                        {collapsed ? "▼" : "▲"}
+                    </button>
+                </div>
             </div>
 
             <div
