@@ -7,8 +7,7 @@ import { removeChildren } from "../api";
 import * as mammoth from "mammoth/mammoth.browser";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import { useAppContext } from "../AppContext";
-
+import { useTiptapContext } from '../TiptapContext';
 
 // Generic ContextMenu component
 export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
@@ -97,7 +96,7 @@ export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
 
 // Menu handlers (all async, receive context)
 export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, flipped, childrenMap }) {
-    const { setTiptapContent } = useAppContext();
+    const { setTiptapContent } = useTiptapContext();
     // Rename
     const handleRename = async (context) => {
         const { cid } = context;

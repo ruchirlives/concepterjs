@@ -10,7 +10,7 @@ export const useTiptapSync = (editor, tiptapContent, setTiptapContent) => {
 
         const currentContent = editor.getJSON();
         const isSameContent = JSON.stringify(currentContent) === JSON.stringify(tiptapContent);
-        
+
         if (isSameContent) return;
 
         isSettingContent.current = true;
@@ -34,10 +34,10 @@ export const useTiptapSync = (editor, tiptapContent, setTiptapContent) => {
         if (!editor) return;
 
         let updateTimeout;
-        
+
         const updateHandler = () => {
             if (updateTimeout) clearTimeout(updateTimeout);
-            
+
             updateTimeout = setTimeout(() => {
                 if (!isSettingContent.current) {
                     const content = editor.getJSON();

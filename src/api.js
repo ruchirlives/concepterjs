@@ -244,6 +244,17 @@ export const getPosition = async (sourceId, targetId) => {
     }
 };
 
+// getNarratives
+export const getNarratives = async () => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/get_narratives`);
+        return response.data || [];
+    } catch (error) {
+        console.error("Error fetching narratives:", error);
+        return [];
+    }
+};
+
 export const fetchAutoComplete = async (prompt) => {
     try {
         // console.log("Fetching autocomplete suggestions from API...");

@@ -1,8 +1,9 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { EditorState } from '@tiptap/pm/state';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
-import { fetchAutoComplete } from "api";
+import { fetchAutoComplete, getNarratives, getPosition, setNarrative } from "api";
+import { useAppContext } from "AppContext";
 import { useTiptapContext } from "./TiptapContext";
 import { useTiptapSync } from './hooks/useTiptapSync';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ const AppTiptap = () => {
     const containerRef = useRef(null);
     const previewRef = useRef(null);
     const PREVIEW_MARKER_TOP_OFFSET = -16; // fine-tune vertical alignment (px)
+    const { rowData } = useAppContext();
 
     // Handle all sync logic
     useTiptapSync(editor, tiptapContent, setTiptapContent);
@@ -139,6 +141,33 @@ const AppTiptap = () => {
     // State for live HTML preview
     const [liveHtml, setLiveHtml] = useState("");
     const [markerPos, setMarkerPos] = useState(null); // {top, left, height}
+    const [narratives, setNarratives] = useState([]);
+    const [narrativesLoading, setNarrativesLoading] = useState(false);
+    const [narrativesError, setNarrativesError] = useState(null);
+
+    // Load narratives from backend
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            setNarrativesLoading(true);
+            setNarrativesError(null);
+            try {
+                const data = await getNarratives();
+                // console.log("Fetched narratives:", data);
+                if (!cancelled) {
+                    // Normalize to array
+                    const arr = Array.isArray(data) ? data : (data?.narratives || []);
+                    setNarratives(arr);
+                }
+            } catch (e) {
+                if (!cancelled) setNarrativesError('Failed to load narratives');
+            } finally {
+                if (!cancelled) setNarrativesLoading(false);
+            }
+        };
+        load();
+        return () => { cancelled = true; };
+    }, [rowData]);
 
     // Insert a marker span at the current selection position in the HTML
     function getHtmlWithCursorMarker(editor) {
@@ -364,6 +393,80 @@ const AppTiptap = () => {
                                     pointerEvents: 'none'
                                 }}
                             />
+                        )}
+
+                        <div className="font-semibold mb-2">Narratives</div>
+                        {narrativesLoading && (
+                            <div className="text-sm text-gray-500">Loading narratives…</div>
+                        )}
+                        {narrativesError && (
+                            <div className="text-sm text-red-600">{narrativesError}</div>
+                        )}
+                        {!narrativesLoading && !narrativesError && (
+                            narratives.length > 0 ? (
+                                narratives.map((n, idx) => (
+                                    <div
+                                        key={`${n.source_id}-${n.target_id}-${idx}`}
+                                        className="text-xs p-2 bg-white border rounded shadow-sm"
+                                        title={`${n.source_name || n.source_id} -> ${n.target_name || n.target_id}`}
+                                    >
+                                        <div className="font-medium truncate">
+                                            {(n.source_name || n.source_id) + ' → ' + (n.target_name || n.target_id)}
+                                        </div>
+                                        {n.label ? (
+                                            <div className="text-gray-700 break-words">{n.label}</div>
+                                        ) : (
+                                            <div className="text-gray-400 italic">No label</div>
+                                        )}
+                                        <div className="flex gap-2 mt-2">
+                                            <button
+                                                className="px-2 py-1 border rounded text-[11px] hover:bg-gray-50"
+                                                onClick={async () => {
+                                                    // First check is user has saved the existing narrative in editor
+                                                    const confirmSwitch = window.confirm('Have you saved the existing narrative?');
+                                                    if (!confirmSwitch) return;
+                                                    try {
+                                                        const data = await getPosition(n.source_id, n.target_id);
+                                                        const narrative = (data?.narrative ?? '');
+                                                        if (!narrative) {
+                                                            toast.error('No narrative found for this pair');
+                                                            return;
+                                                        }
+                                                        setTiptapContent(narrative);
+                                                        toast.success('Loaded narrative into editor');
+                                                    } catch (err) {
+                                                        console.error('Error loading narrative:', err);
+                                                        toast.error('Error loading narrative');
+                                                    }
+                                                }}
+                                            >
+                                                Get
+                                            </button>
+                                            <button
+                                                className="px-2 py-1 border rounded text-[11px] hover:bg-gray-50"
+                                                onClick={async () => {
+                                                    try {
+                                                        const content = tiptapContent || '';
+                                                        const res = await setNarrative(n.source_id, n.target_id, content);
+                                                        if (res) {
+                                                            toast.success('Narrative set from editor content');
+                                                        } else {
+                                                            toast.error('Failed to set narrative');
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('Error setting narrative:', err);
+                                                        toast.error('Error setting narrative');
+                                                    }
+                                                }}
+                                            >
+                                                Set
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-sm text-gray-500">No narratives found.</div>
+                            )
                         )}
                     </>
                 )}
