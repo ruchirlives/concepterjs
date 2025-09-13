@@ -13,9 +13,6 @@ import {
     categorizeContainers,
     embed_containers,
     buildRelationshipsContainers,
-    get_mermaid,
-    get_gantt,
-    get_docx,
     addChildren,
     add_similar,
     api_build_chain_beam,
@@ -28,7 +25,7 @@ import {
     exportBranch,
     searchPositionZ
 } from "../api";
-import { handleWriteBack, requestRefreshChannel, sendMermaidCodeToChannel } from "./effectsShared";
+import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import {
     displayContextMenu,
     requestAddChild,
@@ -49,10 +46,6 @@ export const menuItems = [
     { handler: "createLayerFromVisible", label: "Create Layer from Visible Nodes" },
     { handler: "categorize", label: "Categorize Containers" },
     { handler: "buildRelationships", label: "Build Relationships" },
-    { handler: "exportMermaid", label: "Export to Mermaid" },
-    { handler: "exportGantt", label: "Export to Gantt" },
-    { handler: "exportDocx", label: "Export to Docx" },
-    { handler: "exportSelected", label: "Export Selected" },
     { handler: "exportBranchSelected", label: "Export Branch" },
     { handler: "mergeSelected", label: "Merge Selected" },
     { handler: "joinSelected", label: "Join Selected" },
@@ -250,26 +243,6 @@ async function buildRelationships({ nodes, selectedNodes }) {
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
     const ok = await buildRelationshipsContainers(ids);
     alert(ok ? "Relationships built successfully." : "Failed to build relationships.");
-}
-
-async function exportMermaid({ selectedIds }) {
-    const code = await get_mermaid(selectedIds[0]);
-    sendMermaidCodeToChannel(code);
-}
-
-async function exportGantt({ selectedIds }) {
-    const code = await get_gantt(selectedIds[0]);
-    sendMermaidCodeToChannel(code);
-}
-
-async function exportDocx({ selectedIds }) {
-    const blobUrl = await get_docx(selectedIds[0]);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = "output.docx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 }
 
 async function exportSelected({ selectedIds }) {
