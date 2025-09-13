@@ -1,4 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
+import { EditorState } from '@tiptap/pm/state';
+import { DOMSerializer } from '@tiptap/pm/model';
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { fetchAutoComplete } from "api";
 import { useAppContext } from "AppContext";
@@ -12,6 +14,7 @@ const AppTiptap = () => {
     const [ghostSuggestion, setGhostSuggestion] = useState('');
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);
+    const previewRef = useRef(null);
 
     // Handle all sync logic
     useTiptapSync(editor, tiptapContent, setTiptapContent);
@@ -134,35 +137,36 @@ const AppTiptap = () => {
 
     // State for live HTML preview
     const [liveHtml, setLiveHtml] = useState("");
+    const [markerPos, setMarkerPos] = useState(null); // {top, left, height}
 
     // Insert a marker span at the current selection position in the HTML
     function getHtmlWithCursorMarker(editor) {
         if (!editor) return "";
         const { from } = editor.state.selection;
-        // Get HTML up to cursor
-        const doc = editor.state.doc;
-        const html = editor.getHTML();
-        // Use ProseMirror's posToDOM to find the DOM node and offset for the cursor
-        // But since we only have HTML, we can use a workaround: insert a unique string at the cursor, then replace it with a span
-        const marker = "__TTCURSOR__";
-        // Insert marker at cursor position in the document
-        let htmlWithMarker = "";
+
+        // Create a temporary PM state cloned from the editor, insert a unique marker text,
+        // serialize to HTML, then swap the marker text for a styled span.
+        const MARKER = "[[[__TTCURSOR_MARK__]]]"; // unlikely to exist in content
         try {
-            // Get raw text up to cursor
-            const textBefore = doc.textBetween(0, from, "\n", "\0");
-            // Find the textBefore in the HTML and insert marker after it
-            // This is not perfect for complex docs, but works for simple cases
-            const idx = html.indexOf(textBefore);
-            if (idx !== -1) {
-                htmlWithMarker = html.slice(0, idx + textBefore.length) + marker + html.slice(idx + textBefore.length);
-            } else {
-                htmlWithMarker = html; // fallback
-            }
-        } catch {
-            htmlWithMarker = html;
+            const tmpState = EditorState.create({ schema: editor.schema, doc: editor.state.doc });
+            const tr = tmpState.tr.insertText(MARKER, from, from);
+            const newDoc = tr.doc;
+
+            const serializer = DOMSerializer.fromSchema(editor.schema);
+            const fragment = serializer.serializeFragment(newDoc.content);
+            const container = document.createElement('div');
+            container.appendChild(fragment);
+            const htmlWithMarker = container.innerHTML;
+
+            // Insert a zero-impact anchor we will measure and then replace with an overlay
+            return htmlWithMarker.replace(
+                MARKER,
+                '<span id="tiptap-cursor-anchor" style="display:inline;width:0;overflow:hidden;font-size:0;line-height:0;">\u200b</span>'
+            );
+        } catch (e) {
+            // Fallback to plain HTML without marker if anything goes wrong
+            return editor.getHTML();
         }
-        // Replace marker with span
-        return htmlWithMarker.replace(marker, '<span id="tiptap-cursor-marker" style="display:inline-block;width:1.5ch;height:1.2em;background:#2563eb;border-radius:2px;vertical-align:middle;opacity:0.5;"></span>');
     }
 
     // Update liveHtml whenever editor content or selection changes
@@ -177,6 +181,33 @@ const AppTiptap = () => {
             editor.off('selectionUpdate', updateHtml);
         };
     }, [editor]);
+
+    // After liveHtml updates, place overlay marker and scroll only the preview container
+    React.useEffect(() => {
+        if (collapsed) return;
+        const container = previewRef.current;
+        if (!container) return;
+        const anchor = container.querySelector('#tiptap-cursor-anchor');
+        if (!anchor) {
+            setMarkerPos(null);
+            return;
+        }
+
+        const containerRect = container.getBoundingClientRect();
+        const anchorRect = anchor.getBoundingClientRect();
+        const top = (anchorRect.top - containerRect.top) + container.scrollTop;
+        const left = (anchorRect.left - containerRect.left) + container.scrollLeft;
+        const height = Math.max(16, anchorRect.height || parseFloat(getComputedStyle(container).fontSize));
+
+        // Remove inline anchor to avoid any layout side-effects
+        anchor.parentNode && anchor.parentNode.removeChild(anchor);
+
+        setMarkerPos({ top, left, height });
+
+        const targetScrollTop = top - (container.clientHeight / 2) + (height / 2);
+        const maxScroll = container.scrollHeight - container.clientHeight;
+        container.scrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+    }, [liveHtml, collapsed]);
 
     return (
         <div
@@ -225,19 +256,9 @@ const AppTiptap = () => {
 
             {/* Right navigation/preview panel */}
             <div
-                className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto"
+                className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto relative"
                 style={{ height: collapsed ? 0 : "600px", transition: 'height 0.3s' }}
-                ref={el => {
-                    // Scroll to marker after render
-                    if (el && !collapsed) {
-                        setTimeout(() => {
-                            const marker = el.querySelector('#tiptap-cursor-marker');
-                            if (marker) {
-                                marker.scrollIntoView({ block: 'center', behavior: 'auto' });
-                            }
-                        }, 0);
-                    }
-                }}
+                ref={previewRef}
             >
                 {!collapsed && (
                     <>
@@ -247,6 +268,22 @@ const AppTiptap = () => {
                             style={{ border: '1px solid #ccc', marginBottom: 12, padding: 8, minHeight: 120, fontSize: '0.75rem' }}
                             dangerouslySetInnerHTML={{ __html: liveHtml }}
                         />
+                        {markerPos && (
+                            <div
+                                aria-hidden
+                                style={{
+                                    position: 'absolute',
+                                    left: Math.max(0, markerPos.left - 1),
+                                    top: markerPos.top,
+                                    width: 2,
+                                    height: markerPos.height,
+                                    background: '#2563eb',
+                                    opacity: 0.6,
+                                    borderRadius: 1,
+                                    pointerEvents: 'none'
+                                }}
+                            />
+                        )}
                     </>
                 )}
             </div>
