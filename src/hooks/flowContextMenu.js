@@ -1,37 +1,10 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
-import { useMenuHandlers } from "./useContextMenu";
-import {
-    deleteContainers,
-    removeContainers,
-    renameContainer,
-    removeChildren,
-    fetchChildren,
-    exportSelectedContainers,
-    mergeContainers,
-    joinContainers,
-    categorizeContainers,
-    embed_containers,
-    buildRelationshipsContainers,
-    addChildren,
-    add_similar,
-    api_build_chain_beam,
-    getContainerBudgetApi,
-    convertToBudgetContainerApi,
-    addFinanceContainerApi,
-    joinSimilarContainers, // <-- add this import
-    embedPositions,
-    findSimilarPositions,
-    exportBranch,
-    searchPositionZ
-} from "../api";
+import { useExportApp } from "./useExportApp";
+import * as api from "../api";
 import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
-import {
-    displayContextMenu,
-    requestAddChild,
-} from "./flowFunctions";
-
+import { displayContextMenu, requestAddChild } from "./flowFunctions";
 
 export const menuItems = [
     { handler: "view", label: "View Details" },
@@ -71,40 +44,15 @@ export const menuItems = [
     { handler: "searchPositionZAction", label: "Search Position Z" },
     { handler: "exportApp", label: "Export to App" }
 ];
+
+// FUNCTIONS *****************************************
 /* eslint-disable no-unused-vars */
-
-
-async function exportApp({selectedIds, exportMenu}) {
-    const cid = selectedIds[0];
-    if (!cid) {
-        toast.error("No containers selected.");
-        return;
-    }
-    toast((t) => (
-        <div>
-            <div className="font-semibold mb-2">Export to App</div>
-            {exportMenu.map((item, i) => (
-                <button
-                    key={item.label}
-                    className="block w-full text-left px-3 py-1 text-xs hover:bg-gray-100"
-                    onClick={async () => {
-                        await item.onClick({ cid });
-                        toast.dismiss(t.id);
-                    }}
-                >
-                    {item.label}
-                </button>
-            ))}
-        </div>
-    ), { duration: 8000 });
-}
-
 async function getContainerBudgetAction({ selectedIds }) {
     if (!selectedIds.length) {
         toast.error("No containers selected.");
         return;
     }
-    const budgets = await getContainerBudgetApi(selectedIds);
+    const budgets = await api.getContainerBudgetApi(selectedIds);
     if (!budgets.length) {
         toast("No budgets found for selected containers.");
         return;
@@ -118,7 +66,7 @@ async function convertToBudgetContainerAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await convertToBudgetContainerApi(selectedIds);
+    const res = await api.convertToBudgetContainerApi(selectedIds);
     toast.success(res.message || "Converted to budget container.");
     requestRefreshChannel();
 }
@@ -128,7 +76,7 @@ async function addFinanceContainerAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await addFinanceContainerApi(selectedIds);
+    const res = await api.addFinanceContainerApi(selectedIds);
     toast.success(res.message || "Converted to finance container.");
     requestRefreshChannel();
 }
@@ -166,13 +114,13 @@ async function view({ nodeId, selectedNodes }) {
 }
 
 async function deleteAction({ selectedIds }) {
-    const ok = await deleteContainers(selectedIds);
+    const ok = await api.deleteContainers(selectedIds);
     if (ok) requestRefreshChannel();
     else alert("Failed to delete containers.");
 }
 
 async function removeAction({ selectedIds }) {
-    const ok = await removeContainers(selectedIds);
+    const ok = await api.removeContainers(selectedIds);
     if (ok) requestRefreshChannel();
     else alert("Failed to remove containers.");
 }
@@ -207,7 +155,7 @@ async function hideChildren({ selectedNodes, rowData, setRowData }) {
     const ids = selectedNodes.map(n => n.data.id);
     const childrenIds = [];
     for (const id of ids) {
-        const children = await fetchChildren(id);
+        const children = await api.fetchChildren(id);
         children?.forEach(child => {
             if (!childrenIds.includes(child.id)) childrenIds.push(child.id);
         });
@@ -226,7 +174,7 @@ async function embedContainers({ selectedIds, nodes }) {
         selectedIds = alVisibleIds;
         return;
     }
-    const ok = await embed_containers(selectedIds);
+    const ok = await api.embed_containers(selectedIds);
     if (ok) {
         alert("Containers embedded successfully.");
     } else {
@@ -239,7 +187,7 @@ async function showChildren({ selectedNodes }) {
     if (ids.length === 0) return;
     const childrenIds = [];
     for (const id of ids) {
-        const children = await fetchChildren(id);
+        const children = await api.fetchChildren(id);
         children?.forEach(child => {
             if (!childrenIds.includes(child.id)) childrenIds.push(child.id);
         });
@@ -252,7 +200,7 @@ async function showChildren({ selectedNodes }) {
 async function categorize({ nodes, selectedNodes, activeGroup }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
-    const ok = await categorizeContainers(ids);
+    const ok = await api.categorizeContainers(ids);
     alert(ok ? "Containers categorized successfully." : "Failed to categorize containers.");
     console.log(ok.new_category_ids);
     if (!activeGroup) {
@@ -261,7 +209,7 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
     }
     ids = ok.new_category_ids;
     // add ids as children to the active group
-    await addChildren(activeGroup, ids);
+    await api.addChildren(activeGroup, ids);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -269,16 +217,16 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
 async function buildRelationships({ nodes, selectedNodes }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
-    const ok = await buildRelationshipsContainers(ids);
+    const ok = await api.buildRelationshipsContainers(ids);
     alert(ok ? "Relationships built successfully." : "Failed to build relationships.");
 }
 
 async function exportSelected({ selectedIds }) {
-    exportSelectedContainers(selectedIds);
+    api.exportSelectedContainers(selectedIds);
 }
 
 async function exportBranchSelected({ selectedIds }) {
-    const data = await exportBranch(selectedIds);
+    const data = await api.exportBranch(selectedIds);
     if (data) {
         alert("Branch exported successfully.");
     } else {
@@ -287,7 +235,7 @@ async function exportBranchSelected({ selectedIds }) {
 }
 
 async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, setRowData }) {
-    const ok = await mergeContainers(selectedIds);
+    const ok = await api.mergeContainers(selectedIds);
     if (ok) {
         alert("Containers merged successfully.");
     } else {
@@ -296,13 +244,13 @@ async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, 
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
     if (activeGroup) {
-        await addChildren(activeGroup, [ok.id]);
+        await api.addChildren(activeGroup, [ok.id]);
     }
     requestRefreshChannel();
 }
 
 async function joinSelected({ selectedIds, activeGroup }) {
-    const ok = await joinContainers(selectedIds, true);
+    const ok = await api.joinContainers(selectedIds, true);
     if (ok) {
         alert("Containers joined successfully.");
     } else {
@@ -310,7 +258,7 @@ async function joinSelected({ selectedIds, activeGroup }) {
     }
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
-    await addChildren(activeGroup, [ok.id]);
+    await api.addChildren(activeGroup, [ok.id]);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -329,7 +277,7 @@ async function addSimilar({ nodeId, selectedIds, nodes }) {
         console.log("No selected IDs, using all visible IDs:", alVisibleIds);
         selectedIds = alVisibleIds;
     }
-    const ok = await add_similar(nodeId, selectedIds);
+    const ok = await api.add_similar(nodeId, selectedIds);
     if (ok) {
         alert(ok.message);
     }
@@ -344,10 +292,10 @@ async function joinSimilar({ selectedIds, activeGroup }) {
         return;
     }
     try {
-        const res = await joinSimilarContainers(selectedIds);
+        const res = await api.joinSimilarContainers(selectedIds);
         toast.success(res.message || "Joined similar containers.");
         if (res.new_container_id && activeGroup) {
-            await addChildren(activeGroup, [res.new_container_id]);
+            await api.addChildren(activeGroup, [res.new_container_id]);
         }
         requestRefreshChannel();
     } catch (err) {
@@ -363,7 +311,7 @@ async function buildChainBeam({ nodes, nodeId, selectedIds }) {
 
     const alVisibleIds = nodes.map(n => n.data.id);
 
-    const ok = await api_build_chain_beam(start_node, end_node, alVisibleIds);
+    const ok = await api.api_build_chain_beam(start_node, end_node, alVisibleIds);
     if (ok?.narrative) {
         toast((t) => (
             <div className="max-w-[300px]">
@@ -395,7 +343,7 @@ async function renameFromDescription({ selectedNodes, selectedIds }) {
         if (node) {
             const desc = node.data.Description;
             console.log(`Renaming row ${id} to ${desc}`);
-            const res = await renameContainer(id);
+            const res = await api.renameContainer(id);
             if (!res) alert("Failed to rename row.");
         }
     }
@@ -406,13 +354,13 @@ async function removeFromActiveGroup({ activeGroup, selectedIds, history }) {
         alert("No active group selected.");
         return;
     }
-    let ok = await removeChildren(activeGroup, selectedIds);
+    let ok = await api.removeChildren(activeGroup, selectedIds);
     if (!ok) {
         alert("Failed to remove containers from active group.");
         return;
     }
     const prev = history[history.length - 1] || null;
-    ok = await addChildren(prev, selectedIds);
+    ok = await api.addChildren(prev, selectedIds);
     if (ok) requestRefreshChannel();
 }
 
@@ -504,7 +452,7 @@ async function embedPositionsAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await embedPositions(selectedIds);
+    const res = await api.embedPositions(selectedIds);
     if (res?.message) toast.success(res.message);
     else toast.error("Failed to embed positions.");
 }
@@ -512,7 +460,7 @@ async function embedPositionsAction({ selectedIds }) {
 async function findSimilarPositionsAction({ nodes }) {
     const positionText = prompt("Enter position text to find similar:");
     if (!positionText) return;
-    const res = await findSimilarPositions(positionText);
+    const res = await api.findSimilarPositions(positionText);
     console.log("Similar positions response:", res);
 
     // Build a map of id -> Name for quick lookup
@@ -545,13 +493,12 @@ async function findSimilarPositionsAction({ nodes }) {
     }
 }
 
-
 async function searchPositionZAction({ nodeId, selectedNodes }) {
     const node = selectedNodes.find(n => n.data.id === nodeId) || selectedNodes[0];
     const defaultValue = node?.data?.Name || "";
     const searchTerm = prompt("Search Position Z for:", defaultValue);
     if (!searchTerm) return;
-    const results = await searchPositionZ(searchTerm);
+    const results = await api.searchPositionZ(searchTerm);
     if (results.length) {
         toast.success(
             <div style={{ whiteSpace: "pre-wrap" }}>
@@ -565,32 +512,34 @@ async function searchPositionZAction({ nodeId, selectedNodes }) {
         toast.error("No results found.");
     }
 }
-
-const handlersByName = menuItems.reduce((map, { handler }) => {
-    // eslint-disable-next-line
-    const fn = eval(handler);
-    if (typeof fn !== 'function') console.warn(`Handler not found for "${handler}"`);
-    else map[handler] = fn;
-    return map;
-}, {});
-/* Extra handlers for dynamic layer actions */
-function getDynamicHandler(action) {
-    if (action.startsWith('addLayer:')) {
-        const layer = action.split(':')[1];
-        return (ctx) => addLayerTag(ctx, layer);
-    }
-    if (action.startsWith('removeLayer:')) {
-        const layer = action.split(':')[1];
-        return (ctx) => removeLayerTag(ctx, layer);
-    }
-    return null;
-}
 /* eslint-enable no-unused-vars */
 
+/* DYNAMIC HANDLER ******************************************/
+function getDynamicHandler(action, {exportApp}) {
+    if (action.startsWith('exportApp')) {
+        return (ctx) => exportApp(ctx);
+    } else if (action.startsWith('addLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => addLayerTag(ctx, layer);
+    } else if (action.startsWith('removeLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => removeLayerTag(ctx, layer);
+    } else {
+        // Try to resolve the function by name from the current scope
+        try {
+            // eslint-disable-next-line no-eval
+            const fn = eval(action);
+            if (typeof fn === 'function') return fn;
+        } catch (e) {}
+        return null;
+    }
+}
+
+// HOOK *****************************************
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
     const { layerOptions, activeLayers, addLayer } = useAppContext();
-    const { exportMenu } = useMenuHandlers(rowData, setRowData);
+    const exportApp = useExportApp();
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
         { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
@@ -626,8 +575,8 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             selectedIds.push(...nodes.map(n => n.data.id));
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportMenu };
-        const handler = handlersByName[action] || getDynamicHandler(action);
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp };
+        const handler = getDynamicHandler(action, ctx);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
         if (m) m.style.setProperty("display", "none", "important");
