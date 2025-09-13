@@ -409,11 +409,22 @@ const AppDonut = ({ targetId }) => {
     setClickedSegmentId(null);
   }, [id]);
 
+  const [collapsed, setCollapsed] = useState(false);
+
   if (!id) {
     return (
-      <div className="bg-white rounded shadow p-4" style={{ width: 800, height: 800 }}>
-        <h2 className="font-semibold mb-2">Donut View (D3)</h2>
-        <p>No node selected</p>
+      <div style={{ width: 800, height: collapsed ? 48 : 800, transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="font-semibold">Donut View (D3)</h2>
+          <button
+            className="px-2 py-1 border rounded text-sm"
+            onClick={() => setCollapsed(c => !c)}
+            aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
+          >
+            {collapsed ? "▼" : "▲"}
+          </button>
+        </div>
+        {!collapsed && <p>No node selected</p>}
       </div>
     );
   }
@@ -423,67 +434,80 @@ const AppDonut = ({ targetId }) => {
       className="bg-white rounded shadow p-4"
       style={{
         width: 900,
-        height: 1000,
+        height: collapsed ? 48 : 1000,
+        transition: 'height 0.3s',
+        overflow: 'hidden',
         position: "relative",
         display: "flex",
         flexDirection: "column",
         alignItems: "center"
       }}
     >
-      <h2 className="font-semibold mb-2">Donut View (D3)</h2>
-      <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
-        {rootLabel}
-        {focusedNodeId && (
-          <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
-            Focused on: {nameById[focusedNodeId]}
-          </div>
-        )}
-      </div>
-      {focusedNodeId && (
+      <div className="flex justify-between items-center mb-2 w-full">
+        <h2 className="font-semibold">Donut View (D3)</h2>
         <button
-          onClick={() => setFocusedNodeId(null)}
-          style={{
-            marginBottom: "10px",
-            padding: "5px 10px",
-            background: "#f0f0f0",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "pointer"
-          }}
+          className="px-2 py-1 border rounded text-sm"
+          onClick={() => setCollapsed(c => !c)}
+          aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
         >
-          Show All Lineage
+          {collapsed ? "▼" : "▲"}
         </button>
-      )}
-      <svg
-        ref={svgRef}
-        width={850}
-        height={750}
-        style={{
-          border: "1px solid #ddd",
-          display: "block",
-          margin: "0 auto"
-        }}
-      />
-      <div
-        ref={tooltipRef}
-        style={{
-          position: "fixed",
-          pointerEvents: "none",
-          background: "rgba(0,0,0,0.8)",
-          color: "#fff",
-          padding: "4px 8px",
-          borderRadius: "4px",
-          fontSize: "14px",
-          display: "none",
-          zIndex: 1000
-        }}
-      />
-      {/* Context menu for donut segments */}
-      <ContextMenu
-        contextMenu={contextMenu}
-        setContextMenu={setContextMenu}
-        menuOptions={donutMenuOptions}
-      />
+      </div>
+      {!collapsed && <>
+        <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
+          {rootLabel}
+          {focusedNodeId && (
+            <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
+              Focused on: {nameById[focusedNodeId]}
+            </div>
+          )}
+        </div>
+        {focusedNodeId && (
+          <button
+            onClick={() => setFocusedNodeId(null)}
+            style={{
+              marginBottom: "10px",
+              padding: "5px 10px",
+              background: "#f0f0f0",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+          >
+            Show All Lineage
+          </button>
+        )}
+        <svg
+          ref={svgRef}
+          width={850}
+          height={750}
+          style={{
+            border: "1px solid #ddd",
+            display: "block",
+            margin: "0 auto"
+          }}
+        />
+        <div
+          ref={tooltipRef}
+          style={{
+            position: "fixed",
+            pointerEvents: "none",
+            background: "rgba(0,0,0,0.8)",
+            color: "#fff",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            fontSize: "14px",
+            display: "none",
+            zIndex: 1000
+          }}
+        />
+        {/* Context menu for donut segments */}
+        <ContextMenu
+          contextMenu={contextMenu}
+          setContextMenu={setContextMenu}
+          menuOptions={donutMenuOptions}
+        />
+      </>}
     </div>
   );
 };

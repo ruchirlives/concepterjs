@@ -182,7 +182,7 @@ const AppTiptap = () => {
 
                 <div
                     className="transition-all duration-300 overflow-auto w-full"
-                    style={{ height: collapsed ? 0 : "400px" }}
+                    style={{ height: collapsed ? 0 : "600px" }}
                 >
                     {!collapsed && (
                         <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
@@ -195,15 +195,16 @@ const AppTiptap = () => {
             {/* Right navigation/preview panel */}
             <div
                 className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto"
-                style={{ height: collapsed ? 0 : "400px", transition: 'height 0.3s' }}
+                style={{ height: collapsed ? 0 : "600px", transition: 'height 0.3s' }}
             >
                 {!collapsed && (
                     <>
                         <div className="font-semibold mb-2">Live Document Preview</div>
-                        <div
-                            style={{ minHeight: 120, maxHeight: 340, overflow: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, marginBottom: 8 }}
-                            dangerouslySetInnerHTML={{ __html: liveHtml }}
-                        />
+                            <div
+                                className="prose prose-sm"
+                                style={{ border: '1px solid #ccc', marginBottom: 12, padding: 8, minHeight: 120 }}
+                                dangerouslySetInnerHTML={{ __html: liveHtml }}
+                            />
                     </>
                 )}
             </div>
