@@ -135,13 +135,47 @@ const AppTiptap = () => {
     // State for live HTML preview
     const [liveHtml, setLiveHtml] = useState("");
 
-    // Update liveHtml whenever editor content changes
+    // Insert a marker span at the current selection position in the HTML
+    function getHtmlWithCursorMarker(editor) {
+        if (!editor) return "";
+        const { from } = editor.state.selection;
+        // Get HTML up to cursor
+        const doc = editor.state.doc;
+        const html = editor.getHTML();
+        // Use ProseMirror's posToDOM to find the DOM node and offset for the cursor
+        // But since we only have HTML, we can use a workaround: insert a unique string at the cursor, then replace it with a span
+        const marker = "__TTCURSOR__";
+        // Insert marker at cursor position in the document
+        let htmlWithMarker = "";
+        try {
+            // Get raw text up to cursor
+            const textBefore = doc.textBetween(0, from, "\n", "\0");
+            // Find the textBefore in the HTML and insert marker after it
+            // This is not perfect for complex docs, but works for simple cases
+            const idx = html.indexOf(textBefore);
+            if (idx !== -1) {
+                htmlWithMarker = html.slice(0, idx + textBefore.length) + marker + html.slice(idx + textBefore.length);
+            } else {
+                htmlWithMarker = html; // fallback
+            }
+        } catch {
+            htmlWithMarker = html;
+        }
+        // Replace marker with span
+        return htmlWithMarker.replace(marker, '<span id="tiptap-cursor-marker" style="display:inline-block;width:1.5ch;height:1.2em;background:#2563eb;border-radius:2px;vertical-align:middle;opacity:0.5;"></span>');
+    }
+
+    // Update liveHtml whenever editor content or selection changes
     React.useEffect(() => {
         if (!editor) return;
-        const updateHtml = () => setLiveHtml(editor.getHTML());
+        const updateHtml = () => setLiveHtml(getHtmlWithCursorMarker(editor));
         updateHtml();
         editor.on('update', updateHtml);
-        return () => editor.off('update', updateHtml);
+        editor.on('selectionUpdate', updateHtml);
+        return () => {
+            editor.off('update', updateHtml);
+            editor.off('selectionUpdate', updateHtml);
+        };
     }, [editor]);
 
     return (
@@ -193,6 +227,17 @@ const AppTiptap = () => {
             <div
                 className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto"
                 style={{ height: collapsed ? 0 : "600px", transition: 'height 0.3s' }}
+                ref={el => {
+                    // Scroll to marker after render
+                    if (el && !collapsed) {
+                        setTimeout(() => {
+                            const marker = el.querySelector('#tiptap-cursor-marker');
+                            if (marker) {
+                                marker.scrollIntoView({ block: 'center', behavior: 'auto' });
+                            }
+                        }, 0);
+                    }
+                }}
             >
                 {!collapsed && (
                     <>
