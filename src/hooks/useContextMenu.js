@@ -4,6 +4,10 @@ import { sendMermaidToChannel, sendGanttToChannel, handleWriteBack, requestRefre
 import { get_onenote } from "../api";
 import { get_docx } from "../api";
 import { removeChildren } from "../api";
+import * as mammoth from "mammoth/mammoth.browser";
+import { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { useAppContext } from "../AppContext";
 
 
 // Generic ContextMenu component
@@ -93,6 +97,7 @@ export function ContextMenu({ contextMenu, setContextMenu, menuOptions }) {
 
 // Menu handlers (all async, receive context)
 export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, flipped, childrenMap }) {
+    const { setTiptapContent } = useAppContext();
     // Rename
     const handleRename = async (context) => {
         const { cid } = context;
@@ -164,16 +169,20 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
     // Export Docx
     const handleExportDocx = async (context) => {
         const { cid } = context;
-        const blobUrl = await get_docx(cid);
-        if (blobUrl) {
-            const link = document.createElement("a");
-            link.href = blobUrl;
-            link.download = "output.docx";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        try {
+            const blobUrl = await get_docx(cid);
+            const response = await fetch(blobUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            URL.revokeObjectURL(blobUrl);
+
+            const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+            const editor = new Editor({ extensions: [StarterKit], content: html });
+            const json = editor.getJSON();
+            editor.destroy();
+            setTiptapContent(json);
             toast.success("Exported to Docx!");
-        } else {
+        } catch (error) {
+            console.error("Failed to load Docx", error);
             toast.error("Failed to export Docx.");
         }
     };
