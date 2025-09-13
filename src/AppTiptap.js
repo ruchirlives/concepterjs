@@ -3,12 +3,12 @@ import { EditorState } from '@tiptap/pm/state';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor";
 import { fetchAutoComplete } from "api";
-import { useAppContext } from "AppContext";
+import { useTiptapContext } from "./TiptapContext";
 import { useTiptapSync } from './hooks/useTiptapSync';
 import toast from 'react-hot-toast';
 
 const AppTiptap = () => {
-    const { tiptapContent, setTiptapContent } = useAppContext();
+    const { tiptapContent, setTiptapContent } = useTiptapContext();
     const [editor, setEditor] = useState(null);
     const [collapsed, setCollapsed] = useState(true);
     const [ghostSuggestion, setGhostSuggestion] = useState('');
@@ -195,13 +195,21 @@ const AppTiptap = () => {
     // Update liveHtml whenever editor content or selection changes
     React.useEffect(() => {
         if (!editor) return;
-        const updateHtml = () => setLiveHtml(getHtmlWithCursorMarker(editor));
+        let frameId = null;
+        const updateHtml = () => {
+            if (frameId) cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(() => {
+                setLiveHtml(getHtmlWithCursorMarker(editor));
+                frameId = null;
+            });
+        };
         updateHtml();
         editor.on('update', updateHtml);
         editor.on('selectionUpdate', updateHtml);
         return () => {
             editor.off('update', updateHtml);
             editor.off('selectionUpdate', updateHtml);
+            if (frameId) cancelAnimationFrame(frameId);
         };
     }, [editor]);
 

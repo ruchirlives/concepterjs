@@ -1,5 +1,6 @@
 import React, { useState, Suspense } from 'react';
 import { AppProvider } from './AppContext';
+import { TiptapProvider } from './TiptapContext';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import AppGrid from './AppGrid';
@@ -207,7 +208,9 @@ const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(
   <React.StrictMode>
     <AppProvider>
-      <App />
+      <TiptapProvider>
+        <App />
+      </TiptapProvider>
     </AppProvider>
   </React.StrictMode>
 );

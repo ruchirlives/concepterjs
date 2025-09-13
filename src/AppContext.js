@@ -35,11 +35,6 @@ export const AppProvider = ({ children }) => {
   const [showDropdowns, setShowDropdowns] = useState({});
   const [rawDifferences, setRawDifferences] = useState({});
 
-  // Add Tiptap content state only
-  const [tiptapContent, setTiptapContent] = useState({
-    type: "doc",
-    content: [{ type: "paragraph", content: [{ type: "text", text: "Edit here..." }] }],
-  });
 
   // Layers state
   const [layerOptions, setLayerOptions] = useState([]);
@@ -159,8 +154,6 @@ export const AppProvider = ({ children }) => {
   const value = {
     rowData,
     setRowData,
-    tiptapContent,
-    setTiptapContent,
     layerOptions,
     addLayer,
     removeLayer,

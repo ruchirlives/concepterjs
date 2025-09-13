@@ -4,12 +4,14 @@ import useCreateNewRow from '../components/ModalNewContainer';
 import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
-import { useAppContext } from '../AppContext'; // Import the AppContext to access tiptapContent
+import { useAppContext } from '../AppContext';
+import { useTiptapContext } from '../TiptapContext';
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
 export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
     const menuRef = useRef(null);
-    const { tiptapContent, setTiptapContent, setEdges } = useAppContext();
+    const { setEdges } = useAppContext();
+    const { tiptapContent, setTiptapContent } = useTiptapContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
     const newRowFunc = useCreateNewRow();
 
