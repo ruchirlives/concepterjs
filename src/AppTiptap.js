@@ -135,45 +135,76 @@ const AppTiptap = () => {
         [editor, ghostSuggestion, acceptGhostText, fetchSuggestions, clearGhostText]
     );
 
+    // State for live HTML preview
+    const [liveHtml, setLiveHtml] = useState("");
+
+    // Update liveHtml whenever editor content changes
+    React.useEffect(() => {
+        if (!editor) return;
+        const updateHtml = () => setLiveHtml(editor.getHTML());
+        updateHtml();
+        editor.on('update', updateHtml);
+        return () => editor.off('update', updateHtml);
+    }, [editor]);
+
     return (
         <div
             ref={containerRef}
-            className="relative bg-white rounded shadow w-full"
+            className="relative bg-white rounded shadow w-full flex"
             onKeyDownCapture={onKeyDown}
             style={{ outline: "none" }}
         >
-            <div
-                className="flex justify-between items-center cursor-pointer select-none px-4 py-2"
-                onClick={() => setCollapsed(!collapsed)}
-            >
-                <span className="font-semibold text-lg">Editor</span>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleExport();
-                        }}
-                        className="px-2 py-1 border rounded"
-                    >
-                        Export Word
-                    </button>
-                    <button
-                        aria-label={collapsed ? "Expand editor" : "Collapse editor"}
-                        className="text-xl font-bold"
-                    >
-                        {collapsed ? "▼" : "▲"}
-                    </button>
+            {/* Main content area (left) */}
+            <div className="flex-1 min-w-0">
+                <div
+                    className="flex justify-between items-center cursor-pointer select-none px-4 py-2"
+                    onClick={() => setCollapsed(!collapsed)}
+                >
+                    <span className="font-semibold text-lg">Editor</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleExport();
+                            }}
+                            className="px-2 py-1 border rounded"
+                        >
+                            Export Word
+                        </button>
+                        <button
+                            aria-label={collapsed ? "Expand editor" : "Collapse editor"}
+                            className="text-xl font-bold"
+                        >
+                            {collapsed ? "▼" : "▲"}
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    className="transition-all duration-300 overflow-auto w-full"
+                    style={{ height: collapsed ? 0 : "400px" }}
+                >
+                    {!collapsed && (
+                        <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
+                            <SimpleEditor onEditorReady={setEditor} />
+                        </div>
+                    )}
                 </div>
             </div>
 
+            {/* Right navigation/preview panel */}
             <div
-                className="transition-all duration-300 overflow-auto w-full"
-                style={{ height: collapsed ? 0 : "400px" }}
+                className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto"
+                style={{ height: collapsed ? 0 : "400px", transition: 'height 0.3s' }}
             >
                 {!collapsed && (
-                    <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
-                        <SimpleEditor onEditorReady={setEditor} />
-                    </div>
+                    <>
+                        <div className="font-semibold mb-2">Live Document Preview</div>
+                        <div
+                            style={{ minHeight: 120, maxHeight: 340, overflow: 'auto', background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, marginBottom: 8 }}
+                            dangerouslySetInnerHTML={{ __html: liveHtml }}
+                        />
+                    </>
                 )}
             </div>
         </div>
