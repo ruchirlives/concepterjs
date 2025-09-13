@@ -3,7 +3,7 @@ import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor
 import { fetchAutoComplete } from "api";
 import { useAppContext } from "AppContext";
 import { useTiptapSync } from './hooks/useTiptapSync';
-import { Document, Packer, Paragraph } from "docx";
+import htmlDocx from 'html-docx-js/dist/html-docx';
 
 const AppTiptap = () => {
     const { tiptapContent, setTiptapContent } = useAppContext();
@@ -68,16 +68,12 @@ const AppTiptap = () => {
     const handleExport = useCallback(async () => {
         if (!editor) return;
         try {
-            const doc = new Document({
-                sections: [
-                    {
-                        properties: {},
-                        children: [new Paragraph(editor.getText())],
-                    },
-                ],
-            });
-            const blob = await Packer.toBlob(doc);
-            const url = URL.createObjectURL(blob);
+            // Get HTML from the editor
+            const html = editor.getHTML();
+            // Convert HTML to a Word document Blob
+            const docxBlob = htmlDocx.asBlob(html);
+            // Create a download link
+            const url = URL.createObjectURL(docxBlob);
             const link = document.createElement('a');
             link.href = url;
             link.download = 'editor.docx';
