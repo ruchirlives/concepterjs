@@ -301,8 +301,8 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         { label: "Export to Editor", onClick: handleExportEditor },
     ];
 
-    const exportApp = async (context) => {
-        const { cid } = context;
+    const exportApp = async (cid) => {
+        console.log("Exporting app with context:", cid);
         if (!cid) {
             toast.error("No containers selected.");
             return;
