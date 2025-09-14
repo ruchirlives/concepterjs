@@ -18,6 +18,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const [contextMenu, setContextMenu] = useState(null);
 
     const dragStartRef = useRef(null); // { x, y, radius }
+    const rafIdRef = useRef(null);
+    const pendingPosRef = useRef(null);
+    const lastAppliedRef = useRef(null);
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
 
     // Keep refs in sync
@@ -305,38 +308,65 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         const onMove = (e) => {
             if (selectedRef.current == null || !dragModeRef.current) return;
             const pos = { x: e.offsetX, y: e.offsetY };
-            if (dragModeRef.current === 'move') {
-                setNodes((ns) =>
-                    ns.map((n) =>
-                        n.id === selectedRef.current ? { ...n, x: pos.x, y: pos.y } : n
-                    )
-                );
-            } else if (dragModeRef.current === 'scale' && dragStartRef.current) {
-                // Calculate new radius based on distance from center
-                const { center } = dragStartRef.current;
-                const newRadius = Math.max(10, Math.hypot(pos.x - center.x, pos.y - center.y));
-                setNodes((ns) =>
-                    ns.map((n) =>
-                        n.id === selectedRef.current ? { ...n, radius: newRadius } : n
-                    )
-                );
+            pendingPosRef.current = pos;
+            if (rafIdRef.current == null) {
+                rafIdRef.current = requestAnimationFrame(() => {
+                    const p = pendingPosRef.current;
+                    rafIdRef.current = null;
+                    if (!p || selectedRef.current == null || !dragModeRef.current) return;
+                    if (dragModeRef.current === 'move') {
+                        // avoid redundant state updates with same coords
+                        const lp = lastAppliedRef.current;
+                        if (!lp || lp.x !== p.x || lp.y !== p.y) {
+                            setNodes((ns) =>
+                                ns.map((n) =>
+                                    n.id === selectedRef.current ? { ...n, x: p.x, y: p.y } : n
+                                )
+                            );
+                            lastAppliedRef.current = { x: p.x, y: p.y };
+                        }
+                    } else if (dragModeRef.current === 'scale' && dragStartRef.current) {
+                        const { center } = dragStartRef.current;
+                        const newRadius = Math.max(10, Math.hypot(p.x - center.x, p.y - center.y));
+                        if (!lastAppliedRef.current || lastAppliedRef.current.radius !== newRadius) {
+                            setNodes((ns) =>
+                                ns.map((n) =>
+                                    n.id === selectedRef.current ? { ...n, radius: newRadius } : n
+                                )
+                            );
+                            lastAppliedRef.current = { radius: newRadius };
+                        }
+                    }
+                });
             }
         };
 
         const onUp = async () => {
+            // Capture state, then immediately clear to stop dragging
+            const selectedId = selectedRef.current;
+            const mode = dragModeRef.current;
+            selectedRef.current = null;
+            dragModeRef.current = null;
+            dragStartRef.current = null;
+            lastAppliedRef.current = null;
+            if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
+
             // Save positions or radius back to original incomingNodes array
             let updated = false;
-            if (selectedRef.current != null) {
-                const n = nodesRef.current.find(n => n.id === selectedRef.current);
+            if (selectedId != null) {
+                const n = nodesRef.current.find(n => n.id === selectedId);
                 if (n) {
                     const row = incomingNodes.find(r => r.id === n.id);
-                    if (dragModeRef.current === 'move') {
+                    if (mode === 'move') {
                         if (row) {
                             row.Position = { x: n.x, y: n.y };
                         }
                         setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r));
                         updated = true;
-                    } else if (dragModeRef.current === 'scale') {
+                    } else if (mode === 'scale') {
                         if (row) {
                             row.MapRadius = n.radius;
                         }
@@ -351,9 +381,6 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                     typeof rowData === 'function' ? rowData() : rowData
                 );
             }
-            selectedRef.current = null;
-            dragModeRef.current = null;
-            dragStartRef.current = null;
         };
 
         // Right-click handler for nodes
@@ -376,13 +403,14 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         infiniteCanvas.addEventListener("mousedown", onDown);
         infiniteCanvas.addEventListener("mousemove", onMove);
-        infiniteCanvas.addEventListener("mouseup", onUp);
+        // Also listen on window so mouseup outside canvas ends dragging
+        window.addEventListener("mouseup", onUp);
         infiniteCanvas.addEventListener("contextmenu", onContextMenu);
 
         return () => {
             infiniteCanvas.removeEventListener("mousedown", onDown);
             infiniteCanvas.removeEventListener("mousemove", onMove);
-            infiniteCanvas.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mouseup", onUp);
             infiniteCanvas.removeEventListener("contextmenu", onContextMenu);
         };
     }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
