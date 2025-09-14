@@ -416,7 +416,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
 
 
-    const { handleSelect, handleRename, exportMenu } = useMenuHandlers({ rowData, setRowData });
+    const { handleSelect, handleRename, handleResetPositionScale, exportMenu } = useMenuHandlers({ rowData, setRowData });
     // Example menu options for demonstration
     const menuOptions = [
         {
@@ -426,6 +426,10 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         {
             label: "Rename Node",
             onClick: handleRename
+        },
+        {
+            label: "ResetPositionScale",
+            onClick: handleResetPositionScale
         },
         {
             label: "Export Menu",

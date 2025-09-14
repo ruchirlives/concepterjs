@@ -113,6 +113,18 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
         }
     };
 
+    // Reset Position & Scale (persist nulls so backend clears stored values)
+    const handleResetPositionScale = async (context) => {
+        const { cid } = context;
+        const updatedRowData = (rowData || []).map(row =>
+            row.id === cid ? { ...row, Position: null, MapRadius: null } : row
+        );
+        setRowData(updatedRowData);
+        await handleWriteBack(updatedRowData);
+        requestRefreshChannel();
+        toast.success("Position/Scale reset");
+    };
+
     // Select
     const handleSelect = async (context) => {
         const { cid } = context;
@@ -329,6 +341,7 @@ export function useMenuHandlers({ rowData, setRowData, removeChildFromLayer, fli
     return {
         handleRename,
         handleSelect,
+        handleResetPositionScale,
         handleRemove,
         handleRemoveLayer,
         handleRemoveSource,
