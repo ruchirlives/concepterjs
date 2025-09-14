@@ -200,16 +200,19 @@ async function showChildren({ selectedNodes }) {
 async function categorize({ nodes, selectedNodes, activeGroup }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
-    const ok = await api.categorizeContainers(ids);
-    alert(ok ? "Containers categorized successfully." : "Failed to categorize containers.");
-    console.log(ok.new_category_ids);
+    const result = await api.categorizeContainers(ids);
+    if (!result || !result.new_category_ids) {
+        alert("Failed to categorize containers.");
+        return;
+    }
+    alert("Containers categorized successfully.");
+    console.log(result.new_category_ids);
     if (!activeGroup) {
         requestRefreshChannel();
         return;
     }
-    ids = ok.new_category_ids;
     // add ids as children to the active group
-    await api.addChildren(activeGroup, ids);
+    await api.addChildren(activeGroup, result.new_category_ids);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
