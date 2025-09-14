@@ -74,6 +74,17 @@ export function useBackdropMap(geojsonUrl, dragModeRef) {
         ctx.drawImage(offscreen, -offscreen.width / 2, -offscreen.height / 2);
     };
 
+    // Vector redraw that ignores cached bitmap; useful for high-DPI exports
+    const drawMapVector = (ctx) => {
+        if (!data || !pathRef.current) return;
+        const path = pathRef.current.context(ctx);
+        path(data);
+        ctx.fillStyle = "#e5e7eb";
+        ctx.fill();
+        ctx.strokeStyle = "#6b7280";
+        ctx.stroke();
+    };
+
     const refreshMap = useCallback((transform) => {
         if (dragModeRef.current !== null) return;
         if (!data || !pathRef.current || !offscreen) return;
@@ -91,5 +102,5 @@ export function useBackdropMap(geojsonUrl, dragModeRef) {
         ctx.restore();
     }, [data, dragModeRef, offscreen]);
 
-    return { drawMap, refreshMap, isLoaded: !!data };
+    return { drawMap, drawMapVector, refreshMap, isLoaded: !!data };
 }

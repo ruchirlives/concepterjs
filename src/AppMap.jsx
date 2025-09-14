@@ -10,12 +10,19 @@ export default function AppMap() {
   const redrawRef = useRef(() => {});
   const dragModeRef = useRef(null); // 'move' or 'scale'
   const { rowData, layerOptions = [] } = useAppContext();
-  const { drawMap, refreshMap } = useBackdropMap("/maps/topo_lad.json", dragModeRef);
+  const { drawMap, drawMapVector, refreshMap } = useBackdropMap("/maps/topo_lad.json", dragModeRef);
 
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
   const selectedLayerRef = React.useRef(selectedLayer);
   useEffect(() => { selectedLayerRef.current = selectedLayer; }, [selectedLayer]);
+
+  // Export controls
+  const [exportScale, setExportScale] = React.useState(3);
+  const [exportPreset, setExportPreset] = React.useState("fit"); // fit | 2k | 4k
+  const [snapToGrid, setSnapToGrid] = React.useState(true);
+  const [snapStrategy, setSnapStrategy] = React.useState("nearest"); // nearest | expand
+  const [gridStep, setGridStep] = React.useState(50);
 
   // Optionally filter rowData by selectedLayer
   const filteredRowData = React.useMemo(() => {
@@ -28,13 +35,15 @@ export default function AppMap() {
 
   const {
     redraw,
-    contextMenuElement
+    contextMenuElement,
+    exportBitmap,
   } = useNodes(
     infiniteCanvasRef.current,
     memoizedNodes,
     drawMap,
     selectedLayerRef,
-    dragModeRef
+    dragModeRef,
+    drawMapVector
   );
   redrawRef.current = redraw;
 
@@ -119,6 +128,52 @@ export default function AppMap() {
                 }}
               >
                 Refresh Map
+              </button>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <label style={{ fontSize: 12, alignSelf: "center" }}>Scale</label>
+                <input type="number" min={1} max={8} step={1}
+                  value={exportScale}
+                  onChange={e => setExportScale(Math.max(1, Math.min(8, parseInt(e.target.value || "1", 10))))}
+                  style={{ fontSize: 12, padding: "2px 6px", border: "1px solid #ccc", borderRadius: 4 }} />
+                <label style={{ fontSize: 12, alignSelf: "center" }}>Preset</label>
+                <select value={exportPreset} onChange={e => setExportPreset(e.target.value)}
+                  style={{ fontSize: 12, padding: "2px 6px", border: "1px solid #ccc", borderRadius: 4 }}>
+                  <option value="fit">Fit Nodes</option>
+                  <option value="2k">Center 2000 x 2000</option>
+                  <option value="4k">Center 4000 x 4000</option>
+                </select>
+                <label style={{ fontSize: 12, alignSelf: "center" }}>Grid Step</label>
+                <input type="number" min={10} step={10} value={gridStep}
+                  onChange={e => setGridStep(Math.max(1, parseInt(e.target.value || "50", 10)))}
+                  style={{ fontSize: 12, padding: "2px 6px", border: "1px solid #ccc", borderRadius: 4 }} />
+                <label style={{ fontSize: 12, alignSelf: "center" }}>Snap</label>
+                <select value={snapStrategy} onChange={e => setSnapStrategy(e.target.value)}
+                  style={{ fontSize: 12, padding: "2px 6px", border: "1px solid #ccc", borderRadius: 4 }}>
+                  <option value="nearest">Nearest</option>
+                  <option value="expand">Expand</option>
+                </select>
+                <div style={{ gridColumn: "1 / span 2", display: "flex", alignItems: "center", gap: 6 }}>
+                  <input id="expSnap" type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />
+                  <label htmlFor="expSnap" style={{ fontSize: 12 }}>Snap to grid</label>
+                </div>
+              </div>
+              <button
+                style={{ marginBottom: 10, width: "100%", padding: "6px 0", borderRadius: 4, border: "1px solid #ccc", background: "#f5f5f5", fontWeight: 500, fontSize: 14, cursor: "pointer" }}
+                onClick={() => {
+                  let bounds = null;
+                  if (exportPreset === "2k") bounds = { minX: -1000, maxX: 1000, minY: -1000, maxY: 1000 };
+                  if (exportPreset === "4k") bounds = { minX: -2000, maxX: 2000, minY: -2000, maxY: 2000 };
+                  exportBitmap({
+                    scale: exportScale,
+                    padding: exportPreset === "fit" ? 150 : 0,
+                    bounds,
+                    gridStep,
+                    snapToGrid,
+                    snapStrategy
+                  });
+                }}
+              >
+                Export PNG
               </button>
               <div style={{ marginTop: 6 }}>
                 <label style={{ fontSize: 13, marginRight: 6 }}>Layer:</label>

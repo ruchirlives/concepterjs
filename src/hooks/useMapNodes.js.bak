@@ -10,7 +10,7 @@ import { useAppContext } from "../AppContext";
  * @param {Array} incomingNodes - array of node objects with optional { id, label, x, y }
  * @param {string} selectedLayer - (optional) filter for top-level nodes by this layer/tag
  */
-export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayerRef, dragModeRef, drawUnderlayVector) => {
+export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selectedLayerRef, dragModeRef) => {
     const [nodes, setNodes] = useState([]);
     const selectedRef = useRef(null);
     const nodesRef = useRef(nodes);
@@ -270,51 +270,24 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     }, [infiniteCanvas, drawUnderlay]);
 
     // Export a bitmap of the area covering the nodes and grid contiguous to bounds
-    const exportBitmap = useCallback(async ({
-        scale = 5,
-        padding = 100,
-        bounds = { minX: -2000, maxX: 2000, minY: -2000, maxY: 2000 },
-        gridStep = 50,
-        snapToGrid = true,
-        snapStrategy = 'expand'
-    } = {}) => {
+    const exportBitmap = useCallback(async ({ scale = 4, padding = 100 } = {}) => {
         const nodes = nodesRef.current || [];
-        // Compute bounds from explicit override or nodes
-        let minX, maxX, minY, maxY;
-        if (bounds && typeof bounds.minX === 'number') {
-            ({ minX, maxX, minY, maxY } = bounds);
-        } else {
-            minX = -500; maxX = 500; minY = -500; maxY = 500;
-            if (nodes.length > 0) {
-                minX = Math.min(...nodes.map(n => n.x - (n.radius || 30)));
-                maxX = Math.max(...nodes.map(n => n.x + (n.radius || 30)));
-                minY = Math.min(...nodes.map(n => n.y - (n.radius || 30)));
-                maxY = Math.max(...nodes.map(n => n.y + (n.radius || 30)));
-            }
-            // Expand by padding
-            minX -= padding; maxX += padding; minY -= padding; maxY += padding;
-            // Snap bounds to grid if requested
-            if (snapToGrid) {
-                if (snapStrategy === 'expand') {
-                    minX = Math.floor(minX / gridStep) * gridStep;
-                    maxX = Math.ceil(maxX / gridStep) * gridStep;
-                    minY = Math.floor(minY / gridStep) * gridStep;
-                    maxY = Math.ceil(maxY / gridStep) * gridStep;
-                } else {
-                    // Keep size constant, shift to nearest grid
-                    const width = maxX - minX;
-                    const height = maxY - minY;
-                    const cx = (minX + maxX) / 2;
-                    const cy = (minY + maxY) / 2;
-                    const snappedCx = Math.round(cx / gridStep) * gridStep;
-                    const snappedCy = Math.round(cy / gridStep) * gridStep;
-                    minX = snappedCx - width / 2;
-                    maxX = snappedCx + width / 2;
-                    minY = snappedCy - height / 2;
-                    maxY = snappedCy + height / 2;
-                }
-            }
+        // Compute bounds from nodes
+        let minX = -500, maxX = 500, minY = -500, maxY = 500;
+        if (nodes.length > 0) {
+            minX = Math.min(...nodes.map(n => n.x - (n.radius || 30)));
+            maxX = Math.max(...nodes.map(n => n.x + (n.radius || 30)));
+            minY = Math.min(...nodes.map(n => n.y - (n.radius || 30)));
+            maxY = Math.max(...nodes.map(n => n.y + (n.radius || 30)));
         }
+        // Expand by padding
+        minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+        // Snap bounds to grid (50px step)
+        const STEP = 50;
+        minX = Math.floor(minX / STEP) * STEP;
+        maxX = Math.ceil(maxX / STEP) * STEP;
+        minY = Math.floor(minY / STEP) * STEP;
+        maxY = Math.ceil(maxY / STEP) * STEP;
 
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
@@ -322,8 +295,6 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         canvas.width = Math.max(1, Math.floor(worldWidth * scale));
         canvas.height = Math.max(1, Math.floor(worldHeight * scale));
         const ctx = canvas.getContext('2d');
-        // Improve crispness
-        ctx.imageSmoothingEnabled = false;
         // Map world -> export canvas pixels
         ctx.setTransform(scale, 0, 0, scale, -minX * scale, -minY * scale);
 
@@ -335,22 +306,18 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         ctx.restore();
 
         // Draw underlay (map) and grid within bounds
-        if (typeof drawUnderlayVector === 'function') {
-            // Prefer vector map for exports to keep it crisp
-            drawUnderlayVector(ctx);
-        } else if (typeof drawUnderlay === 'function') {
+        if (typeof drawUnderlay === 'function') {
             drawUnderlay(ctx);
         }
         // Draw grid in export bounds
         ctx.strokeStyle = '#ccc';
-        ctx.lineWidth = 1 / scale;
-        for (let x = minX; x <= maxX; x += gridStep) {
+        for (let x = minX; x <= maxX; x += STEP) {
             ctx.beginPath();
             ctx.moveTo(x, minY);
             ctx.lineTo(x, maxY);
             ctx.stroke();
         }
-        for (let y = minY; y <= maxY; y += gridStep) {
+        for (let y = minY; y <= maxY; y += STEP) {
             ctx.beginPath();
             ctx.moveTo(minX, y);
             ctx.lineTo(maxX, y);
@@ -559,3 +526,4 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 };
 
 export default useNodes;
+
