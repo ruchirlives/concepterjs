@@ -471,7 +471,8 @@ export const categorizeContainers = async (containerIds) => {
     try {
         console.log("Categorizing containers:", containerIds);
         const response = await apiClient.post(`${getApiUrl()}/categorize_containers`, {
-            "containers": containerIds,
+            // API expects `container_ids` for categorization
+            "container_ids": containerIds,
         });
         return response.data;
     } catch (error) {
