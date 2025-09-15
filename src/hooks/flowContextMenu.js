@@ -1,19 +1,35 @@
 import { useRef } from "react";
 import toast from 'react-hot-toast';
 import { useAppContext } from '../AppContext';
-import * as api from "../api";
+import {
+    createContainer,
+    removeChildren,
+    addChildren,
+    getContainerBudgetApi,
+    convertToBudgetContainerApi,
+    addFinanceContainerApi,
+    deleteContainers,
+    removeContainers,
+    fetchChildren,
+    embed_containers,
+    fetchParentContainers,
+    categorizeContainers,
+    buildRelationshipsContainers,
+    exportSelectedContainers,
+    exportBranch,
+    mergeContainers,
+    joinContainers,
+    add_similar,
+    joinSimilarContainers,
+    api_build_chain_beam,
+    renameContainer,
+    embedPositions,
+    findSimilarPositions,
+    searchPositionZ,
+} from "../api";
 import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
-
-// Ensure the api namespace import is retained in production builds where
-// handlers are resolved dynamically (via eval). Some bundlers may tree-shake
-// imports that are only referenced from dynamically-invoked functions, which
-// can lead to `api` being undefined at runtime in minified builds. This
-// harmless global assignment creates a visible side-effect to keep the import.
-if (typeof window !== "undefined") {
-    window.__concepter_api_ref = api;
-}
 
 export const menuItems = [
     // Basics
@@ -82,7 +98,7 @@ async function insertNode({ nodeId, selectedIds, selectedContentLayer, rowData, 
     // Ensure Tags is always a string for downstream code that calls .split
     const tags = selectedContentLayer ? String(selectedContentLayer) : ""
     console.log("Creating new node with tags:", tags);
-    const newId = await api.createContainer();
+    const newId = await createContainer();
 
     // Add to rowData
     if (newId) {
@@ -104,14 +120,14 @@ async function insertNode({ nodeId, selectedIds, selectedContentLayer, rowData, 
         return;
     }
     // Next, remove relationships from nodeId to selectedIds
-    const ok = await api.removeChildren(nodeId, selectedIds);
+    const ok = await removeChildren(nodeId, selectedIds);
     if (!ok) {
         alert("Failed to remove relationships from original node.");
         return;
     }
     // Now, add relationships from nodeId to newNode, and from newNode to selectedIds
-    const ok1 = await api.addChildren(nodeId, [newId]);
-    const ok2 = await api.addChildren(newId, selectedIds);
+    const ok1 = await addChildren(nodeId, [newId]);
+    const ok2 = await addChildren(newId, selectedIds);
     if (!ok1 || !ok2) {
         alert("Failed to add relationships.");
         return;
@@ -124,7 +140,7 @@ async function getContainerBudgetAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const budgets = await api.getContainerBudgetApi(selectedIds);
+    const budgets = await getContainerBudgetApi(selectedIds);
     if (!budgets.length) {
         toast("No budgets found for selected containers.");
         return;
@@ -138,7 +154,7 @@ async function convertToBudgetContainerAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await api.convertToBudgetContainerApi(selectedIds);
+    const res = await convertToBudgetContainerApi(selectedIds);
     toast.success(res.message || "Converted to budget container.");
     requestRefreshChannel();
 }
@@ -148,7 +164,7 @@ async function addFinanceContainerAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await api.addFinanceContainerApi(selectedIds);
+    const res = await addFinanceContainerApi(selectedIds);
     toast.success(res.message || "Converted to finance container.");
     requestRefreshChannel();
 }
@@ -190,13 +206,13 @@ async function deleteAction({ selectedIds }) {
     if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} container(s)? This action cannot be undone.`)) {
         return;
     }
-    const ok = await api.deleteContainers(selectedIds);
+    const ok = await deleteContainers(selectedIds);
     if (ok) requestRefreshChannel();
     else alert("Failed to delete containers.");
 }
 
 async function removeAction({ selectedIds }) {
-    const ok = await api.removeContainers(selectedIds);
+    const ok = await removeContainers(selectedIds);
     if (ok) requestRefreshChannel();
     else alert("Failed to remove containers.");
 }
@@ -231,7 +247,7 @@ async function hideChildren({ selectedNodes, rowData, setRowData }) {
     const ids = selectedNodes.map(n => n.data.id);
     const childrenIds = [];
     for (const id of ids) {
-        const children = await api.fetchChildren(id);
+        const children = await fetchChildren(id);
         children?.forEach(child => {
             if (!childrenIds.includes(child.id)) childrenIds.push(child.id);
         });
@@ -250,7 +266,7 @@ async function embedContainers({ selectedIds, nodes }) {
         selectedIds = alVisibleIds;
         return;
     }
-    const ok = await api.embed_containers(selectedIds);
+    const ok = await embed_containers(selectedIds);
     if (ok) {
         alert("Containers embedded successfully.");
     } else {
@@ -263,7 +279,7 @@ async function showChildren({ selectedNodes }) {
     if (ids.length === 0) return;
     const childrenIds = [];
     for (const id of ids) {
-        const children = await api.fetchChildren(id);
+        const children = await fetchChildren(id);
         children?.forEach(child => {
             if (!childrenIds.includes(child.id)) childrenIds.push(child.id);
         });
@@ -278,7 +294,7 @@ async function showParents({ selectedNodes }) {
     if (ids.length === 0) return;
     const parentIds = [];
     for (const id of ids) {
-        const parents = await api.fetchParentContainers(id);
+        const parents = await fetchParentContainers(id);
         parents?.forEach(parent => {
             if (!parentIds.includes(parent.id)) parentIds.push(parent.id);
         });
@@ -291,7 +307,7 @@ async function showParents({ selectedNodes }) {
 async function categorize({ nodes, selectedNodes, activeGroup }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
-    const result = await api.categorizeContainers(ids);
+    const result = await categorizeContainers(ids);
     if (!result || !result.new_category_ids) {
         alert("Failed to categorize containers.");
         return;
@@ -303,7 +319,7 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
         return;
     }
     // add ids as children to the active group
-    await api.addChildren(activeGroup, result.new_category_ids);
+    await addChildren(activeGroup, result.new_category_ids);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -311,16 +327,16 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
 async function buildRelationships({ nodes, selectedNodes }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
-    const ok = await api.buildRelationshipsContainers(ids);
+    const ok = await buildRelationshipsContainers(ids);
     alert(ok ? "Relationships built successfully." : "Failed to build relationships.");
 }
 
 async function exportSelected({ selectedIds }) {
-    api.exportSelectedContainers(selectedIds);
+    exportSelectedContainers(selectedIds);
 }
 
 async function exportBranchSelected({ selectedIds }) {
-    const data = await api.exportBranch(selectedIds);
+    const data = await exportBranch(selectedIds);
     if (data) {
         alert("Branch exported successfully.");
     } else {
@@ -329,7 +345,7 @@ async function exportBranchSelected({ selectedIds }) {
 }
 
 async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, setRowData }) {
-    const ok = await api.mergeContainers(selectedIds);
+    const ok = await mergeContainers(selectedIds);
     if (ok) {
         alert("Containers merged successfully.");
     } else {
@@ -338,13 +354,13 @@ async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, 
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
     if (activeGroup) {
-        await api.addChildren(activeGroup, [ok.id]);
+        await addChildren(activeGroup, [ok.id]);
     }
     requestRefreshChannel();
 }
 
 async function joinSelected({ selectedIds, activeGroup }) {
-    const ok = await api.joinContainers(selectedIds, true);
+    const ok = await joinContainers(selectedIds, true);
     if (ok) {
         alert("Containers joined successfully.");
     } else {
@@ -352,7 +368,7 @@ async function joinSelected({ selectedIds, activeGroup }) {
     }
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ", activeGroup);
-    await api.addChildren(activeGroup, [ok.id]);
+    await addChildren(activeGroup, [ok.id]);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -371,7 +387,7 @@ async function addSimilar({ nodeId, selectedIds, nodes }) {
         console.log("No selected IDs, using all visible IDs:", alVisibleIds);
         selectedIds = alVisibleIds;
     }
-    const ok = await api.add_similar(nodeId, selectedIds);
+    const ok = await add_similar(nodeId, selectedIds);
     if (ok) {
         alert(ok.message);
     }
@@ -386,10 +402,10 @@ async function joinSimilar({ selectedIds, activeGroup }) {
         return;
     }
     try {
-        const res = await api.joinSimilarContainers(selectedIds);
+        const res = await joinSimilarContainers(selectedIds);
         toast.success(res.message || "Joined similar containers.");
         if (res.new_container_id && activeGroup) {
-            await api.addChildren(activeGroup, [res.new_container_id]);
+            await addChildren(activeGroup, [res.new_container_id]);
         }
         requestRefreshChannel();
     } catch (err) {
@@ -405,7 +421,7 @@ async function buildChainBeam({ nodes, nodeId, selectedIds }) {
 
     const alVisibleIds = nodes.map(n => n.data.id);
 
-    const ok = await api.api_build_chain_beam(start_node, end_node, alVisibleIds);
+    const ok = await api_build_chain_beam(start_node, end_node, alVisibleIds);
     if (ok?.narrative) {
         toast((t) => (
             <div className="max-w-[300px]">
@@ -437,7 +453,7 @@ async function renameFromDescription({ selectedNodes, selectedIds }) {
         if (node) {
             const desc = node.data.Description;
             console.log(`Renaming row ${id} to ${desc}`);
-            const res = await api.renameContainer(id);
+            const res = await renameContainer(id);
             if (!res) alert("Failed to rename row.");
         }
     }
@@ -448,13 +464,13 @@ async function removeFromActiveGroup({ activeGroup, selectedIds, history }) {
         alert("No active group selected.");
         return;
     }
-    let ok = await api.removeChildren(activeGroup, selectedIds);
+    let ok = await removeChildren(activeGroup, selectedIds);
     if (!ok) {
         alert("Failed to remove containers from active group.");
         return;
     }
     const prev = history[history.length - 1] || null;
-    ok = await api.addChildren(prev, selectedIds);
+    ok = await addChildren(prev, selectedIds);
     if (ok) requestRefreshChannel();
 }
 
@@ -546,7 +562,7 @@ async function embedPositionsAction({ selectedIds }) {
         toast.error("No containers selected.");
         return;
     }
-    const res = await api.embedPositions(selectedIds);
+    const res = await embedPositions(selectedIds);
     if (res?.message) toast.success(res.message);
     else toast.error("Failed to embed positions.");
 }
@@ -554,7 +570,7 @@ async function embedPositionsAction({ selectedIds }) {
 async function findSimilarPositionsAction({ nodes }) {
     const positionText = prompt("Enter position text to find similar:");
     if (!positionText) return;
-    const res = await api.findSimilarPositions(positionText);
+    const res = await findSimilarPositions(positionText);
     console.log("Similar positions response:", res);
 
     // Build a map of id -> Name for quick lookup
@@ -592,7 +608,7 @@ async function searchPositionZAction({ nodeId, selectedNodes }) {
     const defaultValue = node?.data?.Name || "";
     const searchTerm = prompt("Search Position Z for:", defaultValue);
     if (!searchTerm) return;
-    const results = await api.searchPositionZ(searchTerm);
+    const results = await searchPositionZ(searchTerm);
     if (results.length) {
         toast.success(
             <div style={{ whiteSpace: "pre-wrap" }}>
@@ -704,4 +720,5 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
 }
 
 export { removeAction };
+
 
