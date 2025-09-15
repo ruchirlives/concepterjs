@@ -888,6 +888,7 @@ export const searchNodes = async (searchTerm, tags) => {
  * @param {string} searchTerm - The search term for position.z.
  * @param {number} [top_n=10] - Number of top results to return.
  * @returns {Promise<Array>} Array of names matching the search.
+ * 
  */
 export const searchPositionZ = async (searchTerm, top_n = 5) => {
     try {
