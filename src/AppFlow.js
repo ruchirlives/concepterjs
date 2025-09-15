@@ -43,7 +43,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     nodes, setNodes,
     edges, setEdges,
     onNodesChange,
-    screenToFlowPosition
+    screenToFlowPosition,
+    selectedContentLayer, setSelectedContentLayer, layerOptions,
   } = useFlowLogic();
 
   const [groupByLayers, setGroupByLayers] = useState(false); // <-- Add this
@@ -155,6 +156,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
           />
           <span>Keep Layout</span>
         </label>
+        {/* Add Content Layer Dropdown */}
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-gray-600">Content:</label>
+          <select
+            value={selectedContentLayer}
+            onChange={e => setSelectedContentLayer(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+            title="Filter content layer"
+          >
+            <option value="">All Layers</option>
+            {layerOptions.map(layer => (
+              <option key={layer} value={layer}>
+                {layer}
+              </option>
+            ))}
+          </select>
+        </div>
       </FlowHeader>
 
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>

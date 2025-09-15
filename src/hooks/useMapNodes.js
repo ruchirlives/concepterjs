@@ -372,7 +372,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 'image/png');
-    }, [drawUnderlay]);
+    }, [drawUnderlay, drawUnderlayVector]);
 
     // Redraw whenever nodes or canvas change
     useEffect(() => {
