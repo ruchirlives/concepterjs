@@ -2,31 +2,81 @@ import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout } = params;
+    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout, groupByLayers } = params;
 
     if (!parentChildMap) return;
 
-    // Build lookup of all original node IDs before hide
-    const originalIdSet = new Set(computedNodes.map(n => n.id));
+    // Build lookup of all node IDs currently present
+    const presentIdSet = new Set(computedNodes.map(n => n.id));
+
+    // In GroupByLayers mode, nodes may be clones with ids like `${orig}__in__layer-<name>`
+    // Build a mapping from originalId -> array of clone nodes
+    const clonesByOriginal = {};
+    if (groupByLayers) {
+        computedNodes.forEach(n => {
+            if (n.type !== 'group') {
+                const original = n.data?.originalId || n.data?.id || n.id;
+                if (!clonesByOriginal[original]) clonesByOriginal[original] = [];
+                clonesByOriginal[original].push(n);
+            }
+        });
+    }
     // const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
 
     // Filter parentChildMap by originalIdSet and remove only 'successor' relations
-    const filteredParentChildMap = parentChildMap
-        .filter(({ container_id, children }) =>
-            originalIdSet.has(container_id) || children.some(child => originalIdSet.has(child.id))
-        )
-        .map(({ container_id, children }) => ({
-            container_id,
-            children: children.filter(c => c.label !== 'successor')
-        }));
+    let filteredParentChildMap;
+    if (!groupByLayers) {
+        filteredParentChildMap = parentChildMap
+            .filter(({ container_id, children }) =>
+                presentIdSet.has(container_id) || children.some(child => presentIdSet.has(child.id))
+            )
+            .map(({ container_id, children }) => ({
+                container_id,
+                children: children.filter(c => c.label !== 'successor')
+            }));
+    } else {
+        // When grouping by layers, we want to project relationships onto each layer
+        // where both endpoints have a clone in the same parent group.
+        const tmp = [];
+        parentChildMap.forEach(({ container_id, children }) => {
+            const parentClones = clonesByOriginal[container_id]?.filter(c => c.parentId);
+            if (!parentClones || parentClones.length === 0) return;
+            const cleanChildren = children.filter(c => c.label !== 'successor');
+            if (cleanChildren.length === 0) return;
+            tmp.push({ container_id, children: cleanChildren });
+        });
+        filteredParentChildMap = tmp;
+    }
 
     // Build childMap: container_id → children objects
-    const childMap = Object.fromEntries(
-        filteredParentChildMap.map(({ container_id, children }) => [
-            container_id.toString(),
-            children
-        ])
-    );
+    let childMap;
+    if (!groupByLayers) {
+        childMap = Object.fromEntries(
+            filteredParentChildMap.map(({ container_id, children }) => [
+                container_id.toString(),
+                children
+            ])
+        );
+    } else {
+        // Build a child map keyed by CLONE IDs inside each layer
+        childMap = {};
+        filteredParentChildMap.forEach(({ container_id, children }) => {
+            const parentClones = clonesByOriginal[container_id] || [];
+            parentClones.forEach(parentClone => {
+                const parentGroup = parentClone.parentId;
+                if (!parentGroup) return;
+                const key = parentClone.id;
+                if (!childMap[key]) childMap[key] = [];
+                children.forEach(c => {
+                    const childClones = clonesByOriginal[c.id] || [];
+                    const inSameLayer = childClones.find(ch => ch.parentId === parentGroup);
+                    if (inSameLayer) {
+                        childMap[key].push({ ...c, id: inSameLayer.id });
+                    }
+                });
+            });
+        });
+    }
 
     // Invert childMap → parentMap
     const nameById = Object.fromEntries(
@@ -58,8 +108,11 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     // Build childToGroup map for edge building
     const groupIds = computedNodes.filter(n => n.type === 'group').map(n => n.id);
     const childToGroup = {};
-    groupIds.forEach(gid => {
-        (childMap[gid] || []).forEach(c => {
+    // In layer mode, keys in childMap are clone IDs; otherwise, keys are original parents
+    Object.entries(childMap).forEach(([pid, children]) => {
+        const parentNode = computedNodes.find(n => n.id === pid) || null;
+        const gid = parentNode?.parentId || (groupIds.includes(pid) ? pid : undefined);
+        (children || []).forEach(c => {
             childToGroup[c.id.toString()] = gid;
         });
     });

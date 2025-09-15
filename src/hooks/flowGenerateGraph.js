@@ -66,41 +66,41 @@ export async function generateNodesAndEdges(params) {
             }
         });
 
-        // 2. Assign parentId for each node tagged with a layer
+        // 2. For each row, create a clone inside every matching layer group
+        const childNodes = [];
         rowData.forEach((item, index) => {
             const tags = (item.Tags || '').toLowerCase().split(',').map(t => t.trim());
-            const matchedLayer = layersToUse.find(l => tags.includes(l.toLowerCase()));
-            if (matchedLayer) {
-                childToGroup[item.id?.toString()] = `layer-${matchedLayer}`;
-            }
-        });
+            const matchedLayers = layersToUse.filter(l => tags.includes(l.toLowerCase()));
+            if (matchedLayers.length === 0) return; // skip if no matching layer
 
-        // 3. Map nodes, assign parentId if in childToGroup
-        const childNodes = rowData.map((item, index) => {
-            const parentId = childToGroup[item.id?.toString()];
-            return {
-                id: item.id.toString(),
-                position: getNodePosition(
-                    item.id.toString(),
-                    parentId
-                        ? { x: 40 + (index % 2) * 120, y: 40 + Math.floor(index / 2) * 80 }
-                        : { x: 100 * index, y: 100 * index }
-                ),
-                data: {
-                    id: item.id,
-                    Name: item.Name || `Node ${item.id}`,
-                    Description: item.Description || '',
-                    Budget: item.Budget || undefined,
-                    Cost: item.Cost || undefined,
-                    Tags: item.Tags || '',
-                    isHighestScoring: highestScoringId === item.id?.toString(),
-                    score: stateScores?.[item.id],
-                    normalizedScore: normalizeScore(stateScores?.[item.id]),
-                    PendingEdges: item.PendingEdges || [],
-                },
-                type: 'custom',
-                ...(parentId ? { parentId, extent: 'parent' } : {}),
-            };
+            matchedLayers.forEach((layer, li) => {
+                const parentId = `layer-${layer}`;
+                const cloneId = `${item.id.toString()}__in__${parentId}`;
+                childToGroup[cloneId] = parentId;
+                childNodes.push({
+                    id: cloneId,
+                    position: getNodePosition(
+                        cloneId,
+                        { x: 40 + ((index + li) % 2) * 120, y: 40 + Math.floor((index + li) / 2) * 80 }
+                    ),
+                    data: {
+                        id: item.id,               // original id
+                        originalId: item.id,       // explicit original id
+                        Name: item.Name || `Node ${item.id}`,
+                        Description: item.Description || '',
+                        Budget: item.Budget || undefined,
+                        Cost: item.Cost || undefined,
+                        Tags: item.Tags || '',
+                        isHighestScoring: highestScoringId === item.id?.toString(),
+                        score: stateScores?.[item.id],
+                        normalizedScore: normalizeScore(stateScores?.[item.id]),
+                        PendingEdges: item.PendingEdges || [],
+                    },
+                    type: 'custom',
+                    parentId,
+                    extent: 'parent',
+                });
+            });
         });
 
         computedNodes = [...layerGroups, ...childNodes];
