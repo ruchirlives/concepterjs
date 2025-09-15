@@ -1,111 +1,109 @@
 # ConcepterJS
 
-ConcepterJS is a React-based interactive project and container management system featuring rich graph visualization and flowcharting capabilities. It allows users to create, manage, and visualize hierarchical container data with contextual actions, Mermaid diagram export, Gantt charts, and DOCX export. It integrates seamlessly with a backend API for data storage, retrieval, and manipulation.
+React-based workspace to manage and visualize hierarchical “containers” (projects, tasks, states, etc.). It provides a grid for data entry, multiple visualizations (flow, matrix, kanban, donut, mermaid), a geographic map view, and rich export options (PNG, SVG, DOCX). It integrates with a backend API for persistence and bulk operations.
 
-It is the front end for https://github.com/ruchirlives/concepter
+Frontend for: https://github.com/ruchirlives/concepter
+
 ---
 
 ## Features
 
-* **Interactive Grid View**
-  Editable AG Grid with filtering, sorting, drag-and-drop, and context menus for managing container data.
-
-* **Graph Visualization with React Flow**
-  Interactive flow diagrams visualizing containers as nodes and relationships as edges with dynamic node creation and editing.
-
-* **Mermaid and Gantt Chart Export**
-  Export container structures as Mermaid diagrams or Gantt charts with live rendering.
-
-* **Hierarchical Container Management**
-  Add, remove, and merge child containers dynamically through context menus and API integration.
-
-* **Document Export**
-  Export container data as DOCX files.
-
-* **Real-time Inter-Component Communication**
-  Uses Broadcast Channels for synchronization between components like node selection and filtering.
+- Interactive Grid: AG Grid with filtering, sorting, editing, and context menus.
+- Flow Graph: Relationship visualization with React Flow and edge/node helpers.
+- Map View: InfiniteCanvas map with draggable/scalable nodes and backdrop topo map; export to PNG and SVG.
+- Mermaid + Gantt: Live Mermaid rendering and Gantt export.
+- DOCX Export: Generate documents from selected containers.
+- Layers and States: Layer toggling, state views, matrix and kanban boards.
+- Sync: BroadcastChannel-based communication between components (selection, filtering, etc.).
 
 ---
 
-## Installation
+## Quick Start
 
-### Prerequisites
+Prerequisites
+- Node.js 18+ recommended
+- npm (or yarn)
 
-* Node.js (version 16 or higher recommended)
-* npm or yarn package manager
-* Compatible backend API server
+Install and run
+- `git clone https://github.com/yourusername/concepterjs.git`
+- `cd concepterjs`
+- `npm install`
+- `npm start` (starts on Create React App dev server)
 
-### Setup
-
-```bash
-git clone https://github.com/yourusername/concepterjs.git
-cd concepterjs
-npm install
-npm start
-```
-
-### Configuration
-
-* Set your backend API URL in `src/apiConfig.js` or through environment variables.
+Configuration
+- Set API URL and optional passcode in `src/apiConfig.js` or via your own wiring.
+- At runtime, you can set the passcode in the header input; a server selector is available in the footer panel.
 
 ---
 
-## Usage
+## Usage Highlights
 
-* Use the **Grid View** to create, edit, and delete containers with details like ID, Name, Description, Tags, Dates.
-* Right-click rows or nodes to access **Context Menus** with options for adding/removing children, merging, exporting diagrams, and more.
-* Visualize container relationships using the **Flow Visualization** panel with drag-and-drop and edge editing.
-* View live Mermaid diagrams in the **Mermaid Panel**.
-* Control data loading, saving, import, and toggling options using the **Buttons Panel**.
-* Use **Modals** to load or import saved container sets.
-
----
-
-## Project Structure
-
-* `AppGrid.js` — Data grid interface with AG Grid.
-* `AppFlow.js` — Graph visualization and interaction using React Flow.
-* `AppMermaid.js` — Mermaid diagram rendering component.
-* `api.js` — Axios API client and endpoint functions.
-* `effectsGrid.js` & `effectsReactFlow.js` — React hooks for event handling and side effects.
-* `GridContextMenu.js` & `FlowContextMenu.js` — Context menus for grid and flow views.
-* `LoadModal.js` — Modal component for loading and importing container sets.
-* `columnDefs.js` — Definitions for AG Grid columns.
-* `apiConfig.js` — Configuration for backend API URL.
+- Grid: Manage containers (ID, Name, Description, Tags, Dates). Right‑click for context actions.
+- Flow: Visualize relationships; build edges and groups; context menu actions for nodes/edges.
+- Map: Drag nodes with Alt+drag, scale with Shift+drag. Use the Headings panel on the right to:
+  - Refresh Map: Re-render the cached backdrop at current zoom.
+  - Export PNG: Choose scale, grid snap, and presets (fit/2k/4k).
+  - Export SVG: Vector export of map, grid, nodes, and labels with explicit fills/strokes for reliable import.
+- Mermaid: View and export Mermaid diagrams.
+- DOCX: Use the document exporter to create Word documents.
 
 ---
 
-## API Endpoints Utilized
+## Project Structure (selected)
 
-* Fetch containers, parents, and children
-* Add/remove children relationships
-* Delete and merge containers
-* Export diagrams and DOCX documents
-* Save/load container sets
-* Get and set edge positions
-* Rekey requests
+- `src/index.js`: App composition and routing of major panels.
+- `src/AppGrid.js`: AG Grid data entry and editing.
+- `src/AppFlow.js`: React Flow relationship view and helpers.
+- `src/AppMap.jsx`: InfiniteCanvas map, export controls (PNG/SVG).
+- `src/hooks/useMapNodes.js`: Node layout, draw, context menu, PNG/SVG exporters.
+- `src/hooks/useBackdropMap.js`: TopoJSON loading, d3-geo projection, bitmap/vector map, SVG path helper.
+- `src/AppMermaid.js`: Mermaid rendering.
+- `src/components/DocxExporter.jsx`: DOCX export utilities.
+- `src/api.js`, `src/apiConfig.js`: API calls and configuration.
+
+---
+
+## Exports
+
+- PNG Export (Map): Controlled via scale, grid step, and snapping; includes backdrop map and grid.
+- SVG Export (Map): Emits explicit `fill` and `stroke` values to avoid black imports. Example shape emissions:
+  - `<circle cx="x" cy="y" r="10" fill="#3498db" stroke="#000" stroke-width="1"/>`
+  - `<text x="x" y="y-15" font-size="14" text-anchor="middle" fill="black">Label</text>`
+- Mermaid: Copy/export diagram source and image from the Mermaid panel.
+- DOCX: Generate Word documents for selected containers.
+
+---
+
+## Scripts
+
+- `npm start`: Run dev server.
+- `npm run build`: Production build.
+- `npm test`: Run tests (if configured).
 
 ---
 
 ## Contributing
 
-Contributions welcome! Please:
-
-1. Fork the repo.
-2. Create a feature branch: `git checkout -b feature/your-feature`.
-3. Commit changes: `git commit -m "Add your feature"`.
-4. Push branch: `git push origin feature/your-feature`.
-5. Open a pull request.
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit: `git commit -m "feat: add your feature"`
+4. Push: `git push origin feature/your-feature`
+5. Open a PR
 
 ---
 
 ## License
 
-* Copyright (c) 2025 Ruchir Shah
-* Licensed under the GNU GPLv3. See [LICENSE](./LICENSE) file for details.
+GPLv3 — see [LICENSE](./LICENSE).
+
+A Scotland topojson map is included which was generated by https://github.com/martinjc/UK-GeoJSON
+
+Licence Information
+Contains Ordnance Survey, Office of National Statistics, National Records Scotland and LPS Intellectual Property data © Crown copyright and database right [2016]. Data licensed under the terms of the Open Government Licence (http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3). Ordnance Survey data covered by OS OpenData Licence. Any further sub-licences must retain this attribution.
 
 ---
 
-## Contact
+## Support
 
-For questions or issues, please open an issue on GitHub or contact the maintainer.
+Open an issue on GitHub for bugs or feature requests.
+
