@@ -102,5 +102,13 @@ export function useBackdropMap(geojsonUrl, dragModeRef) {
         ctx.restore();
     }, [data, dragModeRef, offscreen]);
 
-    return { drawMap, drawMapVector, refreshMap, isLoaded: !!data };
+    // Provide SVG path data for the map for vector export
+    const getMapSVGPath = () => {
+        if (!data || !projectionRef.current) return null;
+        // Create a geoPath without a canvas context to get SVG path string
+        const p = geoPath(projectionRef.current);
+        return p(data);
+    };
+
+    return { drawMap, drawMapVector, refreshMap, isLoaded: !!data, getMapSVGPath };
 }

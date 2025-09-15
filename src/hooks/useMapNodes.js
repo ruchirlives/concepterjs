@@ -374,6 +374,99 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         }, 'image/png');
     }, [drawUnderlay, drawUnderlayVector]);
 
+    // Export SVG with grid, nodes, labels, and optional map path
+    const exportSVG = useCallback(({
+        padding = 100,
+        bounds = { minX: -2000, maxX: 2000, minY: -2000, maxY: 2000 },
+        gridStep = 50,
+        snapToGrid = true,
+        snapStrategy = 'expand',
+        getMapSVGPath
+    } = {}) => {
+        const nodes = nodesRef.current || [];
+        // Compute bounds
+        let minX, maxX, minY, maxY;
+        if (bounds && typeof bounds.minX === 'number') {
+            ({ minX, maxX, minY, maxY } = bounds);
+        } else {
+            minX = -500; maxX = 500; minY = -500; maxY = 500;
+            if (nodes.length > 0) {
+                minX = Math.min(...nodes.map(n => n.x - (n.radius || 30)));
+                maxX = Math.max(...nodes.map(n => n.x + (n.radius || 30)));
+                minY = Math.min(...nodes.map(n => n.y - (n.radius || 30)));
+                maxY = Math.max(...nodes.map(n => n.y + (n.radius || 30)));
+            }
+            minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+            if (snapToGrid) {
+                if (snapStrategy === 'expand') {
+                    minX = Math.floor(minX / gridStep) * gridStep;
+                    maxX = Math.ceil(maxX / gridStep) * gridStep;
+                    minY = Math.floor(minY / gridStep) * gridStep;
+                    maxY = Math.ceil(maxY / gridStep) * gridStep;
+                } else {
+                    const width = maxX - minX;
+                    const height = maxY - minY;
+                    const cx = (minX + maxX) / 2;
+                    const cy = (minY + maxY) / 2;
+                    const snappedCx = Math.round(cx / gridStep) * gridStep;
+                    const snappedCy = Math.round(cy / gridStep) * gridStep;
+                    minX = snappedCx - width / 2;
+                    maxX = snappedCx + width / 2;
+                    minY = snappedCy - height / 2;
+                    maxY = snappedCy + height / 2;
+                }
+            }
+        }
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Build SVG markup in world coordinates
+        const svgParts = [];
+        svgParts.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+        svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}">`);
+        // Background
+        svgParts.push(`<rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#ffffff"/>`);
+        // Map underlay if provided
+        if (typeof getMapSVGPath === 'function') {
+            const d = getMapSVGPath();
+            if (d) {
+                svgParts.push(`<path d="${d}" fill="#e5e7eb" stroke="#6b7280" stroke-width="1"/>`);
+            }
+        }
+        // Grid lines
+        for (let x = minX; x <= maxX; x += gridStep) {
+            svgParts.push(`<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="#cccccc" stroke-width="1"/>`);
+        }
+        for (let y = minY; y <= maxY; y += gridStep) {
+            svgParts.push(`<line x1="${minX}" y1="${y}" x2="${maxX}" y2="${y}" stroke="#cccccc" stroke-width="1"/>`);
+        }
+        // Nodes
+        nodes.forEach(n => {
+            const r = n.radius || 30;
+            const color = n.color || 'blue';
+            svgParts.push(`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${color}" stroke="#222222" stroke-width="${Math.max(0.5, r * 0.02)}"/>`);
+            // Labels
+            const fontSize = (n.fontSize || 16) * 0.2;
+            const lines = Array.isArray(n.label) ? n.label : [String(n.label ?? '')];
+            const totalHeight = lines.length * fontSize;
+            lines.forEach((line, i) => {
+                const ty = n.y - 0 - totalHeight / 2 + i * fontSize + fontSize / 2;
+                svgParts.push(`<text x="${n.x}" y="${ty}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="middle" fill="#000000" font-family="sans-serif">${String(line).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</text>`);
+            });
+        });
+        svgParts.push(`</svg>`);
+
+        const blob = new Blob([svgParts.join('\n')], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'map-export.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, []);
+
     // Redraw whenever nodes or canvas change
     useEffect(() => {
         redraw();
@@ -555,7 +648,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         )
         : null;
 
-    return { nodes, setNodes, redraw, contextMenuElement, exportBitmap };
+    return { nodes, setNodes, redraw, contextMenuElement, exportBitmap, exportSVG };
 };
 
 export default useNodes;

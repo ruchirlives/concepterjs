@@ -10,7 +10,7 @@ export default function AppMap() {
   const redrawRef = useRef(() => {});
   const dragModeRef = useRef(null); // 'move' or 'scale'
   const { rowData, layerOptions = [] } = useAppContext();
-  const { drawMap, drawMapVector, refreshMap } = useBackdropMap("/maps/topo_lad.json", dragModeRef);
+  const { drawMap, drawMapVector, refreshMap, getMapSVGPath } = useBackdropMap("/maps/topo_lad.json", dragModeRef);
 
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
@@ -37,6 +37,7 @@ export default function AppMap() {
     redraw,
     contextMenuElement,
     exportBitmap,
+    exportSVG,
   } = useNodes(
     infiniteCanvasRef.current,
     memoizedNodes,
@@ -174,6 +175,24 @@ export default function AppMap() {
                 }}
               >
                 Export PNG
+              </button>
+              <button
+                style={{ marginBottom: 10, width: "100%", padding: "6px 0", borderRadius: 4, border: "1px solid #ccc", background: "#f5f5f5", fontWeight: 500, fontSize: 14, cursor: "pointer" }}
+                onClick={() => {
+                  let bounds = null;
+                  if (exportPreset === "2k") bounds = { minX: -1000, maxX: 1000, minY: -1000, maxY: 1000 };
+                  if (exportPreset === "4k") bounds = { minX: -2000, maxX: 2000, minY: -2000, maxY: 2000 };
+                  exportSVG({
+                    padding: exportPreset === "fit" ? 150 : 0,
+                    bounds,
+                    gridStep,
+                    snapToGrid,
+                    snapStrategy,
+                    getMapSVGPath,
+                  });
+                }}
+              >
+                Export SVG
               </button>
               <div style={{ marginTop: 6 }}>
                 <label style={{ fontSize: 13, marginRight: 6 }}>Layer:</label>
