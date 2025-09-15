@@ -7,42 +7,48 @@ import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
 
 export const menuItems = [
-    { handler: "view", label: "View Details" },
-    // rename Name label
-    { handler: "rename", label: "Rename" },
-    // copy to clipboard
-    { handler: "copyToClipboard", label: "Copy to Clipboard" },
-    { handler: "deleteAction", label: "Delete" },
-    { handler: "removeAction", label: "Remove Containers from Project" },
-    { handler: "hideUnselected", label: "Hide Unselected" },
-    { handler: "hideChildren", label: "Hide Children" },
-    { handler: "showChildren", label: "Show Children" },
-    { handler: "createLayerFromVisible", label: "Create Layer from Visible Nodes" },
-    { handler: "categorize", label: "Categorize Containers" },
-    { handler: "buildRelationships", label: "Build Relationships" },
-    { handler: "exportBranchSelected", label: "Export Branch" },
-    { handler: "mergeSelected", label: "Merge Selected" },
-    { handler: "joinSelected", label: "Join Selected" },
-    { handler: "addSelected", label: "Add Selected" },
-    { handler: "addSimilar", label: "Add Similar" },
-    { handler: "buildChainBeam", label: "Build Chain Beam" },
-    { handler: "embedContainers", label: "Embed Containers" },
-    { handler: "renameFromDescription", label: "Rename from Description" },
-    { handler: "removeFromActiveGroup", label: "Remove from Active Group" },
-    { handler: "makeGroupNode", label: "Make Group Node" },
-    { handler: "makeInputNode", label: "Make Input Node" },
-    { handler: "makeOutputNode", label: "Make Output Node" },
-    { handler: "unmakeInputNode", label: "Unmake Input Node" },
-    { handler: "unmakeOutputNode", label: "Unmake Output Node" },
-    { handler: "unmakeGroupNode", label: "Unmake Group Node" },
-    { handler: "getContainerBudgetAction", label: "Get Container Budget" },
-    { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container" },
-    { handler: "addFinanceContainerAction", label: "Add Finance Container" },
-    { handler: "joinSimilar", label: "Join Top Similar" }, // <-- add to menuItems array
-    { handler: "embedPositionsAction", label: "Embed Positions" },
-    { handler: "findSimilarPositionsAction", label: "Find Similar Positions" },
-    { handler: "searchPositionZAction", label: "Search Position Z" },
-    { handler: "exportApp", label: "Export to App" }
+    { handler: "view", label: "View Details", group: "Basics" },
+    { handler: "rename", label: "Rename", group: "Basics" },
+    { handler: "copyToClipboard", label: "Copy to Clipboard", group: "Basics" },
+    { handler: "deleteAction", label: "Delete", group: "Basics" },
+    { handler: "removeAction", label: "Remove from Project", group: "Basics" },
+
+    { handler: "hideUnselected", label: "Hide Unselected", group: "Visibility" },
+    { handler: "hideChildren", label: "Hide Children", group: "Visibility" },
+    { handler: "showChildren", label: "Show Children", group: "Visibility" },
+    { handler: "createLayerFromVisible", label: "Create Layer from Visible", group: "Visibility" },
+
+    { handler: "categorize", label: "Categorize Containers", group: "Analyze" },
+    { handler: "buildRelationships", label: "Build Relationships", group: "Analyze" },
+
+    { handler: "mergeSelected", label: "Merge Selected", group: "Combine" },
+    { handler: "joinSelected", label: "Join Selected", group: "Combine" },
+    { handler: "joinSimilar", label: "Join Top Similar", group: "Combine" },
+    { handler: "addSelected", label: "Add Selected", group: "Combine" },
+    { handler: "addSimilar", label: "Add Similar", group: "Combine" },
+
+    { handler: "buildChainBeam", label: "Build Chain Beam", group: "AI" },
+    { handler: "renameFromDescription", label: "Rename from Description", group: "AI" },
+
+    { handler: "embedContainers", label: "Embed Containers", group: "Positions" },
+    { handler: "embedPositionsAction", label: "Embed Positions", group: "Positions" },
+    { handler: "findSimilarPositionsAction", label: "Find Similar Positions", group: "Positions" },
+    { handler: "searchPositionZAction", label: "Search Position Z", group: "Positions" },
+
+    { handler: "removeFromActiveGroup", label: "Remove from Active Group", group: "Groups" },
+    { handler: "makeGroupNode", label: "Make Group Node", group: "Node Type" },
+    { handler: "unmakeGroupNode", label: "Unmake Group Node", group: "Node Type" },
+    { handler: "makeInputNode", label: "Make Input Node", group: "Node Type" },
+    { handler: "unmakeInputNode", label: "Unmake Input Node", group: "Node Type" },
+    { handler: "makeOutputNode", label: "Make Output Node", group: "Node Type" },
+    { handler: "unmakeOutputNode", label: "Unmake Output Node", group: "Node Type" },
+
+    { handler: "getContainerBudgetAction", label: "Get Container Budget", group: "Finance" },
+    { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container", group: "Finance" },
+    { handler: "addFinanceContainerAction", label: "Add Finance Container", group: "Finance" },
+
+    { handler: "exportBranchSelected", label: "Export Branch", group: "Export" },
+    { handler: "exportApp", label: "Export to App", group: "Export" }
 ];
 
 // FUNCTIONS *****************************************
@@ -114,6 +120,10 @@ async function view({ nodeId, selectedNodes }) {
 }
 
 async function deleteAction({ selectedIds }) {
+    // first confirm
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} container(s)? This action cannot be undone.`)) {
+        return;
+    }
     const ok = await api.deleteContainers(selectedIds);
     if (ok) requestRefreshChannel();
     else alert("Failed to delete containers.");
@@ -544,8 +554,8 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
     const { layerOptions, activeLayers, addLayer } = useAppContext();
     const { exportApp } = useMenuHandlers(rowData, setRowData);
     const layerMenus = [
-        { handler: 'addLayerMenu', label: 'Add to Layer', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
-        { handler: 'removeLayerMenu', label: 'Remove from Layer', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
+        { handler: 'addLayerMenu', label: 'Add to Layer', group: 'Layers', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
+        { handler: 'removeLayerMenu', label: 'Remove from Layer', group: 'Layers', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
     ];
     const allMenuItems = [...baseMenuItems, ...layerMenus];
 
@@ -573,9 +583,20 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
         const selectedNodes = nodes.filter(n => n.selected);
         const selectedIds = selectedNodes.map(n => n.data.id);
 
-        // If no nodes are selected selectedIds will be all nodes in the graph
+        // If no nodes are selected:
+        // - When right-clicked on a node, select that node only.
+        // - When opened from the gear menu, select all nodes in view.
         if (selectedIds.length === 0) {
-            selectedIds.push(...nodes.map(n => n.data.id));
+            if (nodeId && nodeId !== "gear") {
+                const clickedNode = nodes.find(n => n.data.id === nodeId);
+                if (clickedNode) {
+                    selectedNodes.push(clickedNode);
+                    selectedIds.push(clickedNode.data.id);
+                }
+            } else {
+                selectedIds.push(...nodes.map(n => n.data.id));
+                selectedNodes.push(...nodes);
+            }
         }
 
         const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp };

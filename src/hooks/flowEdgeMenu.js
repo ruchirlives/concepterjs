@@ -89,8 +89,23 @@ export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
             removeEdgeById(edgeId);
 
             // useCreateNewRow to create a new node(s)
-            const newNodes = await newRowFunc();
-            console.log("New Nodes:", newNodes);
+            const result = await newRowFunc();
+            console.log("New Nodes result:", result);
+
+            // Normalize result to an array of nodes with { id }
+            let newNodes = [];
+            if (Array.isArray(result)) {
+                newNodes = result;
+            } else if (result && (Array.isArray(result.loadedNodes) || Array.isArray(result.newRows))) {
+                const a = Array.isArray(result.loadedNodes) ? result.loadedNodes : [];
+                const b = Array.isArray(result.newRows) ? result.newRows : [];
+                newNodes = [...a, ...b];
+            }
+
+            if (!Array.isArray(newNodes) || newNodes.length === 0) {
+                console.log("No nodes created or selected");
+                return;
+            }
 
             // For each new node, use the addChildren function to add the new node as a child of the source node
             for (const newNode of newNodes) {

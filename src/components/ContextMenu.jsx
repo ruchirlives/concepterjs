@@ -9,6 +9,21 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
 
     const current = stack[stack.length - 1];
 
+    // Group items for layout
+    const groups = React.useMemo(() => {
+        const order = [];
+        const map = {};
+        (current || []).forEach((item) => {
+            const g = item.group || "Other";
+            if (!map[g]) {
+                map[g] = [];
+                order.push(g);
+            }
+            map[g].push(item);
+        });
+        return order.map((name) => ({ name, items: map[name] }));
+    }, [current]);
+
     const handleClick = (item) => {
         if (item.children) {
             setStack([...stack, item.children]);
@@ -35,13 +50,15 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
                 padding: "8px 0",
                 maxHeight: "300px",
                 overflowY: "auto",
-                minWidth: "320px"
+                minWidth: "320px",
+                maxWidth: "80vw",
+                overflowX: "auto"
             }}
         >
             {stack.length > 1 && (
                 <div
                     style={{
-                        gridColumn: "span 4",
+                        gridColumn: "1 / -1",
                         padding: "6px 12px",
                         cursor: "pointer",
                         whiteSpace: "nowrap"
@@ -56,25 +73,39 @@ const ContextMenu = React.forwardRef(({ menuItems, onMenuItemClick }, ref) => {
             <div
                 style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: "2px"
+                    gridTemplateColumns: `repeat(${Math.max(groups.length, 1)}, 1fr)`,
+                    gap: "8px"
                 }}
             >
-                {current.map((item) => (
-                    <div
-                        key={item.handler}
-                        className="context-menu__item"
-                        style={{
-                            padding: "6px 12px",
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                            borderRadius: "2px"
-                        }}
-                        onClick={() => handleClick(item)}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#f5f5f5")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                    >
-                        {item.label}
+                {groups.map((group) => (
+                    <div key={group.name} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        {group.name !== "Other" && (
+                            <div style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#555",
+                                padding: "4px 8px"
+                            }}>{group.name}</div>
+                        )}
+                        <div style={{ display: "grid", gap: 2 }}>
+                            {group.items.map((item) => (
+                                <div
+                                    key={item.handler}
+                                    className="context-menu__item"
+                                    style={{
+                                        padding: "6px 12px",
+                                        cursor: "pointer",
+                                        whiteSpace: "nowrap",
+                                        borderRadius: "2px"
+                                    }}
+                                    onClick={() => handleClick(item)}
+                                    onMouseEnter={e => (e.currentTarget.style.background = "#f5f5f5")}
+                                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                    {item.label}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ))}
             </div>

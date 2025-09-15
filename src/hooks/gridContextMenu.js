@@ -164,9 +164,18 @@ export const useContextMenu = () => {
             if (!response) alert("Failed to add children.");
         },
         "create children": async ({ rowId, handleAddRow }) => {
-            const newRows = await handleAddRow();
-            if (!Array.isArray(newRows) || newRows.length === 0) return alert("No children created.");
-            const newRowIds = newRows.map((row) => row.id);
+            const result = await handleAddRow();
+            // Normalize result to array of created/selected rows
+            let created = [];
+            if (Array.isArray(result)) {
+                created = result;
+            } else if (result && (Array.isArray(result.loadedNodes) || Array.isArray(result.newRows))) {
+                const a = Array.isArray(result.loadedNodes) ? result.loadedNodes : [];
+                const b = Array.isArray(result.newRows) ? result.newRows : [];
+                created = [...a, ...b];
+            }
+            if (!Array.isArray(created) || created.length === 0) return alert("No children created.");
+            const newRowIds = created.map((row) => row.id);
             const response = await addChildren(rowId, newRowIds);
             if (!response) alert("Failed to create children.");
         },

@@ -80,17 +80,6 @@ export default function useCreateNewRow() {
 
         // Merge selectedContentLayer into loadedNodes' Tags, preserving previous tags and avoiding duplicates
         const updatedLoadedNodes = loadedNodes
-        // const updatedLoadedNodes = loadedNodes.map(node => {
-        // const prevTags = node.Tags
-        //         ? node.Tags.split(',').map(tag => tag.trim()).filter(Boolean)
-        //         : [];
-        //     const mergedTagsSet = new Set([...prevTags]);
-        //     if (selectedContentLayer) mergedTagsSet.add(selectedContentLayer);
-        //     return {
-        //         ...node,
-        //         Tags: Array.from(mergedTagsSet).join(', ')
-        //     };
-        // });
 
         handleWriteBack(updatedLoadedNodes);
         console.log(updatedLoadedNodes);
