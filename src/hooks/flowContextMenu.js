@@ -6,6 +6,15 @@ import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
 
+// Ensure the api namespace import is retained in production builds where
+// handlers are resolved dynamically (via eval). Some bundlers may tree-shake
+// imports that are only referenced from dynamically-invoked functions, which
+// can lead to `api` being undefined at runtime in minified builds. This
+// harmless global assignment creates a visible side-effect to keep the import.
+if (typeof window !== "undefined") {
+    window.__concepter_api_ref = api;
+}
+
 export const menuItems = [
     // Basics
     { handler: "view", label: "View Details", group: "Basics" },
