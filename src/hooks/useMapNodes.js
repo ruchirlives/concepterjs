@@ -420,6 +420,32 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         const width = maxX - minX;
         const height = maxY - minY;
 
+        const hslToHex = (h, s, l) => {
+            s /= 100; l /= 100;
+            const k = n => (n + h / 30) % 12;
+            const a = s * Math.min(l, 1 - l);
+            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+            return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+        };
+        const rgbToHex = (r, g, b) => `#${[r, g, b].map(v => Math.max(0, Math.min(255, parseInt(v, 10))).toString(16).padStart(2, '0')).join('')}`;
+        const colorToHex = (c) => {
+            if (!c) return '#3498db';
+            if (c.startsWith('#')) return c;
+            const hsl = c.match(/^hsl\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)%\s*,\s*(\d+(?:\.\d+)?)%\s*\)$/i);
+            if (hsl) {
+                const [, h, s, l] = hsl;
+                return hslToHex(parseFloat(h), parseFloat(s), parseFloat(l));
+            }
+            const rgb = c.match(/^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([01]?(?:\.\d+)?))?\s*\)$/i);
+            if (rgb) {
+                const [, r, g, b] = rgb;
+                return rgbToHex(r, g, b);
+            }
+            // Fallback named colors or unsupported formats -> default
+            return '#3498db';
+        };
+
         // Build SVG markup in world coordinates
         const svgParts = [];
         svgParts.push(`<?xml version="1.0" encoding="UTF-8"?>`);
@@ -443,11 +469,13 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         // Nodes
         nodes.forEach(n => {
             const r = n.radius || 30;
-            const color = n.color || 'blue';
-            svgParts.push(`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${color}" stroke="#222222" stroke-width="${Math.max(0.5, r * 0.02)}"/>`);
+            const colorHex = colorToHex(n.color || '');
+            const strokeWidth = Math.max(0.5, r * 0.02);
+            svgParts.push(`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${colorHex}" stroke="#000000" stroke-width="${strokeWidth}"/>`);
             // Labels
             const fontSize = (n.fontSize || 16) * 0.2;
-            const lines = Array.isArray(n.label) ? n.label : [String(n.label ?? '')];
+            const labelValue = (n.name != null ? n.name : n.label);
+            const lines = Array.isArray(labelValue) ? labelValue : [String(labelValue ?? '')];
             const totalHeight = lines.length * fontSize;
             lines.forEach((line, i) => {
                 const ty = n.y - 0 - totalHeight / 2 + i * fontSize + fontSize / 2;
