@@ -1,4 +1,4 @@
-import { addChildren, createContainer, writeBackData } from "../api";
+import { createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
 import { handleWriteBack } from "hooks/effectsShared";

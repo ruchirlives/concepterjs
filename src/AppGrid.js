@@ -11,7 +11,7 @@ import ContextMenu, { useContextMenu } from "./hooks/gridContextMenu";
 import LoadModal from "./components/ModalLoad";
 // import MiniMap from "./ModalMiniMap"; // Import the MiniMap component
 import columnDefs from "./hooks/gridColumnDefs";
-import { fetchContainers, fetchChildren, saveContainers, fetchContainerById } from "./api";
+import { fetchContainers, saveContainers, fetchContainerById } from "./api";
 import {
   useFetchData, useWriteBackButton, useAddRowButton, useLoadButtonEffect, useImportButtonEffect,
   useSaveButtonEffect, useDropDownEffect, useReloadEffect, useRefreshEffect,
@@ -44,7 +44,6 @@ const App = () => {
 
   // State to store name of the current container
   const [currentContainer, setCurrentContainer] = useState(null);
-  const [setActiveGroup] = useState(null);
   const [collapsed, setCollapsed] = React.useState(true);
 
   // Reference to the grid API

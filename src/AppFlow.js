@@ -26,7 +26,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const {
     collapsed, setCollapsed,
-    history, setHistory,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
     comparatorState,
@@ -99,7 +98,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     selectionContextMenu,
     gearContextMenu,
   } = useContextMenu(
-    flowWrapperRef, undefined, menuItems, nodes, rowData, setRowData, history
+    flowWrapperRef, undefined, menuItems, nodes, rowData, setRowData
   );
 
   const {
