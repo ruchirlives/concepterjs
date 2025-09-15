@@ -7,34 +7,41 @@ import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
 
 export const menuItems = [
+    // Basics
     { handler: "view", label: "View Details", group: "Basics" },
     { handler: "rename", label: "Rename", group: "Basics" },
     { handler: "copyToClipboard", label: "Copy to Clipboard", group: "Basics" },
     { handler: "deleteAction", label: "Delete", group: "Basics" },
     { handler: "removeAction", label: "Remove from Project", group: "Basics" },
 
+    // Visibility
     { handler: "hideUnselected", label: "Hide Unselected", group: "Visibility" },
     { handler: "hideChildren", label: "Hide Children", group: "Visibility" },
     { handler: "showChildren", label: "Show Children", group: "Visibility" },
     { handler: "createLayerFromVisible", label: "Create Layer from Visible", group: "Visibility" },
 
+    // Analysis
     { handler: "categorize", label: "Categorize Containers", group: "Analyze" },
     { handler: "buildRelationships", label: "Build Relationships", group: "Analyze" },
 
+    // Combine
     { handler: "mergeSelected", label: "Merge Selected", group: "Combine" },
     { handler: "joinSelected", label: "Join Selected", group: "Combine" },
     { handler: "joinSimilar", label: "Join Top Similar", group: "Combine" },
     { handler: "addSelected", label: "Add Selected", group: "Combine" },
     { handler: "addSimilar", label: "Add Similar", group: "Combine" },
 
+    // AI
     { handler: "buildChainBeam", label: "Build Chain Beam", group: "AI" },
     { handler: "renameFromDescription", label: "Rename from Description", group: "AI" },
 
+    // Positions
     { handler: "embedContainers", label: "Embed Containers", group: "Positions" },
     { handler: "embedPositionsAction", label: "Embed Positions", group: "Positions" },
     { handler: "findSimilarPositionsAction", label: "Find Similar Positions", group: "Positions" },
     { handler: "searchPositionZAction", label: "Search Position Z", group: "Positions" },
 
+    // Groups
     { handler: "removeFromActiveGroup", label: "Remove from Active Group", group: "Groups" },
     { handler: "makeGroupNode", label: "Make Group Node", group: "Node Type" },
     { handler: "unmakeGroupNode", label: "Unmake Group Node", group: "Node Type" },
@@ -43,10 +50,13 @@ export const menuItems = [
     { handler: "makeOutputNode", label: "Make Output Node", group: "Node Type" },
     { handler: "unmakeOutputNode", label: "Unmake Output Node", group: "Node Type" },
 
+    // Finance
     { handler: "getContainerBudgetAction", label: "Get Container Budget", group: "Finance" },
     { handler: "convertToBudgetContainerAction", label: "Convert to Budget Container", group: "Finance" },
     { handler: "addFinanceContainerAction", label: "Add Finance Container", group: "Finance" },
 
+    // Export
+    { handler: "exportSelected", label: "Export Selected", group: "Export" },
     { handler: "exportBranchSelected", label: "Export Branch", group: "Export" },
     { handler: "exportApp", label: "Export to App", group: "Export" }
 ];
