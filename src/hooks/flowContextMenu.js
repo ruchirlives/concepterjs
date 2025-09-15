@@ -65,14 +65,31 @@ export const menuItems = [
 // FUNCTIONS *****************************************
 /* eslint-disable no-unused-vars */
 
-async function insertNode({ nodeId, selectedIds, selectedContentLayer }) {
+async function insertNode({ nodeId, selectedIds, selectedContentLayer, rowData, setRowData }) {
     // First create new node
     const newNodeName = prompt("Enter name for the new node:");
     if (!newNodeName) return;
-    const tags = selectedContentLayer ? [selectedContentLayer] : []
+    // Ensure Tags is always a string for downstream code that calls .split
+    const tags = selectedContentLayer ? String(selectedContentLayer) : ""
     console.log("Creating new node with tags:", tags);
-    const newNode = await api.createContainer({ Name: newNodeName, Description: "", Tags: tags });
-    if (!newNode || !newNode.id) {
+    const newId = await api.createContainer();
+
+    // Add to rowData
+    if (newId) {
+        const newRow = {
+            id: newId,
+            Name: newNodeName,
+            Description: "",
+            Tags: tags
+        };
+        rowData.push(newRow);
+        setRowData([...rowData]);
+    }
+    await handleWriteBack(rowData);
+
+    console.log("New node created with id:", newId);
+    // Continue to rewire relationships if applicable
+    if (!newId) {
         alert("Failed to create new node.");
         return;
     }
@@ -83,12 +100,13 @@ async function insertNode({ nodeId, selectedIds, selectedContentLayer }) {
         return;
     }
     // Now, add relationships from nodeId to newNode, and from newNode to selectedIds
-    const ok1 = await api.addChildren(nodeId, [newNode.id]);
-    const ok2 = await api.addChildren(newNode.id, selectedIds);
+    const ok1 = await api.addChildren(nodeId, [newId]);
+    const ok2 = await api.addChildren(newId, selectedIds);
     if (!ok1 || !ok2) {
         alert("Failed to add relationships.");
         return;
     }
+    await requestRefreshChannel();
 }
 
 async function getContainerBudgetAction({ selectedIds }) {
@@ -581,7 +599,7 @@ function getDynamicHandler(action) {
             // eslint-disable-next-line no-eval
             const fn = eval(action);
             if (typeof fn === 'function') return fn;
-        } catch (e) {}
+        } catch (e) { }
         return null;
     }
 }
