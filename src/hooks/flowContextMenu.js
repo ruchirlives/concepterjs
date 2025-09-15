@@ -31,6 +31,48 @@ import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
 
+// Explicit handler map to avoid eval and ensure bundlers keep references
+const HANDLERS = {
+    insertNode,
+    getContainerBudgetAction,
+    convertToBudgetContainerAction,
+    addFinanceContainerAction,
+    rename,
+    view,
+    deleteAction,
+    removeAction,
+    copyToClipboard,
+    hideUnselected,
+    hideChildren,
+    embedContainers,
+    showChildren,
+    showParents,
+    categorize,
+    buildRelationships,
+    exportSelected,
+    exportBranchSelected,
+    mergeSelected,
+    joinSelected,
+    addSelected,
+    addSimilar,
+    joinSimilar,
+    buildChainBeam,
+    renameFromDescription,
+    removeFromActiveGroup,
+    makeGroupNode,
+    unmakeGroupNode,
+    makeInputNode,
+    unmakeInputNode,
+    makeOutputNode,
+    unmakeOutputNode,
+    addLayerTag,
+    removeLayerTag,
+    createLayerFromVisible,
+    embedPositionsAction,
+    findSimilarPositionsAction,
+    searchPositionZAction,
+};
+
 export const menuItems = [
     // Basics
     { handler: "view", label: "View Details", group: "Basics" },
@@ -634,15 +676,8 @@ function getDynamicHandler(action) {
     } else if (action.startsWith('removeLayer:')) {
         const layer = action.split(':')[1];
         return (ctx) => removeLayerTag(ctx, layer);
-    } else {
-        // Try to resolve the function by name from the current scope
-        try {
-            // eslint-disable-next-line no-eval
-            const fn = eval(action);
-            if (typeof fn === 'function') return fn;
-        } catch (e) { }
-        return null;
     }
+    return HANDLERS[action] || null;
 }
 
 // HOOK *****************************************
