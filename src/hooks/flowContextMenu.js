@@ -251,10 +251,6 @@ async function copyToClipboard({ selectedNodes }) {
 }
 
 async function hideUnselected({ selectedIds }) {
-    if () {
-        // Add active group to selectedIds
-        
-    }
     const ch = new BroadcastChannel("idSelectChannel");
     ch.postMessage({ selectedIds });
     ch.close();
@@ -331,14 +327,8 @@ async function categorize({ nodes, selectedNodes }) {
     }
     alert("Containers categorized successfully.");
     console.log(result.new_category_ids);
-    if (!) {
-        requestRefreshChannel();
-        return;
-    }
-    // add ids as children to the active group
-    await api.addChildren(, result.new_category_ids);
-    // brief delay to allow the request to complete
     requestRefreshChannel();
+    return;
 }
 
 async function buildRelationships({ nodes, selectedNodes }) {
@@ -370,9 +360,6 @@ async function mergeSelected({ selectedIds, activeLayers, rowData, setRowData })
     }
     // add ids as children to the active group
     console.log("ID: ", ok.id, "Active group: ");
-    if () {
-        await api.addChildren(, [ok.id]);
-    }
     requestRefreshChannel();
 }
 
@@ -383,10 +370,6 @@ async function joinSelected({ selectedIds }) {
     } else {
         alert("Failed to join containers.");
     }
-    // add ids as children to the active group
-    console.log("ID: ", ok.id, "Active group: ");
-    await api.addChildren(, [ok.id]);
-    // brief delay to allow the request to complete
     requestRefreshChannel();
 }
 
@@ -727,23 +710,4 @@ export function useContextMenu(flowWrapperRef, _unused, baseMenuItems, nodes, ro
 }
 
 export { removeAction };
-
-
-
-
-
-async function removeFromSelectedParent({ nodeId, selectedIds }) {
-    const parentCandidates = selectedIds.filter(id => id !== nodeId);
-    if (parentCandidates.length === 0) {
-        alert("Select a parent and the node to remove.");
-        return;
-    }
-    let any = false;
-    for (const parentId of parentCandidates) {
-        const ok = await api.removeChildren(parentId, [nodeId]);
-        if (ok) any = true;
-    }
-    if (any) requestRefreshChannel();
-}
-
 
