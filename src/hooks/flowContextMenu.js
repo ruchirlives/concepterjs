@@ -65,11 +65,13 @@ export const menuItems = [
 // FUNCTIONS *****************************************
 /* eslint-disable no-unused-vars */
 
-async function insertNode({ nodeId, selectedIds }) {
+async function insertNode({ nodeId, selectedIds, selectedContentLayer }) {
     // First create new node
     const newNodeName = prompt("Enter name for the new node:");
     if (!newNodeName) return;
-    const newNode = await api.createContainer({ Name: newNodeName, Description: "" });
+    const tags = selectedContentLayer ? [selectedContentLayer] : []
+    console.log("Creating new node with tags:", tags);
+    const newNode = await api.createContainer({ Name: newNodeName, Description: "", Tags: tags });
     if (!newNode || !newNode.id) {
         alert("Failed to create new node.");
         return;
@@ -587,7 +589,7 @@ function getDynamicHandler(action) {
 // HOOK *****************************************
 export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
-    const { layerOptions, activeLayers, addLayer } = useAppContext();
+    const { layerOptions, activeLayers, addLayer, selectedContentLayer } = useAppContext();
     const { exportApp } = useMenuHandlers(rowData, setRowData);
     const layerMenus = [
         { handler: 'addLayerMenu', label: 'Add to Layer', group: 'Layers', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
@@ -635,7 +637,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             }
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp, selectedContentLayer };
         const handler = getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
