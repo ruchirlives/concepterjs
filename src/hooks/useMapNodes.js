@@ -168,8 +168,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         let topLevelNodes;
         const selectedLayer = selectedLayerRef && selectedLayerRef.current;
         if (selectedLayer) {
-            // If filtering by layer, include all nodes with the tag, regardless of child/parent status
-            topLevelNodes = incomingNodes.filter(row => (row.Tags || "").split(",").map(t => t.trim()).includes(selectedLayer));
+            // When filtering by layer, still only include true top-level nodes (not children)
+            topLevelNodes = incomingNodes.filter(row => {
+                const tags = (row.Tags || "").split(",").map(t => t.trim());
+                return tags.includes(selectedLayer) && !childIds.has(row.id);
+            });
         } else {
             // Default: only nodes not children in parentChildMap
             topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
@@ -182,11 +185,10 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         // Center and radius for the circle
         const centerX = 0;
         const centerY = 0;
-        // Scale radius so nodes don't overlap: base radius + extra per node
-        const minSpacing = topLevelNodes.length > 0 && topLevelNodes[0].MapRadius
-            ? topLevelNodes[0].MapRadius
-            : BASE_RADIUS * 2.5;
-        const circleRadius = Math.max(350, (N * minSpacing) / (2 * Math.PI));
+        // Scale radius so nodes don't overlap: based on BASE_RADIUS and node count
+        const minSpacing = BASE_RADIUS * 2.5; // desired spacing between node centers along the circle
+        const minCircleRadius = BASE_RADIUS * 2; // dynamic minimum so it scales with BASE_RADIUS
+        const circleRadius = Math.max(minCircleRadius, (N * minSpacing) / (2 * Math.PI));
         topLevelNodes.forEach((row, index) => {
             // If the node already has a Position (x/y or Position.x/Position.y), use it; otherwise, lay out in a circle
             let x = row.x;
