@@ -57,6 +57,18 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
     const gridColCount = 8;
     const gridSpacingX = 340;
     const gridSpacingY = 120;
+    // Compute the bottom (max Y) of connected nodes so we can offset islands below
+    let connectedBottomY = 0;
+    connectedNodes.forEach((node) => {
+        const n = g.node(node.id);
+        if (n) {
+            const topY = n.y - n.height / 2;
+            const bottomY = topY + n.height;
+            if (bottomY > connectedBottomY) connectedBottomY = bottomY;
+        }
+    });
+    const islandYOffset = connectedBottomY > 0 ? connectedBottomY + 80 : 0; // 80px gap
+
     const gridNodes = disconnectedNodes.map((node, idx) => {
         const col = idx % gridColCount;
         const row = Math.floor(idx / gridColCount);
@@ -64,7 +76,7 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
             ...node,
             position: {
                 x: col * gridSpacingX,
-                y: row * gridSpacingY
+                y: islandYOffset + row * gridSpacingY
             }
         };
     });
@@ -276,6 +288,16 @@ export const getLayoutedElements = (
         const gridColCount = 8;
         const gridSpacingX = 340;
         const gridSpacingY = 120;
+        // Offset island children below the connected children within the group
+        let connectedBottomY = 0;
+        laidOutConnected.forEach(n => {
+            const width = n.style?.width || 320;
+            const height = n.style?.height || estimateNodeHeight(n.data?.Name || '', width);
+            const bottomY = n.position.y + height;
+            if (bottomY > connectedBottomY) connectedBottomY = bottomY;
+        });
+        const islandYOffset = connectedBottomY > 0 ? connectedBottomY + 80 : 0; // 80px gap
+
         const laidOutIslands = islandChildren.map((node, idx) => {
             const col = idx % gridColCount;
             const row = Math.floor(idx / gridColCount);
@@ -283,7 +305,7 @@ export const getLayoutedElements = (
                 ...node,
                 position: {
                     x: col * gridSpacingX,
-                    y: row * gridSpacingY
+                    y: islandYOffset + row * gridSpacingY
                 }
             };
         });
