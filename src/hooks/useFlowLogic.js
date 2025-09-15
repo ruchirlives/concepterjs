@@ -19,9 +19,21 @@ export const useFlowLogic = () => {
     // console.log('Hidden layers:', [...hiddenLayers]);
     // console.log('Available layer options:', layerOptions);
 
-    if (hiddenLayers.size === 0) return rowData;
+    // 1) Positive filter by selected content layer (if any)
+    const positivelyFiltered = selectedContentLayer
+      ? rowData.filter(container => {
+          const containerTags = (container.Tags || '')
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(Boolean);
+          return containerTags.includes(selectedContentLayer);
+        })
+      : rowData;
 
-    const filtered = rowData.filter(container => {
+    // 2) Negative filter by hidden layers (if any hidden)
+    if (hiddenLayers.size === 0) return positivelyFiltered;
+
+    const filtered = positivelyFiltered.filter(container => {
       // Keep containers without Tags (no layer assigned)
       if (!container.Tags || container.Tags.trim() === '') return true;
 
@@ -45,7 +57,7 @@ export const useFlowLogic = () => {
 
     console.log('Filtered rowData count:', filtered.length);
     return filtered;
-  }, [rowData, hiddenLayers, layerOptions]);
+  }, [rowData, hiddenLayers, layerOptions, selectedContentLayer]);
 
   // Handle state change callback
   const handleStateChange = useCallback((newState) => {
