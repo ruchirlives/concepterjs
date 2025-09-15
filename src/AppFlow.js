@@ -19,7 +19,6 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import FlowHeader from './components/FlowHeader';
-import FlowNavigation from './components/FlowNavigation';
 import { useFlowLogic } from './hooks/useFlowLogic';
 
 const App = ({ keepLayout, setKeepLayout }) => {
@@ -27,7 +26,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const {
     collapsed, setCollapsed,
-    activeGroup, setActiveGroup,
     history, setHistory,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
@@ -71,20 +69,12 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setLayoutPositions(storedPositions);
   }, [keepLayout, nodes, setLayoutPositions]);
 
-  // Broadcast activeGroup to activeGroupChannel
-  useEffect(() => {
-    const activeGroupChannel = new BroadcastChannel('activeGroupChannel');
-    console.log('Broadcasting activeGroup:', activeGroup);
-    activeGroupChannel.postMessage({ activeGroup });
-    return () => {
-      activeGroupChannel.close();
-    }
-  }, [activeGroup]);
+  // Removed activeGroup broadcasting
 
   // Flow effects hooks
   useCreateNodesAndEdges({
     nodes, setNodes, setEdges, rowData: flowFilteredRowData, keepLayout,
-    activeGroup, setLayoutPositions, layoutPositions, setRowData,
+    setLayoutPositions, layoutPositions, setRowData,
     stateScores, getHighestScoringContainer,
     groupByLayers,
   });
@@ -93,7 +83,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const onEdgeConnect = useOnConnect(setEdges, addEdge, rowData);
   const onConnectEnd = useOnConnectEnd({
     setEdges, setNodes, screenToFlowPosition, setRowData, addEdge,
-    activeGroup, setLayoutPositions
+    setLayoutPositions
   });
   const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
 
@@ -109,7 +99,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     selectionContextMenu,
     gearContextMenu,
   } = useContextMenu(
-    flowWrapperRef, activeGroup, menuItems, nodes, rowData, setRowData, history
+    flowWrapperRef, undefined, menuItems, nodes, rowData, setRowData, history
   );
 
   const {
@@ -117,7 +107,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     handleEdgeMenu,
     onMenuItemClick: onEdgeMenuItemClick,
     hideMenu: hideEdgeMenu,
-  } = useEdgeMenu(flowWrapperRef, activeGroup);
+  } = useEdgeMenu(flowWrapperRef);
 
   const hideMenu = () => {
     hideContextMenu();
@@ -182,13 +172,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           style={{ height: 600 }}
           onClick={hideMenu}
         >
-          <FlowNavigation
-            activeGroup={activeGroup}
-            history={history}
-            setHistory={setHistory}
-            setActiveGroup={setActiveGroup}
-            rowData={rowData}
-          />
+          {/* FlowNavigation removed with activeGroup */}
 
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
             <ReactFlow
@@ -206,15 +190,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onEdgeContextMenu={handleEdgeMenu}
               onNodeContextMenu={handleContextMenu}
               onSelectionContextMenu={selectionContextMenu}
-              onNodeDoubleClick={(e, node) => {
-                if (node.type === 'group') {
-                  setHistory(h => [...h, activeGroup]);
-                  setActiveGroup(node.id);
-                  if (typeof setKeepLayout === 'function') {
-                    setKeepLayout(false);
-                  }
-                }
-              }}
+              onNodeDoubleClick={undefined}
               minZoom={0.1} // <-- Add this line
             >
               <Controls position="top-left">

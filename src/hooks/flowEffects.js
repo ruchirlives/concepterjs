@@ -347,7 +347,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
-    const { rowData, activeGroup, stateScores, getHighestScoringContainer, groupByLayers } = params;
+    const { rowData, stateScores, getHighestScoringContainer, groupByLayers } = params;
     const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap, layerOptions } = useAppContext();
     const rowDataRef = useRef(rowData);
 
@@ -379,7 +379,6 @@ export const useCreateNodesAndEdges = (params) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         rowData,
-        activeGroup,
         activeLayers,
         stateScores,
         parentChildMap,

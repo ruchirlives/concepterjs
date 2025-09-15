@@ -4,7 +4,7 @@ import { useAppContext } from "AppContext";
 import { handleWriteBack } from "hooks/effectsShared";
 
 export default function useCreateNewRow() {
-    const { rowData, setRowData, activeGroup, selectedContentLayer } = useAppContext();
+    const { rowData, setRowData, selectedContentLayer } = useAppContext();
 
     return async () => {
         console.log("Creating new rows");
@@ -66,9 +66,7 @@ export default function useCreateNewRow() {
             });
 
         }
-        if (activeGroup) {
-            await addChildren(activeGroup, newRows.map((row) => row.id));
-        }
+        // No active group; skip auto-adding new rows to a group
 
         if (newRows.length > 0) {
             setRowData((prev) => {

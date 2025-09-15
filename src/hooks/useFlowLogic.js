@@ -9,7 +9,7 @@ export const useFlowLogic = () => {
   const [history, setHistory] = useState([]);
   const [layoutPositions, setLayoutPositions] = useState({});
 
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState, activeGroup, setActiveGroup, selectedContentLayer, setSelectedContentLayer } = useAppContext();
+  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState, selectedContentLayer, setSelectedContentLayer } = useAppContext();
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
@@ -95,7 +95,6 @@ export const useFlowLogic = () => {
   return {
     // State
     collapsed, setCollapsed,
-    activeGroup, setActiveGroup,
     history, setHistory,
     layoutPositions, setLayoutPositions,
 

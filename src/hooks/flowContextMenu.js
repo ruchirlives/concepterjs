@@ -33,7 +33,7 @@ const HANDLERS = {
     joinSimilar,
     buildChainBeam,
     renameFromDescription,
-    removeFromActiveGroup,
+    removeFromSelectedParent,
     makeGroupNode,
     unmakeGroupNode,
     makeInputNode,
@@ -86,7 +86,7 @@ export const menuItems = [
     { handler: "searchPositionZAction", label: "Search Position Z", group: "Positions" },
 
     // Groups
-    { handler: "removeFromActiveGroup", label: "Remove from Active Group", group: "Groups" },
+    { handler: "removeFromSelectedParent", label: "Remove from Selected Parent", group: "Groups" },
     { handler: "makeGroupNode", label: "Make Group Node", group: "Node Type" },
     { handler: "unmakeGroupNode", label: "Unmake Group Node", group: "Node Type" },
     { handler: "makeInputNode", label: "Make Input Node", group: "Node Type" },
@@ -250,10 +250,10 @@ async function copyToClipboard({ selectedNodes }) {
     }
 }
 
-async function hideUnselected({ selectedIds, activeGroup }) {
-    if (activeGroup) {
+async function hideUnselected({ selectedIds }) {
+    if () {
         // Add active group to selectedIds
-        selectedIds.push(activeGroup);
+        
     }
     const ch = new BroadcastChannel("idSelectChannel");
     ch.postMessage({ selectedIds });
@@ -321,7 +321,7 @@ async function showParents({ selectedNodes }) {
     ch.close();
 }
 
-async function categorize({ nodes, selectedNodes, activeGroup }) {
+async function categorize({ nodes, selectedNodes }) {
     let ids = selectedNodes.map(n => n.data.id);
     if (ids.length === 0) ids = nodes.map(n => n.data.id);
     const result = await api.categorizeContainers(ids);
@@ -331,12 +331,12 @@ async function categorize({ nodes, selectedNodes, activeGroup }) {
     }
     alert("Containers categorized successfully.");
     console.log(result.new_category_ids);
-    if (!activeGroup) {
+    if (!) {
         requestRefreshChannel();
         return;
     }
     // add ids as children to the active group
-    await api.addChildren(activeGroup, result.new_category_ids);
+    await api.addChildren(, result.new_category_ids);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -361,7 +361,7 @@ async function exportBranchSelected({ selectedIds }) {
     }
 }
 
-async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, setRowData }) {
+async function mergeSelected({ selectedIds, activeLayers, rowData, setRowData }) {
     const ok = await api.mergeContainers(selectedIds);
     if (ok) {
         alert("Containers merged successfully.");
@@ -369,14 +369,14 @@ async function mergeSelected({ selectedIds, activeGroup, activeLayers, rowData, 
         alert("Failed to merge containers.");
     }
     // add ids as children to the active group
-    console.log("ID: ", ok.id, "Active group: ", activeGroup);
-    if (activeGroup) {
-        await api.addChildren(activeGroup, [ok.id]);
+    console.log("ID: ", ok.id, "Active group: ");
+    if () {
+        await api.addChildren(, [ok.id]);
     }
     requestRefreshChannel();
 }
 
-async function joinSelected({ selectedIds, activeGroup }) {
+async function joinSelected({ selectedIds }) {
     const ok = await api.joinContainers(selectedIds, true);
     if (ok) {
         alert("Containers joined successfully.");
@@ -384,8 +384,8 @@ async function joinSelected({ selectedIds, activeGroup }) {
         alert("Failed to join containers.");
     }
     // add ids as children to the active group
-    console.log("ID: ", ok.id, "Active group: ", activeGroup);
-    await api.addChildren(activeGroup, [ok.id]);
+    console.log("ID: ", ok.id, "Active group: ");
+    await api.addChildren(, [ok.id]);
     // brief delay to allow the request to complete
     requestRefreshChannel();
 }
@@ -413,7 +413,7 @@ async function addSimilar({ nodeId, selectedIds, nodes }) {
     requestRefreshChannel();
 }
 
-async function joinSimilar({ selectedIds, activeGroup }) {
+async function joinSimilar({ selectedIds }) {
     if (!selectedIds.length) {
         toast.error("No containers selected.");
         return;
@@ -421,9 +421,7 @@ async function joinSimilar({ selectedIds, activeGroup }) {
     try {
         const res = await api.joinSimilarContainers(selectedIds);
         toast.success(res.message || "Joined similar containers.");
-        if (res.new_container_id && activeGroup) {
-            await api.addChildren(activeGroup, [res.new_container_id]);
-        }
+        // no ; skip adding to group
         requestRefreshChannel();
     } catch (err) {
         toast.error("Failed to join similar containers.");
@@ -476,19 +474,18 @@ async function renameFromDescription({ selectedNodes, selectedIds }) {
     }
 }
 
-async function removeFromActiveGroup({ activeGroup, selectedIds, history }) {
-    if (!activeGroup) {
-        alert("No active group selected.");
+async function removeFromSelectedParent({ nodeId, selectedIds }) {
+    const parentCandidates = selectedIds.filter(id => id !== nodeId);
+    if (parentCandidates.length === 0) {
+        alert("Select a parent and the node to remove.");
         return;
     }
-    let ok = await api.removeChildren(activeGroup, selectedIds);
-    if (!ok) {
-        alert("Failed to remove containers from active group.");
-        return;
+    let any = false;
+    for (const parentId of parentCandidates) {
+        const ok = await api.removeChildren(parentId, [nodeId]);
+        if (ok) any = true;
     }
-    const prev = history[history.length - 1] || null;
-    ok = await api.addChildren(prev, selectedIds);
-    if (ok) requestRefreshChannel();
+    if (any) requestRefreshChannel();
 }
 
 async function makeGroupNode({ selectedIds }) {
@@ -656,7 +653,7 @@ function getDynamicHandler(action) {
 }
 
 // HOOK *****************************************
-export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes, rowData, setRowData, history) {
+export function useContextMenu(flowWrapperRef, _unused, baseMenuItems, nodes, rowData, setRowData, history) {
     const menuRef = useRef(null);
     const { layerOptions, activeLayers, addLayer, selectedContentLayer } = useAppContext();
     const { exportApp } = useMenuHandlers(rowData, setRowData);
@@ -706,7 +703,7 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
             }
         }
 
-        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, activeGroup, history, activeLayers, addLayer, exportApp, selectedContentLayer };
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, history, activeLayers, addLayer, exportApp, selectedContentLayer };
         const handler = getDynamicHandler(action);
         if (!handler) return console.warn(`No handler for action "${action}"`);
         await handler(ctx);
@@ -731,5 +728,22 @@ export function useContextMenu(flowWrapperRef, activeGroup, baseMenuItems, nodes
 
 export { removeAction };
 
+
+
+
+
+async function removeFromSelectedParent({ nodeId, selectedIds }) {
+    const parentCandidates = selectedIds.filter(id => id !== nodeId);
+    if (parentCandidates.length === 0) {
+        alert("Select a parent and the node to remove.");
+        return;
+    }
+    let any = false;
+    for (const parentId of parentCandidates) {
+        const ok = await api.removeChildren(parentId, [nodeId]);
+        if (ok) any = true;
+    }
+    if (any) requestRefreshChannel();
+}
 
 

@@ -238,34 +238,7 @@ const App = () => {
     };
   });
 
-  useEffect(() => {
-    const channel = new BroadcastChannel("activeGroupChannel");
-    channel.onmessage = (event) => {
-      const { activeGroup } = event.data;
-      console.log("Received active group:", activeGroup);
-      setActiveGroup(activeGroup);
-
-      if (activeGroup === null) {
-        setRowData((prevData) =>
-          prevData.map((row) => ({ ...row, hidden: false }))
-        );
-        return;
-      } else {
-        fetchChildren(activeGroup).then((children) => {
-          const childIds = new Set(children.map(child => child.id));
-          setRowData(prevData =>
-            prevData.map(row => ({
-              ...row,
-              hidden: !childIds.has(row.id),
-            }))
-          );
-        });
-      }
-    };
-    return () => {
-      channel.close();
-    }
-  }); // <-- Only run once on mount
+  // Removed active group broadcast listener
 
   // Use custom hooks for effects
   useFetchData(setRowData, fetchContainers);

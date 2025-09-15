@@ -8,7 +8,7 @@ import { useAppContext } from '../AppContext';
 import { useTiptapContext } from '../TiptapContext';
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
-export const useEdgeMenu = (flowWrapperRef, activeGroup) => {
+export const useEdgeMenu = (flowWrapperRef) => {
     const menuRef = useRef(null);
     const { setEdges } = useAppContext();
     const { tiptapContent, setTiptapContent } = useTiptapContext();
