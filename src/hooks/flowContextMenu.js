@@ -30,6 +30,7 @@ export const menuItems = [
     { handler: "joinSimilar", label: "Join Top Similar", group: "Combine" },
     { handler: "addSelected", label: "Add Selected", group: "Combine" },
     { handler: "addSimilar", label: "Add Similar", group: "Combine" },
+    { handler: "insertNode", label: "Insert Node", group: "Combine" },
 
     // AI
     { handler: "buildChainBeam", label: "Build Chain Beam", group: "AI" },
@@ -63,6 +64,31 @@ export const menuItems = [
 
 // FUNCTIONS *****************************************
 /* eslint-disable no-unused-vars */
+
+async function insertNode({ nodeId, selectedIds }) {
+    // First create new node
+    const newNodeName = prompt("Enter name for the new node:");
+    if (!newNodeName) return;
+    const newNode = await api.createContainer({ Name: newNodeName, Description: "" });
+    if (!newNode || !newNode.id) {
+        alert("Failed to create new node.");
+        return;
+    }
+    // Next, remove relationships from nodeId to selectedIds
+    const ok = await api.removeChildren(nodeId, selectedIds);
+    if (!ok) {
+        alert("Failed to remove relationships from original node.");
+        return;
+    }
+    // Now, add relationships from nodeId to newNode, and from newNode to selectedIds
+    const ok1 = await api.addChildren(nodeId, [newNode.id]);
+    const ok2 = await api.addChildren(newNode.id, selectedIds);
+    if (!ok1 || !ok2) {
+        alert("Failed to add relationships.");
+        return;
+    }
+}
+
 async function getContainerBudgetAction({ selectedIds }) {
     if (!selectedIds.length) {
         toast.error("No containers selected.");
