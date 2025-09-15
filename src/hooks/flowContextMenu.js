@@ -18,6 +18,7 @@ export const menuItems = [
     { handler: "hideUnselected", label: "Hide Unselected", group: "Visibility" },
     { handler: "hideChildren", label: "Hide Children", group: "Visibility" },
     { handler: "showChildren", label: "Show Children", group: "Visibility" },
+    { handler: "showParents", label: "Show Parents", group: "Visibility" },
     { handler: "createLayerFromVisible", label: "Create Layer from Visible", group: "Visibility" },
 
     // Analysis
@@ -260,6 +261,21 @@ async function showChildren({ selectedNodes }) {
     }
     const ch = new BroadcastChannel("showChildChannel");
     childrenIds.forEach(childId => ch.postMessage({ childId }));
+    ch.close();
+}
+
+async function showParents({ selectedNodes }) {
+    let ids = selectedNodes.map(n => n.data.id);
+    if (ids.length === 0) return;
+    const parentIds = [];
+    for (const id of ids) {
+        const parents = await api.fetchParentContainers(id);
+        parents?.forEach(parent => {
+            if (!parentIds.includes(parent.id)) parentIds.push(parent.id);
+        });
+    }
+    const ch = new BroadcastChannel("showParentChannel");
+    parentIds.forEach(parentId => ch.postMessage({ parentId }));
     ch.close();
 }
 

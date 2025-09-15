@@ -137,6 +137,33 @@ const App = () => {
     };
   });
 
+  // Add channel to listen for messages to activate addRowIfNotExists for parents
+  useEffect(() => {
+    const channel = new BroadcastChannel("showParentChannel");
+    channel.onmessage = async (event) => {
+      const { parentId } = event.data;
+      console.log("Received parentId:", parentId);
+      // Fetch the parent data from the API
+      const parent = rowData.find((row) => row.id === parentId);
+      if (!parent) {
+        console.error("Parent not found in rowData:", parentId);
+        // fetch the parent data from the API
+        await fetchContainerById(parentId).then((parentData) => {
+          if (parentData) {
+            addRowIfNotExists(parentData); // Add the parent row to the main grid
+          } else {
+            console.error("Parent data not found for ID:", parentId);
+          }
+        });
+        return;
+      }
+      addRowIfNotExists(parent); // Add the parent row to the main grid
+    };
+    return () => {
+      channel.close(); // Close the channel when the component unmounts
+    };
+  });
+
   // Use the custom context menu logic
   const { menuRef, handleContextMenu, onMenuItemClick, hideMenu } = useContextMenu();
 
