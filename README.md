@@ -3,9 +3,6 @@
 ConcepterJS is a React-based interactive project and container management system featuring rich graph visualization and flowcharting capabilities. It allows users to create, manage, and visualize hierarchical container data with contextual actions, Mermaid diagram export, Gantt charts, and DOCX export. It integrates seamlessly with a backend API for data storage, retrieval, and manipulation.
 
 It is the front end for https://github.com/ruchirlives/concepter
-
-Concepter has a minified version of this code already included, so this code is provided here for code reference.
-
 ---
 
 ## Features
