@@ -15,7 +15,9 @@ export default function AppMap() {
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
   const selectedLayerRef = React.useRef(selectedLayer);
-  useEffect(() => { selectedLayerRef.current = selectedLayer; }, [selectedLayer]);
+  useEffect(() => { 
+    selectedLayerRef.current = selectedLayer; 
+  }, [selectedLayer]);
 
   // Export controls
   const [exportScale, setExportScale] = React.useState(3);

@@ -167,12 +167,15 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         let topLevelNodes;
         const selectedLayer = selectedLayerRef && selectedLayerRef.current;
+        console.log("Filtering top-level nodes by layer:", selectedLayer);
+        console.log("Incoming nodes:", incomingNodes);
         if (selectedLayer) {
             // When filtering by layer, still only include true top-level nodes (not children)
             topLevelNodes = incomingNodes.filter(row => {
                 const tags = (row.Tags || "").split(",").map(t => t.trim());
-                return tags.includes(selectedLayer) && !childIds.has(row.id);
+                return tags.includes(selectedLayer);
             });
+            console.log("Filtered top-level nodes:", topLevelNodes);
         } else {
             // Default: only nodes not children in parentChildMap
             topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
