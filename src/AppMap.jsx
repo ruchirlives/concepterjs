@@ -109,7 +109,7 @@ export default function AppMap() {
           Loading data...
         </div>
       )}
-      <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative" }}>
+      <div style={{ width: "100vw", height: "100vh", overflow: "hidden", position: "relative" }}>
         {/* Integrated container for Headings tab and canvas */}
         <div style={{ position: "absolute", top: 0, right: 0, width: 340, height: "100%", zIndex: 20, display: "flex", flexDirection: "column", pointerEvents: "none" }}>
           <div style={{ margin: 10, pointerEvents: "auto" }}>
