@@ -181,14 +181,25 @@ const App = () => {
           ))}
         </div>
 
-        {/* Active tab content */}
-        <div className="flex-1 min-h-0 overflow-auto bg-white border border-gray-200 rounded-md p-2">
-          {tabs.find(t => t.key === activeTab)?.render({
-            isLoadModalOpen,
-            setIsLoadModalOpen,
-            keepLayout,
-            setKeepLayout,
-          })}
+        {/* Active tab content (keep AppGrid mounted always) */}
+        <div className="flex-1 min-h-0 overflow-auto bg-white border border-gray-200 rounded-md p-2 relative">
+          {/* Persistently mounted Grid */}
+          <div style={{ display: activeTab === 'grid' ? 'block' : 'none' }}>
+            <AppGrid
+              isLoadModalOpen={isLoadModalOpen}
+              setIsLoadModalOpen={setIsLoadModalOpen}
+            />
+          </div>
+
+          {/* Other tabs rendered when active (Grid handled above) */}
+          {activeTab !== 'grid' && (
+            tabs.find(t => t.key === activeTab)?.render({
+              isLoadModalOpen,
+              setIsLoadModalOpen,
+              keepLayout,
+              setKeepLayout,
+            })
+          )}
         </div>
       </main>
 
