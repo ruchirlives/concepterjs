@@ -9,7 +9,8 @@ import AppLayers from './AppLayers';
 import AppMap from './AppMap';
 import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
-import { setPasscode } from './apiConfig';
+import { setPasscode, setApiUrl } from './apiConfig';
+import API_URLS from './hooks/globalconfig';
 import { recopyValues } from './api';
 
 const AppTiptap = React.lazy(() => import('./AppTiptap'));
@@ -20,52 +21,45 @@ const AppMermaid = React.lazy(() => import('./AppMermaid'));
 const AppDonut = React.lazy(() => import('./AppDonut'));
 // const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
-// Memoize the components that don't depend on state
-const MemoizedStaticContent = React.memo(() => (
-  <>
-    <section id="matrix">
-      <Suspense fallback={<div>Loading matrix...</div>}>
+// Simple Tabs-based navigation for subapps
+const tabs = [
+  { key: 'grid', label: 'Grid', render: (state) => <AppGrid isLoadModalOpen={state.isLoadModalOpen} setIsLoadModalOpen={state.setIsLoadModalOpen} /> },
+  { key: 'layers', label: 'Layers', render: () => <AppLayers /> },
+  { key: 'flow', label: 'Flow', render: (state) => <AppFlow keepLayout={state.keepLayout} setKeepLayout={state.setKeepLayout} /> },
+  { key: 'matrix', label: 'Matrix', render: () => (
+      <Suspense fallback={<div className="p-4">Loading matrix...</div>}>
         <AppMatrix />
       </Suspense>
-    </section>
-
-    <section id="kanban">
-      <Suspense fallback={<div>Loading kanban...</div>}>
+    ) },
+  { key: 'kanban', label: 'Kanban', render: () => (
+      <Suspense fallback={<div className="p-4">Loading kanban...</div>}>
         <AppKanban />
       </Suspense>
-    </section>
-
-    <section id="states">
-      <Suspense fallback={<div>Loading states...</div>}>
+    ) },
+  { key: 'states', label: 'States', render: () => (
+      <Suspense fallback={<div className="p-4">Loading states...</div>}>
         <AppState />
       </Suspense>
-    </section>
-
-    <section id="donut">
-      <AppDonut />
-    </section>
-
-    <section id="tiptap">
-      <Suspense fallback={<div>Loading editor...</div>}>
+    ) },
+  { key: 'donut', label: 'Donut', render: () => <AppDonut /> },
+  { key: 'editor', label: 'Editor', render: () => (
+      <Suspense fallback={<div className="p-4">Loading editor...</div>}>
         <AppTiptap />
       </Suspense>
-    </section>
-
-    {/* AppMap */}
-    <section id="map" className="h-[600px]">
-      <Suspense fallback={<div>Loading map...</div>}>
-        <AppMap />
-      </Suspense>
-    </section>
-
-    <section id="mermaid" className="mb-28">
-      <Suspense fallback={<div>Loading diagram...</div>}>
+    ) },
+  { key: 'map', label: 'Map', render: () => (
+      <div className="h-[600px]">
+        <Suspense fallback={<div className="p-4">Loading map...</div>}>
+          <AppMap />
+        </Suspense>
+      </div>
+    ) },
+  { key: 'mermaid', label: 'Mermaid', render: () => (
+      <Suspense fallback={<div className="p-4">Loading diagram...</div>}>
         <AppMermaid />
       </Suspense>
-    </section>
-
-  </>
-));
+    ) },
+];
 
 const handleRecopyValues = async () => {
   try {
@@ -132,8 +126,12 @@ const App = () => {
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [isCreateFromContentModalOpen, setIsCreateFromContentModalOpen] = useState(false);
   const [keepLayout, setKeepLayout] = useState(false);
-  const [server, setServer] = useState("0");
+  const [server, setServer] = useState(API_URLS?.mongo || "");
   const [passcode, setLocalPasscode] = useState("");
+  const [activeTab, setActiveTab] = useState('grid');
+  React.useEffect(() => {
+    if (server) setApiUrl(server);
+  }, [server]);
 
   const handleCreateFromContent = (result) => {
     console.log('Containers created:', result);
@@ -168,19 +166,30 @@ const App = () => {
         </div>
       </header>
 
-      {/* Main content wrapper */}
-      <main className="flex-1 flex flex-col gap-4 px-6 py-4 overflow-auto">
-        {/* Components that depend on state - keep separate */}
-        <section id="grid">
-          <AppGrid isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen} />
-        </section>
-        <section id="layers">
-          <AppLayers />
-        </section>
-        <section id="sub">
-          <AppFlow keepLayout={keepLayout} setKeepLayout={setKeepLayout} />
-        </section>
-        <MemoizedStaticContent />
+      {/* Main content with Tabs */}
+      <main className="flex-1 flex flex-col px-6 py-4 overflow-hidden">
+        {/* Tabs header */}
+        <div className="flex gap-2 border-b border-gray-200 mb-3 overflow-x-auto">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`px-3 py-2 text-sm rounded-t-md border ${activeTab === t.key ? 'bg-white border-gray-200 border-b-white text-blue-700 font-medium' : 'bg-gray-100 border-transparent text-gray-700 hover:bg-gray-200'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Active tab content */}
+        <div className="flex-1 min-h-0 overflow-auto bg-white border border-gray-200 rounded-md p-2">
+          {tabs.find(t => t.key === activeTab)?.render({
+            isLoadModalOpen,
+            setIsLoadModalOpen,
+            keepLayout,
+            setKeepLayout,
+          })}
+        </div>
       </main>
 
       {/* Floating panel */}
