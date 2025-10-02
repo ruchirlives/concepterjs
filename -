@@ -1,0 +1,127 @@
+                        const newRadius = Math.max(10, Math.hypot(p.x - center.x, p.y - center.y));
+                        if (!lastAppliedRef.current || lastAppliedRef.current.radius !== newRadius) {
+                            setNodes((ns) =>
+                                ns.map((n) =>
+                                    n.id === selectedRef.current ? { ...n, radius: newRadius } : n
+                                )
+                            );
+                            lastAppliedRef.current = { radius: newRadius };
+                        }
+                    }
+                });
+            }
+        };
+
+        const onUp = async () => {
+            // Capture state, then immediately clear to stop dragging
+            const selectedId = selectedRef.current;
+            const mode = dragModeRef.current;
+            selectedRef.current = null;
+            dragModeRef.current = null;
+            dragStartRef.current = null;
+            lastAppliedRef.current = null;
+            if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
+
+            // Save positions or radius back to original incomingNodes array
+            let updated = false;
+            if (selectedId != null) {
+                const n = nodesRef.current.find(n => n.id === selectedId);
+                if (n) {
+                    const row = incomingNodes.find(r => r.id === n.id);
+                    if (mode === 'move') {
+                        if (row) {
+                            row.Position = { x: n.x, y: n.y };
+                        }
+                        setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r));
+                        updated = true;
+                    } else if (mode === 'scale') {
+                        if (row) {
+                            row.MapRadius = n.radius;
+                        }
+                        setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, MapRadius: n.radius } : r));
+                        updated = true;
+                    }
+                }
+            }
+            if (updated) {
+                // Persist changes to backend
+                await handleWriteBack(
+                    typeof rowData === 'function' ? rowData() : rowData
+                );
+            }
+        };
+
+        // Right-click handler for nodes
+        const onContextMenu = (e) => {
+            const pos = { x: e.offsetX, y: e.offsetY };
+            const hit = [...nodesRef.current].reverse().find(
+                (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
+            );
+            if (hit) {
+                e.preventDefault();
+                // Find parentId for the node (implement getParentId as needed)
+                setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    cid: hit.id,
+                    parentId: hit.parentId,
+                });
+            }
+        };
+
+        infiniteCanvas.addEventListener("mousedown", onDown);
+        infiniteCanvas.addEventListener("mousemove", onMove);
+        // Also listen on window so mouseup outside canvas ends dragging
+        window.addEventListener("mouseup", onUp);
+        infiniteCanvas.addEventListener("contextmenu", onContextMenu);
+
+        return () => {
+            infiniteCanvas.removeEventListener("mousedown", onDown);
+            infiniteCanvas.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            infiniteCanvas.removeEventListener("contextmenu", onContextMenu);
+        };
+    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
+
+
+    const { handleSelect, handleRename, handleResetPositionScale, exportMenu } = useMenuHandlers({ rowData, setRowData });
+    // Example menu options for demonstration
+    const menuOptions = [
+        {
+            label: "Select Node",
+            onClick: handleSelect
+        },
+        {
+            label: "Rename Node",
+            onClick: handleRename
+        },
+        {
+            label: "ResetPositionScale",
+            onClick: handleResetPositionScale
+        },
+        {
+            label: "Export Menu",
+            submenu: exportMenu
+        }
+    ];
+
+
+    // Render ContextMenu in a portal to document.body
+    const contextMenuElement = contextMenu
+        ? createPortal(
+            <ContextMenu
+                contextMenu={contextMenu}
+                setContextMenu={setContextMenu}
+                menuOptions={menuOptions}
+            />,
+            typeof window !== "undefined" && window.document && window.document.body ? window.document.body : null
+        )
+        : null;
+
+    return { nodes, setNodes, redraw, contextMenuElement, exportBitmap, exportSVG };
+};
+
+export default useNodes;

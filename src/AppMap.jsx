@@ -15,7 +15,7 @@ export default function AppMap() {
   // Layer filter state
   const [selectedLayer, setSelectedLayer] = React.useState("");
   const selectedLayerRef = React.useRef(selectedLayer);
-  useEffect(() => { 
+  useEffect(() => {
     selectedLayerRef.current = selectedLayer; 
   }, [selectedLayer]);
 
@@ -64,6 +64,17 @@ export default function AppMap() {
     const infiniteCanvas = new InfiniteCanvas(canvas);
     infiniteCanvasRef.current = infiniteCanvas;
 
+    const persistTransform = () => {
+      try {
+        const ic = infiniteCanvasRef.current;
+        if (ic && typeof ic.getTransform === "function") {
+          const m = ic.getTransform();
+          const payload = { a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f };
+          sessionStorage.setItem("appmap:transform", JSON.stringify(payload));
+        }
+      } catch {}
+    };
+
     const handleResize = () => {
       if (!canvasRef.current) return;
       const parent = canvasRef.current.parentElement;
@@ -78,16 +89,64 @@ export default function AppMap() {
     window.addEventListener("resize", handleResize);
     handleResize();
 
+    // Restore previous pan/zoom after initial resize to avoid resets
+    try {
+      const saved = sessionStorage.getItem("appmap:transform");
+      if (saved) {
+        const t = JSON.parse(saved);
+        if (t && typeof infiniteCanvas.setTransform === "function") {
+          const { a = 1, b = 0, c = 0, d = 1, e = 0, f = 0 } = t;
+          infiniteCanvas.setTransform(a, b, c, d, e, f);
+          if (redrawRef.current) redrawRef.current();
+        }
+      }
+    } catch {}
+
     // Add wheel event listener to canvas
     if (canvas) {
       canvas.addEventListener("wheel", preventScroll, { passive: false });
+      // Save transform on user interactions that likely change it
+      canvas.addEventListener("wheel", persistTransform, { passive: true });
+      canvas.addEventListener("pointerup", persistTransform);
     }
 
+    // Save/restore on tab visibility change
+    const onHide = () => persistTransform();
+    const onShow = () => {
+      try {
+        const saved = sessionStorage.getItem("appmap:transform");
+        const ic = infiniteCanvasRef.current;
+        if (saved && ic && typeof ic.setTransform === "function") {
+          const t = JSON.parse(saved);
+          const { a = 1, b = 0, c = 0, d = 1, e = 0, f = 0 } = t || {};
+          ic.setTransform(a, b, c, d, e, f);
+          if (redrawRef.current) redrawRef.current();
+        }
+      } catch {}
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) onHide(); else onShow();
+    });
+
     return () => {
+      // Persist current pan/zoom (canvas transform) before unmount
+      try {
+        const ic = infiniteCanvasRef.current;
+        if (ic && typeof ic.getTransform === "function") {
+          const m = ic.getTransform();
+          const payload = { a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f };
+          sessionStorage.setItem("appmap:transform", JSON.stringify(payload));
+        }
+      } catch (e) {
+        // ignore storage errors
+      }
       window.removeEventListener("resize", handleResize);
       if (canvas) {
         canvas.removeEventListener("wheel", preventScroll);
+        canvas.removeEventListener("wheel", persistTransform);
+        canvas.removeEventListener("pointerup", persistTransform);
       }
+      document.onvisibilitychange = null;
       infiniteCanvasRef.current = null;
     };
   }, []);
