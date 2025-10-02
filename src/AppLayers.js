@@ -29,7 +29,7 @@ const AppLayers = () => {
     selectedContentLayer, // <-- get from context
     setSelectedContentLayer, // <-- get from context
   } = useAppContext();
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [newLayer, setNewLayer] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);

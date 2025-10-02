@@ -4,7 +4,7 @@ import { useAppContext } from '../AppContext';
 import { useStateScores } from './useStateScores';
 
 export const useFlowLogic = () => {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   const [history, setHistory] = useState([]);
   const [layoutPositions, setLayoutPositions] = useState({});

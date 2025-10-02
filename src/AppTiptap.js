@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 const AppTiptap = () => {
     const { tiptapContent, setTiptapContent } = useTiptapContext();
     const [editor, setEditor] = useState(null);
-    const [collapsed, setCollapsed] = useState(true);
+    const [collapsed, setCollapsed] = useState(false);
     const [ghostSuggestion, setGhostSuggestion] = useState('');
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);

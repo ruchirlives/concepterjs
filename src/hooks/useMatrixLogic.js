@@ -27,7 +27,7 @@ export const useMatrixLogic = () => {
     parentChildMap, setParentChildMap // <-- only these for relationships
   } = useAppContext();
 
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
 

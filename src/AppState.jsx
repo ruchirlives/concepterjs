@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast"; // Assuming you're using react-hot-toas
 const App = () => {
   const { rowData, setDiffDict } = useAppContext();
   const [selectedTargetState, setSelectedTargetState] = useState("base");
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [flipDirection, setFlipDirection] = useState(false);
 
   // Use the custom hook for state comparison logic

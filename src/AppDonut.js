@@ -409,7 +409,7 @@ const AppDonut = ({ targetId }) => {
     setClickedSegmentId(null);
   }, [id]);
 
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   if (!id) {
     return (

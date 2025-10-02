@@ -44,7 +44,7 @@ const App = () => {
 
   // State to store name of the current container
   const [currentContainer, setCurrentContainer] = useState(null);
-  const [collapsed, setCollapsed] = React.useState(true);
+  const [collapsed, setCollapsed] = React.useState(false);
 
   // Reference to the grid API
   const gridApiRef = useRef(null); // Ref to store gridApi
@@ -285,9 +285,9 @@ const App = () => {
     {/* Grid content collapsible but always mounted */}
     <div
       className={`transition-all duration-300 overflow-auto`}
-      style={{ height: collapsed ? 0 : 400 }}
+      style={{ height: collapsed ? 0 : 600 }}
     >
-      <div style={{ height: 400 }}> {/* 👈 Keep grid a fixed height always */}
+      <div style={{ height: 600 }}> {/* 👈 Keep grid a fixed height always */}
         <AgGridReact
           rowSelection="multiple"
           theme={myTheme}

@@ -70,7 +70,7 @@ function AppMermaid() {
     const [mermaidCode, setMermaidCode] = useState(initialCode);
     console.log("Initial mermaid code:", mermaidCode);
     const containerRef = useRef(null);
-    const [collapsed, setCollapsed] = useState(true); // Changed from false to true
+    const [collapsed, setCollapsed] = useState(false);
 
     // Define the global callback function
     useEffect(() => {
