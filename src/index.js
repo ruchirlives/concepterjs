@@ -133,6 +133,15 @@ const App = () => {
     if (server) setApiUrl(server);
   }, [server]);
 
+  // Ensure canvases/layouts re-measure when switching to Map tab while kept mounted
+  React.useEffect(() => {
+    if (activeTab === 'map') {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
+  }, [activeTab]);
+
   const handleCreateFromContent = (result) => {
     console.log('Containers created:', result);
     alert(`${result.message}\nCreated ${result.container_ids.length} containers`);
@@ -181,8 +190,21 @@ const App = () => {
           ))}
         </div>
 
-        {/* Active tab content (keep AppGrid mounted always) */}
+        {/* Active tab content (keep AppGrid and AppMap mounted always) */}
         <div className="flex-1 min-h-0 overflow-auto bg-white border border-gray-200 rounded-md p-2 relative">
+          {/* Persistently mounted Map layer */}
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              opacity: activeTab === 'map' ? 1 : 0,
+              pointerEvents: activeTab === 'map' ? 'auto' : 'none',
+            }}
+            className="h-[600px]"
+          >
+            <Suspense fallback={<div className="p-4">Loading map...</div>}>
+              <AppMap />
+            </Suspense>
+          </div>
           {/* Persistently mounted Grid */}
           <div style={{ display: activeTab === 'grid' ? 'block' : 'none' }}>
             <AppGrid
@@ -192,7 +214,7 @@ const App = () => {
           </div>
 
           {/* Other tabs rendered when active (Grid handled above) */}
-          {activeTab !== 'grid' && (
+          {activeTab !== 'grid' && activeTab !== 'map' && (
             tabs.find(t => t.key === activeTab)?.render({
               isLoadModalOpen,
               setIsLoadModalOpen,
