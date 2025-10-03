@@ -219,6 +219,15 @@ const AppDonut = ({ targetId }) => {
       .filter(entry => entry.items.length > 0);
   }, [showLayerRings, visibleLayers, rowData, hiddenLayers]);
 
+  // Track viewport size to re-render responsive chart on resize
+  const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   // Function to handle segment clicks
   const handleSegmentClick = useCallback((event, d) => {
     event.stopPropagation();
@@ -289,7 +298,10 @@ const AppDonut = ({ targetId }) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const width = 700, height = 700, radius = Math.min(width, height) / 2 - 20;
+    const svgEl = svgRef.current;
+    const width = svgEl ? svgEl.clientWidth : 700;
+    const height = svgEl ? svgEl.clientHeight : width; // keep square if auto
+    const radius = Math.min(width, height) / 2 - 20;
     const g = svg.append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
 
     if (showLayerRings) {
@@ -320,6 +332,7 @@ const AppDonut = ({ targetId }) => {
 
         const ringGroup = g.append("g").attr("data-layer", layerEntry.layer);
 
+        // Draw the ring segments
         ringGroup.selectAll("path")
           .data(arcs)
           .enter()
@@ -352,12 +365,41 @@ const AppDonut = ({ targetId }) => {
             }
           });
 
+        // Add container labels on segments (truncated to fit)
+        const fontSize = 9;
+        ringGroup.selectAll("text")
+          .data(arcs)
+          .enter()
+          .append("text")
+          .attr("transform", d => {
+            const [cx, cy] = arcGenerator.centroid(d);
+            return `translate(${cx},${cy})`;
+          })
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "middle")
+          .attr("fill", "#374151")
+          .style("font-size", `${fontSize}px`)
+          .text(d => {
+            const arcLen = Math.abs(d.endAngle - d.startAngle);
+            const rMid = (innerRadius + outerRadius) / 2;
+            const estMaxChars = Math.floor((arcLen * rMid) / (fontSize * 0.7));
+            const label = d.data.name || "";
+            if (arcLen < 0.25 || estMaxChars < 3) {
+              return label.length >= 5 ? label.substring(0, 5) : label;
+            }
+            if (label.length > estMaxChars) {
+              return label.substring(0, Math.max(1, estMaxChars - 1)) + "…";
+            }
+            return label;
+          });
+
         // Layer label
         const labelRadius = innerRadius + (ringWidth / 2);
+        // Layer label in a distinct color
         g.append("text")
           .attr("text-anchor", "middle")
           .attr("dy", "0.35em")
-          .attr("fill", "#555")
+          .attr("fill", "#1d4ed8")
           .attr("font-size", "10px")
           .attr("transform", `rotate(0) translate(0, ${-labelRadius})`)
           .text(layerEntry.layer);
@@ -539,7 +581,8 @@ const AppDonut = ({ targetId }) => {
     handleSegmentContextMenu,
     clickedSegmentId,
     showLayerRings,
-    layersWithItems
+    layersWithItems,
+    viewportSize
   ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
@@ -551,7 +594,7 @@ const AppDonut = ({ targetId }) => {
 
   if (!id) {
     return (
-      <div style={{ width: 800, height: collapsed ? 48 : 800, transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
+      <div style={{ width: '100%', height: collapsed ? 48 : 800, transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
         <div className="flex justify-between items-center mb-2">
           <h2 className="font-semibold">Donut View (D3)</h2>
           <button
@@ -571,14 +614,14 @@ const AppDonut = ({ targetId }) => {
     <div
       className="bg-white rounded shadow p-4"
       style={{
-        width: 900,
-        height: collapsed ? 48 : 1000,
+        width: '100%',
+        height: collapsed ? 48 : 'auto',
         transition: 'height 0.3s',
         overflow: 'hidden',
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center"
+        alignItems: "stretch"
       }}
     >
       <div className="flex justify-between items-center mb-2 w-full gap-4">
@@ -639,12 +682,12 @@ const AppDonut = ({ targetId }) => {
         )}
         <svg
           ref={svgRef}
-          width={850}
-          height={750}
+          width="100%"
+          height="auto"
           style={{
             border: "1px solid #ddd",
             display: "block",
-            margin: "0 auto"
+            aspectRatio: '1 / 1'
           }}
         />
         <div
