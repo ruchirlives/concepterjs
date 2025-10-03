@@ -213,15 +213,19 @@ const App = () => {
             />
           </div>
 
-          {/* Other tabs rendered when active (Grid handled above) */}
-          {activeTab !== 'grid' && activeTab !== 'map' && (
-            tabs.find(t => t.key === activeTab)?.render({
-              isLoadModalOpen,
-              setIsLoadModalOpen,
-              keepLayout,
-              setKeepLayout,
-            })
-          )}
+          {/* Persistently mounted other tabs (besides Grid/Map) */}
+          {tabs
+            .filter(t => t.key !== 'grid' && t.key !== 'map')
+            .map(t => (
+              <div key={t.key} style={{ display: activeTab === t.key ? 'block' : 'none' }}>
+                {t.render({
+                  isLoadModalOpen,
+                  setIsLoadModalOpen,
+                  keepLayout,
+                  setKeepLayout,
+                })}
+              </div>
+            ))}
         </div>
       </main>
 
