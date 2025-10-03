@@ -3,6 +3,7 @@ import * as d3 from "d3";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
+import LayerDropdown from "./components/LayerDropdown";
 
 // Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
@@ -78,8 +79,8 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
 const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
-  const { rowData, setRowData } = useAppContext();
-  const { childrenMap, nameById } = useMatrixLogic();
+  const { rowData, setRowData, hiddenLayers } = useAppContext();
+  const { childrenMap, nameById, layerOptions: availableLayerOptions } = useMatrixLogic();
 
   const [id, setId] = useState(
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
@@ -88,6 +89,7 @@ const AppDonut = ({ targetId }) => {
   const [donutTree, setDonutTree] = useState([]);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
+  const [showLayerRings, setShowLayerRings] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -123,6 +125,11 @@ const AppDonut = ({ targetId }) => {
 
   // Build the donut tree whenever id changes
   useEffect(() => {
+    if (showLayerRings) {
+      setFocusedNodeId(null);
+      return;
+    }
+
     // Determine which node to use as the root
     const rootNodeId = focusedNodeId || id;
 
@@ -134,14 +141,18 @@ const AppDonut = ({ targetId }) => {
     // Build ancestry tree starting from the determined root node
     const tree = buildAncestryTree(rootNodeId, nameById, childrenMap);
     setDonutTree(tree);
-  }, [id, focusedNodeId, nameById, childrenMap]);
+  }, [id, focusedNodeId, nameById, childrenMap, showLayerRings]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
     if (!rowData) return [];
     const tags = new Set();
     rowData.forEach(row => {
-      if (row.Tags) tags.add(row.Tags);
+      if (!row.Tags) return;
+      row.Tags.split(",")
+        .map(tag => tag.trim())
+        .filter(Boolean)
+        .forEach(tag => tags.add(tag));
     });
     return Array.from(tags);
   }, [rowData]);
@@ -166,10 +177,47 @@ const AppDonut = ({ targetId }) => {
 
   // Get the root node's full label
   const rootLabel = useMemo(() => {
+    if (showLayerRings) {
+      return "Layer View";
+    }
     if (donutTree.length === 0) return "";
     const rootItem = donutTree.find(item => item.level === 0);
     return rootItem ? rootItem.label : "";
-  }, [donutTree]);
+  }, [donutTree, showLayerRings]);
+
+  const visibleLayers = useMemo(() => {
+    return (availableLayerOptions || []).filter(layer => !hiddenLayers.has(layer));
+  }, [availableLayerOptions, hiddenLayers]);
+
+  const layersWithItems = useMemo(() => {
+    if (!showLayerRings) return [];
+    const sanitizeTags = tags =>
+      (tags || "")
+        .split(",")
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    return visibleLayers
+      .map(layer => {
+        const items = rowData
+          .filter(row => {
+            const tags = sanitizeTags(row.Tags);
+            if (tags.length === 0) return false;
+            const inLayer = tags.includes(layer);
+            const notHidden = !tags.some(t => hiddenLayers.has(t));
+            return inLayer && notHidden;
+          })
+          .map(row => ({
+            id: row.id?.toString(),
+            name: row.Name || row.id?.toString(),
+            layer,
+            original: row,
+            level: layer
+          }));
+        return { layer, items };
+      })
+      .filter(entry => entry.items.length > 0);
+  }, [showLayerRings, visibleLayers, rowData, hiddenLayers]);
 
   // Function to handle segment clicks
   const handleSegmentClick = useCallback((event, d) => {
@@ -186,6 +234,11 @@ const AppDonut = ({ targetId }) => {
     channel.postMessage({ nodeId: clickedId });
 
     setClickedSegmentId(clickedId);
+
+    if (showLayerRings || typeof clickedLevel !== "number") {
+      setFocusedNodeId(null);
+      return;
+    }
 
     // Step 1: Clear all items with level > clickedLevel from donutTree (keep the clicked level)
     const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
@@ -220,7 +273,7 @@ const AppDonut = ({ targetId }) => {
     });
 
     setDonutTree(uniqueTree);
-  }, [donutTree, nameById, childrenMap]);
+  }, [donutTree, nameById, childrenMap, showLayerRings]);
 
   // Add right-click handler for donut segments
   const handleSegmentContextMenu = useCallback((event, d) => {
@@ -233,12 +286,88 @@ const AppDonut = ({ targetId }) => {
   }, []);
 
   useEffect(() => {
-    if (donutTree.length === 0) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
     const width = 700, height = 700, radius = Math.min(width, height) / 2 - 20;
     const g = svg.append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+    if (showLayerRings) {
+      if (layersWithItems.length === 0) {
+        return;
+      }
+
+      const ringCount = layersWithItems.length;
+      const ringWidth = ringCount === 0 ? radius : radius / ringCount;
+      const layerPie = d3.pie().sort(null).value(() => 1);
+
+      layersWithItems.forEach((layerEntry, layerIndex) => {
+        const innerRadius = ringWidth * layerIndex;
+        const outerRadius = ringWidth * (layerIndex + 1);
+        const arcGenerator = d3.arc()
+          .startAngle(d => d.startAngle)
+          .endAngle(d => d.endAngle)
+          .innerRadius(innerRadius)
+          .outerRadius(outerRadius);
+
+        const augmentedItems = layerEntry.items.map(item => ({
+          ...item,
+          level: layerIndex,
+          layer: layerEntry.layer
+        }));
+
+        const arcs = layerPie(augmentedItems);
+
+        const ringGroup = g.append("g").attr("data-layer", layerEntry.layer);
+
+        ringGroup.selectAll("path")
+          .data(arcs)
+          .enter()
+          .append("path")
+          .attr("d", arcGenerator)
+          .attr("fill", d => {
+            if (d.data.id === clickedSegmentId) {
+              return "#ff4444";
+            }
+            return colorByTag(layerEntry.layer) || "#ccc";
+          })
+          .attr("stroke", d => d.data.id === clickedSegmentId ? "#cc0000" : "#fff")
+          .attr("stroke-width", d => d.data.id === clickedSegmentId ? 3 : 1)
+          .style("cursor", "pointer")
+          .on("click", handleSegmentClick)
+          .on("contextmenu", handleSegmentContextMenu)
+          .on("mousemove", function (event, d) {
+            const tooltip = tooltipRef.current;
+            if (tooltip) {
+              tooltip.style.display = "block";
+              tooltip.style.left = (event.clientX + 10) + "px";
+              tooltip.style.top = (event.clientY + 10) + "px";
+              tooltip.textContent = `${d.data.name} (${layerEntry.layer})`;
+            }
+          })
+          .on("mouseleave", function () {
+            const tooltip = tooltipRef.current;
+            if (tooltip) {
+              tooltip.style.display = "none";
+            }
+          });
+
+        // Layer label
+        const labelRadius = innerRadius + (ringWidth / 2);
+        g.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.35em")
+          .attr("fill", "#555")
+          .attr("font-size", "10px")
+          .attr("transform", `rotate(0) translate(0, ${-labelRadius})`)
+          .text(layerEntry.layer);
+      });
+
+      return;
+    }
+
+    if (donutTree.length === 0) return;
+    // Default ancestry view below
 
     // Group items by level
     const levels = {};
@@ -402,12 +531,21 @@ const AppDonut = ({ targetId }) => {
         }
         return label;
       });
-  }, [donutTree, rowData, colorByTag, handleSegmentClick, handleSegmentContextMenu, clickedSegmentId]); // Added clickedSegmentId to dependencies
+  }, [
+    donutTree,
+    rowData,
+    colorByTag,
+    handleSegmentClick,
+    handleSegmentContextMenu,
+    clickedSegmentId,
+    showLayerRings,
+    layersWithItems
+  ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
   useEffect(() => {
     setClickedSegmentId(null);
-  }, [id]);
+  }, [id, showLayerRings]);
 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -443,8 +581,25 @@ const AppDonut = ({ targetId }) => {
         alignItems: "center"
       }}
     >
-      <div className="flex justify-between items-center mb-2 w-full">
-        <h2 className="font-semibold">Donut View (D3)</h2>
+      <div className="flex justify-between items-center mb-2 w-full gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="font-semibold">Donut View (D3)</h2>
+          <label className="flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={showLayerRings}
+              onChange={e => setShowLayerRings(e.target.checked)}
+            />
+            <span>Layer Rings</span>
+          </label>
+          {showLayerRings && (
+            <LayerDropdown
+              buttonText="Layers"
+              title="Select layers to display"
+              dropdownTitle="Toggle Layers"
+            />
+          )}
+        </div>
         <button
           className="px-2 py-1 border rounded text-sm"
           onClick={() => setCollapsed(c => !c)}
@@ -456,13 +611,13 @@ const AppDonut = ({ targetId }) => {
       {!collapsed && <>
         <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
           {rootLabel}
-          {focusedNodeId && (
+          {!showLayerRings && focusedNodeId && (
             <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
               Focused on: {nameById[focusedNodeId]}
             </div>
           )}
         </div>
-        {focusedNodeId && (
+        {!showLayerRings && focusedNodeId && (
           <button
             onClick={() => setFocusedNodeId(null)}
             style={{
@@ -476,6 +631,11 @@ const AppDonut = ({ targetId }) => {
           >
             Show All Lineage
           </button>
+        )}
+        {showLayerRings && layersWithItems.length === 0 && (
+          <div style={{ marginBottom: "10px", color: "#666" }}>
+            No visible layers with items to display.
+          </div>
         )}
         <svg
           ref={svgRef}
