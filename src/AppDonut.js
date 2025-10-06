@@ -4,6 +4,19 @@ import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
 import LayerDropdown from "./components/LayerDropdown";
+import { setPosition } from "./api";
+import { requestRefreshChannel } from "hooks/effectsShared";
+
+// Match AppKanban behavior: prompt for label and save link
+async function linkItems(sourceItem, targetItem, relationships) {
+  const key = `${sourceItem.cid}--${targetItem.id}`;
+  const currentLabel = relationships[key] || null;
+  const newLabel = prompt("Enter new label:", currentLabel);
+  if (newLabel !== null) {
+    await setPosition(sourceItem.cid, targetItem.id, newLabel);
+    requestRefreshChannel();
+  }
+}
 
 // Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
@@ -80,7 +93,7 @@ const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
   const { rowData, setRowData, hiddenLayers } = useAppContext();
-  const { childrenMap, nameById, layerOptions: availableLayerOptions } = useMatrixLogic();
+  const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
 
   const [id, setId] = useState(
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
@@ -90,6 +103,15 @@ const AppDonut = ({ targetId }) => {
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
   const [showLayerRings, setShowLayerRings] = useState(false);
+  // Drag/link state (mirrors AppKanban)
+  const [dragItem, setDragItem] = useState(null); // { cid, ctrl }
+  const dragItemRef = useRef(dragItem);
+  const [ctrlDragging, setCtrlDragging] = useState(false);
+  const [dragLine, setDragLine] = useState(null); // { from: {x,y}, to: {x,y} }
+  const [manualMouseTracking, setManualMouseTracking] = useState(false);
+  const rafIdRef = useRef(null);
+
+  useEffect(() => { dragItemRef.current = dragItem; }, [dragItem]);
 
   // Compute related IDs (clicked + all ancestors + all descendants)
   const relatedIds = useMemo(() => {
@@ -339,6 +361,87 @@ const AppDonut = ({ targetId }) => {
     });
   }, []);
 
+  // Ctrl+mousedown to start linking; draw a line following the mouse until mouseup.
+  const handleSegmentMouseDown = useCallback((event, d) => {
+    if (!event.ctrlKey) return;
+    event.stopPropagation();
+    event.preventDefault(); // prevent text selection during ctrl-drag
+    setCtrlDragging(true);
+    setManualMouseTracking(true);
+    const cid = d?.data?.id?.toString();
+    setDragItem({ cid, ctrl: true });
+
+    // Disable user selection globally while dragging
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+
+    const rect = event.target.getBoundingClientRect();
+    const startPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    setDragLine({ from: startPos, to: startPos });
+
+    const handleMouseMove = (e) => {
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine(line => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
+        rafIdRef.current = null;
+      });
+    };
+    const handleMouseUp = (e) => {
+      setCtrlDragging(false);
+      setDragLine(null);
+      setManualMouseTracking(false);
+
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      if (elem && elem.dataset && elem.dataset.donutItemId) {
+        const targetId = elem.dataset.donutItemId;
+        const targetItem = rowData.find(r => r.id.toString() === targetId);
+        if (targetItem && dragItemRef.current) {
+          linkItems(dragItemRef.current, targetItem, relationships);
+        }
+      }
+      setDragItem(null);
+
+      // Restore selection behavior
+      document.body.style.userSelect = prevUserSelect;
+
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }, [relationships, rowData]);
+
+  // Mirror AppKanban: if ctrlDragging and not manually tracking, update line on global mousemove
+  useEffect(() => {
+    if (!ctrlDragging || !dragLine || manualMouseTracking) return;
+    const handleMouseMove = (e) => {
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine(line => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
+        rafIdRef.current = null;
+      });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [ctrlDragging, dragLine, manualMouseTracking]);
+
+  // Mirror AppKanban: clear drag line on dragend
+  useEffect(() => {
+    if (!ctrlDragging) {
+      setDragLine(null);
+      return;
+    }
+    const handleDragEnd = () => {
+      setCtrlDragging(false);
+      setDragLine(null);
+      setDragItem(null);
+      // Ensure text selection is re-enabled if drag ends unexpectedly
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener("dragend", handleDragEnd);
+    return () => window.removeEventListener("dragend", handleDragEnd);
+  }, [ctrlDragging]);
+
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
@@ -416,6 +519,8 @@ const AppDonut = ({ targetId }) => {
           .style("cursor", "pointer")
           .on("click", handleSegmentClick)
           .on("contextmenu", handleSegmentContextMenu)
+          .on("mousedown", handleSegmentMouseDown)
+          .attr("data-donut-item-id", d => d.data.id)
           .on("mousemove", function (event, d) {
             const tooltip = tooltipRef.current;
             if (tooltip) {
@@ -591,6 +696,8 @@ const AppDonut = ({ targetId }) => {
       .style("cursor", "pointer")
       .on("click", handleSegmentClick)
       .on("contextmenu", handleSegmentContextMenu) // <-- Add this line
+      .on("mousedown", handleSegmentMouseDown)
+      .attr("data-donut-item-id", d => d.data.id)
       .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
@@ -665,7 +772,8 @@ const AppDonut = ({ targetId }) => {
     layersWithItems,
     viewportSize,
     stripCommonWords,
-    relatedIds
+    relatedIds,
+    handleSegmentMouseDown
   ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
@@ -707,6 +815,13 @@ const AppDonut = ({ targetId }) => {
         alignItems: "stretch"
       }}
     >
+      {dragLine && (
+        <svg
+          style={{ position: "fixed", pointerEvents: "none", left: 0, top: 0, width: "100vw", height: "100vh", zIndex: 1000 }}
+        >
+          <line x1={dragLine.from.x} y1={dragLine.from.y} x2={dragLine.to.x} y2={dragLine.to.y} stroke="red" strokeWidth="2" />
+        </svg>
+      )}
       <div className="flex justify-between items-center mb-2 w-full gap-4">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold">Donut View (D3)</h2>
