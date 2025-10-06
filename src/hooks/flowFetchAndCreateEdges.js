@@ -48,7 +48,7 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         // When grouping by layers, we want to project relationships onto each layer
         // where both endpoints have a clone in the same parent group.
         const tmp = [];
-        const getCloneGroup = (clone) => clone.parentId || clone.id.split('__in__')[1] || undefined;
+        // const getCloneGroup = (clone) => clone.parentId || clone.id.split('__in__')[1] || undefined;
         parentChildMap.forEach(({ container_id, children }) => {
             const parentClones = clonesByOriginal[container_id]?.filter(c => showGroupNodes ? c.parentId : true);
             if (!parentClones || parentClones.length === 0) return;
