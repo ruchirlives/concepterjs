@@ -109,6 +109,17 @@ const AppDonut = ({ targetId }) => {
     { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
 
+  // Helper to strip common short words from labels
+  const stripCommonWords = useCallback((text) => {
+    if (!text) return "";
+    const stop = new Set(["the", "to", "and", "of", "as", "in", "on", "for", "a", "an", "is", "it", "by", "at", "from", "or", "but", "with", "that"]);
+    return String(text)
+      .split(/\s+/)
+      .filter(w => !stop.has(w.toLowerCase()))
+      .join(" ")
+      .trim();
+  }, []);
+
   useEffect(() => {
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.onmessage = (event) => {
@@ -309,13 +320,21 @@ const AppDonut = ({ targetId }) => {
         return;
       }
 
-      const ringCount = layersWithItems.length;
+      // Reserve an inner blank root circle by adding one extra ring slot
+      const ringCount = layersWithItems.length + 1;
       const ringWidth = ringCount === 0 ? radius : radius / ringCount;
+      // Draw a subtle boundary for the blank root circle
+      g.append("circle")
+        .attr("r", ringWidth)
+        .attr("fill", "none")
+        .attr("stroke", "#eee")
+        .attr("stroke-width", 1);
       const layerPie = d3.pie().sort(null).value(() => 1);
 
       layersWithItems.forEach((layerEntry, layerIndex) => {
-        const innerRadius = ringWidth * layerIndex;
-        const outerRadius = ringWidth * (layerIndex + 1);
+        // Shift all rings outward by one ringWidth to keep center blank
+        const innerRadius = ringWidth * (layerIndex + 1);
+        const outerRadius = ringWidth * (layerIndex + 2);
         const arcGenerator = d3.arc()
           .startAngle(d => d.startAngle)
           .endAngle(d => d.endAngle)
@@ -366,7 +385,7 @@ const AppDonut = ({ targetId }) => {
           });
 
         // Add container labels on segments (truncated to fit)
-        const fontSize = 9;
+        const fontSize = 10;
         ringGroup.selectAll("text")
           .data(arcs)
           .enter()
@@ -383,7 +402,7 @@ const AppDonut = ({ targetId }) => {
             const arcLen = Math.abs(d.endAngle - d.startAngle);
             const rMid = (innerRadius + outerRadius) / 2;
             const estMaxChars = Math.floor((arcLen * rMid) / (fontSize * 0.7));
-            const label = d.data.name || "";
+            const label = stripCommonWords(d.data.name || "");
             if (arcLen < 0.25 || estMaxChars < 3) {
               return label.length >= 5 ? label.substring(0, 5) : label;
             }
@@ -560,7 +579,7 @@ const AppDonut = ({ targetId }) => {
         const r = (d.y0 + d.y1) / 2;
         const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.7));
 
-        let label = d.data.name;
+        let label = stripCommonWords(d.data.name);
 
         // If the segment would normally be blank, show first 5 chars
         if (arcLength < minArc || estMaxChars < 3) {
@@ -582,7 +601,8 @@ const AppDonut = ({ targetId }) => {
     clickedSegmentId,
     showLayerRings,
     layersWithItems,
-    viewportSize
+    viewportSize,
+    stripCommonWords
   ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
@@ -594,7 +614,7 @@ const AppDonut = ({ targetId }) => {
 
   if (!id) {
     return (
-      <div style={{ width: '100%', height: collapsed ? 48 : 800, transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
+      <div style={{ width: '100%', height: collapsed ? 48 : '100vh', transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
         <div className="flex justify-between items-center mb-2">
           <h2 className="font-semibold">Donut View (D3)</h2>
           <button
@@ -615,7 +635,7 @@ const AppDonut = ({ targetId }) => {
       className="bg-white rounded shadow p-4"
       style={{
         width: '100%',
-        height: collapsed ? 48 : 'auto',
+        height: collapsed ? 48 : '100vh',
         transition: 'height 0.3s',
         overflow: 'hidden',
         position: "relative",
@@ -652,7 +672,7 @@ const AppDonut = ({ targetId }) => {
         </button>
       </div>
       {!collapsed && <>
-        <div style={{ fontWeight: "bold", fontSize: "1.2rem", marginBottom: "10px" }}>
+        <div style={{ fontWeight: "bold", fontSize: "1 rem", marginBottom: "2px" }}>
           {rootLabel}
           {!showLayerRings && focusedNodeId && (
             <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
@@ -680,16 +700,17 @@ const AppDonut = ({ targetId }) => {
             No visible layers with items to display.
           </div>
         )}
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="auto"
-          style={{
-            border: "1px solid #ddd",
-            display: "block",
-            aspectRatio: '1 / 1'
-          }}
-        />
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="100%"
+            style={{
+              display: "block"
+            }}
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </div>
         <div
           ref={tooltipRef}
           style={{

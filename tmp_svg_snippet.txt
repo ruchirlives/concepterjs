@@ -1,0 +1,12 @@
+          ref={svgRef}
+          width="100%"
+          height="auto"
+          style={{
+            border: "1px solid #ddd",
+            display: "block",
+            aspectRatio: '1 / 1'
+          }}
+        />
+        <div
+          ref={tooltipRef}
+          style={{
