@@ -277,22 +277,12 @@ export const useMatrixLogic = () => {
     });
     const tsv = [headers.join("\t"), ...rows].join("\n");
 
-    toast((t) => (
-      <div className="max-w-[300px]">
-        <div className="font-semibold mb-1">Matrix TSV</div>
-        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono">{tsv}</div>
-        <button
-          className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
-          onClick={() => {
-            navigator.clipboard.writeText(tsv);
-            toast.success("Copied!");
-            toast.dismiss(t.id);
-          }}
-        >
-          Copy to Clipboard
-        </button>
-      </div>
-    ));
+    if (navigator && navigator.clipboard) {
+      navigator.clipboard.writeText(tsv);
+      alert("Matrix copied to clipboard as TSV!");
+    } else {
+      alert(tsv);
+    }
   }, [filteredSources, filteredTargets, relationships, differences, comparatorState, flipped]);
 
   const handleCopyDiff = async (containerId) => {
