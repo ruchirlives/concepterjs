@@ -4,18 +4,6 @@ import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
 import LayerDropdown from "./components/LayerDropdown";
-import { setPosition } from "./api";
-import { requestRefreshChannel } from "hooks/effectsShared";
-
-async function linkItems(sourceItem, targetItem, relationships) {
-  const key = `${sourceItem.cid}--${targetItem.id}`;
-  const currentLabel = relationships[key] || null;
-  const newLabel = prompt("Enter new label:", currentLabel);
-  if (newLabel !== null) {
-    await setPosition(sourceItem.cid, targetItem.id, newLabel);
-    requestRefreshChannel();
-  }
-}
 
 // Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
 function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
@@ -92,7 +80,7 @@ const AppDonut = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
   const { rowData, setRowData, hiddenLayers } = useAppContext();
-  const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
+  const { childrenMap, nameById, layerOptions: availableLayerOptions } = useMatrixLogic();
 
   const [id, setId] = useState(
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
@@ -105,10 +93,6 @@ const AppDonut = ({ targetId }) => {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
-  const [dragItem, setDragItem] = useState(null);
-  const dragItemRef = useRef(null);
-  const [dragLine, setDragLine] = useState(null);
-  const rafIdRef = useRef(null);
 
   // Use menu handlers (no removeChildFromLayer or flipped needed here)
   const menuHandlers = useMenuHandlers({
@@ -321,71 +305,6 @@ const AppDonut = ({ targetId }) => {
     });
   }, []);
 
-  const handleSegmentMouseDown = useCallback((event, d) => {
-    if (!event.ctrlKey || event.button !== 0) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const cid = d?.data?.id?.toString();
-    if (!cid) return;
-
-    const dragState = { cid, ctrl: true };
-    setDragItem(dragState);
-    dragItemRef.current = dragState;
-
-    const rect = event.target.getBoundingClientRect();
-    const startPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    setDragLine({ from: startPos, to: startPos });
-
-    const handleMouseMove = (e) => {
-      if (rafIdRef.current != null) return;
-      rafIdRef.current = requestAnimationFrame(() => {
-        setDragLine(line => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
-        rafIdRef.current = null;
-      });
-    };
-
-    const resolveTargetId = (elem) => {
-      let current = elem;
-      while (current) {
-        if (current.dataset && current.dataset.donutItemId) {
-          return current.dataset.donutItemId;
-        }
-        current = current.parentElement;
-      }
-      return null;
-    };
-
-    const handleMouseUp = (e) => {
-      if (rafIdRef.current != null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      setDragLine(null);
-
-      const elem = document.elementFromPoint(e.clientX, e.clientY);
-      const targetId = resolveTargetId(elem);
-      if (targetId && dragItemRef.current && targetId !== dragItemRef.current.cid) {
-        const targetItem = rowData.find(r => r.id?.toString() === targetId);
-        if (targetItem) {
-          linkItems(dragItemRef.current, targetItem, relationships || {});
-        }
-      }
-
-      setDragItem(null);
-      dragItemRef.current = null;
-
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  }, [relationships, rowData]);
-
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
@@ -438,7 +357,6 @@ const AppDonut = ({ targetId }) => {
           .enter()
           .append("path")
           .attr("d", arcGenerator)
-          .attr("data-donut-item-id", d => d.data.id)
           .attr("fill", d => {
             if (d.data.id === clickedSegmentId) {
               return "#ff4444";
@@ -450,7 +368,6 @@ const AppDonut = ({ targetId }) => {
           .style("cursor", "pointer")
           .on("click", handleSegmentClick)
           .on("contextmenu", handleSegmentContextMenu)
-          .on("mousedown", handleSegmentMouseDown)
           .on("mousemove", function (event, d) {
             const tooltip = tooltipRef.current;
             if (tooltip) {
@@ -481,8 +398,6 @@ const AppDonut = ({ targetId }) => {
           .attr("dominant-baseline", "middle")
           .attr("fill", "#374151")
           .style("font-size", `${fontSize}px`)
-          .attr("data-donut-item-id", d => d.data.id)
-          .on("mousedown", handleSegmentMouseDown)
           .text(d => {
             const arcLen = Math.abs(d.endAngle - d.startAngle);
             const rMid = (innerRadius + outerRadius) / 2;
@@ -602,7 +517,6 @@ const AppDonut = ({ targetId }) => {
       .data(nodes)
       .enter().append("path")
       .attr("d", arc)
-      .attr("data-donut-item-id", d => d.data.id)
       .attr("fill", d => {
         if (d.data.id === clickedSegmentId) {
           return "#ff4444";
@@ -615,7 +529,6 @@ const AppDonut = ({ targetId }) => {
       .style("cursor", "pointer")
       .on("click", handleSegmentClick)
       .on("contextmenu", handleSegmentContextMenu) // <-- Add this line
-      .on("mousedown", handleSegmentMouseDown)
       .on("mousemove", function (event, d) {
         const tooltip = tooltipRef.current;
         if (tooltip) {
@@ -653,12 +566,8 @@ const AppDonut = ({ targetId }) => {
       .data(nodes)
       .enter()
       .append("text")
-      .attr("data-donut-item-id", d => d.data.id)
-      .on("mousedown", handleSegmentMouseDown)
       .attr("dy", "0.32em")
       .append("textPath")
-      .attr("data-donut-item-id", d => d.data.id)
-      .on("mousedown", handleSegmentMouseDown)
       .attr("href", d => `#arc-label-${d.data.id}`)
       .attr("startOffset", "5%")
       .style("text-anchor", "left")
@@ -689,7 +598,6 @@ const AppDonut = ({ targetId }) => {
     colorByTag,
     handleSegmentClick,
     handleSegmentContextMenu,
-    handleSegmentMouseDown,
     clickedSegmentId,
     showLayerRings,
     layersWithItems,
