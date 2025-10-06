@@ -2,7 +2,7 @@ import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout, groupByLayers } = params;
+    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout, groupByLayers, showGhostConnections = true } = params;
 
     if (!parentChildMap) return;
 
@@ -127,47 +127,49 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         setEdges
     });
 
-    // Add ghost nodes for PendingEdges
-    computedNodes.forEach(node => {
-        const pendingEdges = Array.isArray(node.data?.PendingEdges) ? node.data.PendingEdges : [];
-        pendingEdges.forEach((pending, idx) => {
-            if (!pending?.Name) return;
-            const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
+    if (showGhostConnections) {
+        // Add ghost nodes for PendingEdges
+        computedNodes.forEach(node => {
+            const pendingEdges = Array.isArray(node.data?.PendingEdges) ? node.data.PendingEdges : [];
+            pendingEdges.forEach((pending, idx) => {
+                if (!pending?.Name) return;
+                const ghostNodeId = `ghost-${node.id}-${pending.to || idx}`;
 
-            // Determine parent group for this node, if any
-            const parentGroupId = node.parentId || childToGroup[node.id];
+                // Determine parent group for this node, if any
+                const parentGroupId = node.parentId || childToGroup[node.id];
 
-            const ghostNode = {
-                id: ghostNodeId,
-                type: 'ghost',
-                data: { 
-                    label: pending.Name 
-                        ? pending.Name.slice(0, 50) + (pending.Name.length > 50 ? '…' : '') 
-                        : '', 
-                    parentId: node.id, 
-                    id: pending.to || null 
-                },
-                position: {
-                    x: (node.position?.x || 0) + 150,
-                    y: (node.position?.y || 0) + 60 * (idx + 1)
-                },
-                selectable: false,
-                draggable: true,
-                targetPosition: 'left',
-                ...(parentGroupId ? { parentId: parentGroupId, extent: 'parent' } : {})
-            };
-            computedNodes.push(ghostNode);
+                const ghostNode = {
+                    id: ghostNodeId,
+                    type: 'ghost',
+                    data: {
+                        label: pending.Name
+                            ? pending.Name.slice(0, 50) + (pending.Name.length > 50 ? '…' : '')
+                            : '',
+                        parentId: node.id,
+                        id: pending.to || null
+                    },
+                    position: {
+                        x: (node.position?.x || 0) + 150,
+                        y: (node.position?.y || 0) + 60 * (idx + 1)
+                    },
+                    selectable: false,
+                    draggable: true,
+                    targetPosition: 'left',
+                    ...(parentGroupId ? { parentId: parentGroupId, extent: 'parent' } : {})
+                };
+                computedNodes.push(ghostNode);
 
-            newEdges.push({
-                id: `pendingedge-${node.id}-${ghostNodeId}`,
-                source: node.id,
-                target: ghostNodeId,
-                type: 'customEdge',
-                // Only set label if it has text, otherwise undefined/empty
-                data: { label: pending.Name && pending.Name.trim() ? (pending.position?.label || '') : '' },
+                newEdges.push({
+                    id: `pendingedge-${node.id}-${ghostNodeId}`,
+                    source: node.id,
+                    target: ghostNodeId,
+                    type: 'customEdge',
+                    // Only set label if it has text, otherwise undefined/empty
+                    data: { label: pending.Name && pending.Name.trim() ? (pending.position?.label || '') : '' },
+                });
             });
         });
-    });
+    }
 
     // Layout & set state
     await deployNodesEdges();

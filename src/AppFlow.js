@@ -44,7 +44,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     selectedContentLayer, setSelectedContentLayer, layerOptions,
   } = useFlowLogic();
 
-  const [groupByLayers, setGroupByLayers] = useState(false); // <-- Add this
+  const [groupByLayers, setGroupByLayers] = useState(false);
+  const [showGhostConnections, setShowGhostConnections] = useState(true);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -76,6 +77,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setLayoutPositions, layoutPositions, setRowData,
     stateScores, getHighestScoringContainer,
     groupByLayers,
+    showGhostConnections,
   });
 
   const onEdgesChange = useOnEdgeChange(setEdges);
@@ -133,6 +135,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
             onChange={e => setGroupByLayers(e.target.checked)}
           />
           <label htmlFor="groupByLayers" className="text-sm">Group By Layers</label>
+        </div>
+        {/* Toggle ghost connections */}
+        <div className="flex items-center gap-2 ml-4">
+          <input
+            type="checkbox"
+            id="toggleGhostConnections"
+            checked={showGhostConnections}
+            onChange={e => setShowGhostConnections(e.target.checked)}
+          />
+          <label htmlFor="toggleGhostConnections" className="text-sm">Show Ghost Connections</label>
         </div>
         {/* Keep Layout toggle */}
         <label className="inline-flex items-center space-x-2 text-sm ml-4">
