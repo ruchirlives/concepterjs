@@ -2,7 +2,17 @@ import { buildVisibleEdges } from './flowBuildVisibleEdges';
 import { getLayoutedElements } from './flowLayouter';
 
 export const fetchAndCreateEdges = async (computedNodes, params) => {
-    const { setNodes, setEdges, parentChildMap, setLayoutPositions, layoutPositions, keepLayout, groupByLayers, showGhostConnections = true } = params;
+    const {
+        setNodes,
+        setEdges,
+        parentChildMap,
+        setLayoutPositions,
+        layoutPositions,
+        keepLayout,
+        groupByLayers,
+        showGhostConnections = true,
+        showGroupNodes = true,
+    } = params;
 
     if (!parentChildMap) return;
 
@@ -38,8 +48,9 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         // When grouping by layers, we want to project relationships onto each layer
         // where both endpoints have a clone in the same parent group.
         const tmp = [];
+        const getCloneGroup = (clone) => clone.parentId || clone.id.split('__in__')[1] || undefined;
         parentChildMap.forEach(({ container_id, children }) => {
-            const parentClones = clonesByOriginal[container_id]?.filter(c => c.parentId);
+            const parentClones = clonesByOriginal[container_id]?.filter(c => showGroupNodes ? c.parentId : true);
             if (!parentClones || parentClones.length === 0) return;
             const cleanChildren = children.filter(c => c.label !== 'successor');
             if (cleanChildren.length === 0) return;
@@ -60,16 +71,17 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     } else {
         // Build a child map keyed by CLONE IDs inside each layer
         childMap = {};
+        const getCloneGroup = (clone) => clone.parentId || clone.id.split('__in__')[1] || undefined;
         filteredParentChildMap.forEach(({ container_id, children }) => {
             const parentClones = clonesByOriginal[container_id] || [];
             parentClones.forEach(parentClone => {
-                const parentGroup = parentClone.parentId;
+                const parentGroup = getCloneGroup(parentClone);
                 if (!parentGroup) return;
                 const key = parentClone.id;
                 if (!childMap[key]) childMap[key] = [];
                 children.forEach(c => {
                     const childClones = clonesByOriginal[c.id] || [];
-                    const inSameLayer = childClones.find(ch => ch.parentId === parentGroup);
+                    const inSameLayer = childClones.find(ch => getCloneGroup(ch) === parentGroup);
                     if (inSameLayer) {
                         childMap[key].push({ ...c, id: inSameLayer.id });
                     }

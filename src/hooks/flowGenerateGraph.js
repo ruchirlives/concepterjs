@@ -13,6 +13,7 @@ export async function generateNodesAndEdges(params) {
         layerOptions,
         keepLayout,         // <-- add this
         layoutPositions,    // <-- add this
+        showGroupNodes,
     } = params;
 
     if (!rowData || rowData.length === 0) return;
@@ -54,12 +55,14 @@ export async function generateNodesAndEdges(params) {
             const saved = layoutPositions?.[`layer-${layer}`] || {};
             return {
                 id: `layer-${layer}`,
-                type: 'group',
+                type: showGroupNodes ? 'group' : 'custom',
                 data: { Name: layer, children: [] },
-                style: {
-                    width: saved.width || GROUP_NODE_WIDTH,
-                    height: saved.height || 180,
-                },
+                style: showGroupNodes
+                    ? {
+                        width: saved.width || GROUP_NODE_WIDTH,
+                        height: saved.height || 180,
+                    }
+                    : {},
                 position: saved.x !== undefined && saved.y !== undefined
                     ? { x: saved.x, y: saved.y }
                     : { x: 100 * i, y: 0 }
@@ -76,7 +79,9 @@ export async function generateNodesAndEdges(params) {
             matchedLayers.forEach((layer, li) => {
                 const parentId = `layer-${layer}`;
                 const cloneId = `${item.id.toString()}__in__${parentId}`;
-                childToGroup[cloneId] = parentId;
+                if (showGroupNodes) {
+                    childToGroup[cloneId] = parentId;
+                }
                 childNodes.push({
                     id: cloneId,
                     position: getNodePosition(
@@ -97,8 +102,7 @@ export async function generateNodesAndEdges(params) {
                         PendingEdges: item.PendingEdges || [],
                     },
                     type: 'custom',
-                    parentId,
-                    extent: 'parent',
+                    ...(showGroupNodes ? { parentId, extent: 'parent' } : {}),
                 });
             });
         });
@@ -120,7 +124,7 @@ export async function generateNodesAndEdges(params) {
                         const childTags = (childItem?.Tags || '').toLowerCase().split(',').map(t => t.trim());
                         const childIsGroup = childTags.includes('group');
                         // Only assign parentId if not a group and not a 'successor' relationship
-                        if (!childIsGroup && child.label !== 'successor') {
+                        if (showGroupNodes && !childIsGroup && child.label !== 'successor') {
                             childToGroup[child.id?.toString()] = container_id?.toString();
                         }
                     });
@@ -164,9 +168,9 @@ export async function generateNodesAndEdges(params) {
                     normalizedScore: normalizeScore(stateScores?.[item.id]),
                     PendingEdges: item.PendingEdges || [],
                 },
-                type: isGroup ? 'group' : 'custom',
-                style: isGroup ? { width: GROUP_NODE_WIDTH, height: 180 } : {},
-                ...(parentId ? { parentId, extent: 'parent' } : {}),
+                type: isGroup && showGroupNodes ? 'group' : 'custom',
+                style: isGroup && showGroupNodes ? { width: GROUP_NODE_WIDTH, height: 180 } : {},
+                ...(showGroupNodes && parentId ? { parentId, extent: 'parent' } : {}),
             };
         });
     }

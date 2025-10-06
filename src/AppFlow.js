@@ -46,6 +46,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const [groupByLayers, setGroupByLayers] = useState(false);
   const [showGhostConnections, setShowGhostConnections] = useState(true);
+  const [showGroupNodes, setShowGroupNodes] = useState(true);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -78,6 +79,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     stateScores, getHighestScoringContainer,
     groupByLayers,
     showGhostConnections,
+    showGroupNodes,
   });
 
   const onEdgesChange = useOnEdgeChange(setEdges);
@@ -135,6 +137,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
             onChange={e => setGroupByLayers(e.target.checked)}
           />
           <label htmlFor="groupByLayers" className="text-sm">Group By Layers</label>
+        </div>
+        {/* Show group nodes as groups */}
+        <div className="flex items-center gap-2 ml-4">
+          <input
+            type="checkbox"
+            id="showGroupNodes"
+            checked={showGroupNodes}
+            onChange={e => setShowGroupNodes(e.target.checked)}
+          />
+          <label htmlFor="showGroupNodes" className="text-sm">Display Group Nodes</label>
         </div>
         {/* Toggle ghost connections */}
         <div className="flex items-center gap-2 ml-4">
