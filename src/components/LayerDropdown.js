@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLayerDropdown } from '../hooks/useLayerDropdown';
+import { useAppContext } from '../AppContext';
 
 const LayerDropdown = ({ 
   className = '',
@@ -7,6 +8,7 @@ const LayerDropdown = ({
   title = 'Filter layers',
   dropdownTitle = 'Hide Layers'
 }) => {
+  const { addLayer } = useAppContext();
   const {
     layerDropdownOpen,
     setLayerDropdownOpen,
@@ -16,6 +18,15 @@ const LayerDropdown = ({
     layerOptions,
     reorderLayers,
   } = useLayerDropdown();
+
+  const [newLayer, setNewLayer] = useState("");
+
+  const handleAdd = () => {
+    const name = newLayer.trim();
+    if (!name) return;
+    addLayer(name);
+    setNewLayer("");
+  };
 
   const moveLayer = (layer, direction) => {
     const idx = layerOptions.indexOf(layer);
@@ -48,6 +59,24 @@ const LayerDropdown = ({
           style={{ zIndex: 9999 }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Add layer inline controls */}
+          <div className="p-2 border-b border-gray-200 flex items-center gap-2">
+            <input
+              type="text"
+              value={newLayer}
+              onChange={(e) => setNewLayer(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+              placeholder="New layer name"
+              className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+            />
+            <button
+              onClick={handleAdd}
+              className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+              title="Add layer"
+            >
+              Add
+            </button>
+          </div>
           <div className="p-2 border-b border-gray-200 text-xs font-medium text-gray-600">
             {dropdownTitle}
           </div>
