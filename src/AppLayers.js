@@ -59,6 +59,7 @@ const AppLayers = () => {
 
   const handleAdd = () => {
     const name = newLayer.trim();
+    console.log("Adding layer:", name);
     if (name) {
       addLayer(name);
       setNewLayer("");
@@ -205,8 +206,8 @@ const AppLayers = () => {
         className={`transition-all duration-300 overflow-auto`}
         style={{ height: collapsed ? 0 : "auto" }}
       >
-        <div className="p-4 space-y-2">
-          <div className="flex space-x-2">
+        <div className="p-4 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="flex space-x-2" onMouseDown={(e) => e.stopPropagation()}>
             <input
               className="border rounded px-2 py-1 text-sm flex-grow"
               type="text"
@@ -216,11 +217,14 @@ const AppLayers = () => {
             />
             <button
               onClick={handleAdd}
+              onMouseDown={(e) => e.stopPropagation()}
               className="bg-blue-600 text-white text-sm px-2 py-1 rounded"
             >
               Add
             </button>
-            <ExcelButton handleExportExcel={handleExportExcel} />
+            <div onMouseDown={(e) => e.stopPropagation()}>
+              <ExcelButton handleExportExcel={handleExportExcel} />
+            </div>
           </div>
         </div>
         {/* Layer assignment table with checkboxes in headers and "No Layer" column */}
