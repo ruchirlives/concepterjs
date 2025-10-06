@@ -1,5 +1,4 @@
 import React, { useState, Suspense } from 'react';
-import { Toaster } from 'react-hot-toast';
 import { AppProvider } from './AppContext';
 import { TiptapProvider } from './TiptapContext';
 import ReactDOM from 'react-dom/client';
@@ -246,9 +245,6 @@ const App = () => {
         setIsOpen={setIsCreateFromContentModalOpen}
         onCreateContainers={handleCreateFromContent}
       />
-
-      {/* Global toaster so notifications work on every tab */}
-      <Toaster position="top-right" />
     </div>
   );
 };
@@ -266,3 +262,4 @@ root.render(
 );
 
 reportWebVitals();
+
