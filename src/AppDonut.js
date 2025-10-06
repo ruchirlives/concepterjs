@@ -102,7 +102,7 @@ const AppDonut = ({ targetId }) => {
   const [donutTree, setDonutTree] = useState([]);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
-  const [showLayerRings, setShowLayerRings] = useState(false);
+  const [showLayerRings, setShowLayerRings] = useState(true);
   // Drag/link state (mirrors AppKanban)
   const [dragItem, setDragItem] = useState(null); // { cid, ctrl }
   const dragItemRef = useRef(dragItem);
@@ -113,36 +113,27 @@ const AppDonut = ({ targetId }) => {
 
   useEffect(() => { dragItemRef.current = dragItem; }, [dragItem]);
 
-  // Compute related IDs (clicked + all ancestors + all descendants)
+  // Compute related IDs (clicked + direct children only)
   const relatedIds = useMemo(() => {
     if (!clickedSegmentId) return new Set();
-    const rel = new Set([clickedSegmentId?.toString()]);
-
-    // Descendants via childrenMap (parent -> [children])
-    const addDescendants = (id) => {
-      const children = childrenMap?.[id] || [];
-      for (const c of children) {
-        if (!rel.has(c)) {
-          rel.add(c);
-          addDescendants(c);
-        }
-      }
-    };
-
-    // Ancestors by scanning childrenMap for parents containing id
-    const addAncestors = (id) => {
-      if (!childrenMap) return;
-      Object.entries(childrenMap).forEach(([parent, kids]) => {
-        if (kids.includes(id) && !rel.has(parent)) {
-          rel.add(parent);
-          addAncestors(parent);
-        }
-      });
-    };
-
-    addDescendants(clickedSegmentId?.toString());
-    addAncestors(clickedSegmentId?.toString());
+    const rootId = clickedSegmentId?.toString();
+    const rel = new Set([rootId]);
+    const children = childrenMap?.[rootId] || [];
+    children.forEach(c => rel.add(c.toString()));
     return rel;
+  }, [clickedSegmentId, childrenMap]);
+
+  // Compute ancestor IDs (direct parent(s) only) for separate highlighting
+  const ancestorIds = useMemo(() => {
+    if (!clickedSegmentId || !childrenMap) return new Set();
+    const rootId = clickedSegmentId?.toString();
+    const directParents = new Set();
+    Object.entries(childrenMap).forEach(([parent, kids]) => {
+      if (kids.includes(rootId)) {
+        directParents.add(parent.toString());
+      }
+    });
+    return directParents;
   }, [clickedSegmentId, childrenMap]);
 
   // Context menu state
@@ -502,19 +493,21 @@ const AppDonut = ({ targetId }) => {
           .attr("stroke", d => {
             const id = d.data.id?.toString();
             if (id === clickedSegmentId?.toString()) return "#cc0000";
-            if (relatedIds.has(id)) return "#f59e0b"; // amber for related
+            if (relatedIds.has(id)) return "#f59e0b"; // amber for descendants
+            if (ancestorIds.has(id)) return "#3b82f6"; // blue for ancestors
             return "#fff";
           })
           .attr("stroke-width", d => {
             const id = d.data.id?.toString();
             if (id === clickedSegmentId?.toString()) return 3;
             if (relatedIds.has(id)) return 2;
+            if (ancestorIds.has(id)) return 2;
             return 1;
           })
           .style("opacity", d => {
             if (!clickedSegmentId) return 1;
             const id = d.data.id?.toString();
-            return relatedIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
+            return relatedIds.has(id) || ancestorIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
           })
           .style("cursor", "pointer")
           .on("click", handleSegmentClick)
@@ -679,19 +672,21 @@ const AppDonut = ({ targetId }) => {
       .attr("stroke", d => {
         const id = d.data.id?.toString();
         if (id === clickedSegmentId?.toString()) return "#cc0000";
-        if (relatedIds.has(id)) return "#f59e0b";
+        if (relatedIds.has(id)) return "#f59e0b"; // descendants
+        if (ancestorIds.has(id)) return "#3b82f6"; // ancestors
         return "#fff";
       })
       .attr("stroke-width", d => {
         const id = d.data.id?.toString();
         if (id === clickedSegmentId?.toString()) return 3;
         if (relatedIds.has(id)) return 2;
+        if (ancestorIds.has(id)) return 2;
         return 1;
       })
       .style("opacity", d => {
         if (!clickedSegmentId) return 1;
         const id = d.data.id?.toString();
-        return relatedIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
+        return relatedIds.has(id) || ancestorIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
       })
       .style("cursor", "pointer")
       .on("click", handleSegmentClick)
@@ -773,7 +768,8 @@ const AppDonut = ({ targetId }) => {
     viewportSize,
     stripCommonWords,
     relatedIds,
-    handleSegmentMouseDown
+    handleSegmentMouseDown,
+    ancestorIds
   ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
@@ -872,6 +868,26 @@ const AppDonut = ({ targetId }) => {
           >
             Show All Lineage
           </button>
+        )}
+        {clickedSegmentId && (
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "8px", fontSize: "12px", color: "#374151" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ display: "inline-block", width: 12, height: 12, background: "#ff4444", border: "2px solid #cc0000", borderRadius: 2 }} />
+              <span>Clicked</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ display: "inline-block", width: 12, height: 12, background: "transparent", border: "2px solid #f59e0b", borderRadius: 2 }} />
+              <span>Descendant</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ display: "inline-block", width: 12, height: 12, background: "transparent", border: "2px solid #3b82f6", borderRadius: 2 }} />
+              <span>Parent</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ display: "inline-block", width: 12, height: 12, background: "#9ca3af", opacity: 0.35, borderRadius: 2 }} />
+              <span>Other</span>
+            </div>
+          </div>
         )}
         {showLayerRings && layersWithItems.length === 0 && (
           <div style={{ marginBottom: "10px", color: "#666" }}>
