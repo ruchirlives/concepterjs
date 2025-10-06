@@ -7,7 +7,6 @@ import { CustomStateNode } from "components/CustomStateNode";
 import { CustomStateEdge } from "components/CustomStateEdge";
 import { useStateComparison } from "./hooks/useStateComparison";
 import DiffPopup from "./components/DiffPopup";
-import { toast } from "react-hot-toast"; // Assuming you're using react-hot-toast
 
 const App = () => {
   const { rowData, setDiffDict } = useAppContext();
@@ -98,7 +97,7 @@ const App = () => {
         sourceNode?.data.label || edge.source,
         targetNode?.data.label || edge.target,
         qualitativeText,
-        qualLabelText, // <-- Add value to row
+        qualLabelText,
         edgeData.totalWeight || "0"
       ]);
     });
@@ -106,49 +105,14 @@ const App = () => {
     // Convert to TSV format
     const tsv = exportData.map(row => row.join("\t")).join("\n");
 
-    // Show in toast with copy option
-    toast((t) => (
-      <div className="max-w-[400px]">
-        <div className="font-semibold mb-1">State Diagram Export</div>
-        <div className="text-xs mb-2 text-gray-600">
-          {nodes.length} states, {edges.length} comparisons with detailed changes
-        </div>
-        <div className="text-xs mb-2 overflow-y-auto max-h-40 whitespace-pre-wrap font-mono bg-gray-50 p-2 rounded">
-          {tsv.substring(0, 300)}...
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-            onClick={() => {
-              navigator.clipboard.writeText(tsv);
-              toast.success("Copied to clipboard!");
-              toast.dismiss(t.id);
-            }}
-          >
-            Copy to Clipboard
-          </button>
-          <button
-            className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
-            onClick={() => {
-              const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `state-diagram-${selectedTargetState}-${new Date().toISOString().split('T')[0]}.tsv`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-              toast.success("File downloaded!");
-              toast.dismiss(t.id);
-            }}
-          >
-            Download File
-          </button>
-        </div>
-      </div>
-    ), { duration: 10000 });
-  }, [nodes, edges, selectedTargetState]);
+    // Copy to clipboard and alert, matching Kanban behavior
+    if (navigator && navigator.clipboard) {
+      navigator.clipboard.writeText(tsv);
+      alert("State diagram copied to clipboard as TSV!");
+    } else {
+      alert(tsv);
+    }
+  }, [nodes, edges]);
 
   return (
     <div className="bg-white rounded shadow">
