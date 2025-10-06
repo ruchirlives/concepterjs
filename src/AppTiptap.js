@@ -72,6 +72,7 @@ const AppTiptap = () => {
     }, [showGhostText, clearGhostText]);
 
     const handleExport = useCallback(() => {
+        console.log("Exporting document content");
         if (!editor) return;
         const html = editor.getHTML();
         const wrappedHtml = `<html>${html}</html>`;
