@@ -14,7 +14,19 @@ const LayerDropdown = ({
     toggleLayerVisibility,
     showAllLayers,
     layerOptions,
+    reorderLayers,
   } = useLayerDropdown();
+
+  const moveLayer = (layer, direction) => {
+    const idx = layerOptions.indexOf(layer);
+    if (idx === -1) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= layerOptions.length) return;
+    const next = [...layerOptions];
+    const [removed] = next.splice(idx, 1);
+    next.splice(newIdx, 0, removed);
+    reorderLayers(next);
+  };
 
   return (
     <div className={`relative layer-dropdown ${className}`}>
@@ -40,34 +52,45 @@ const LayerDropdown = ({
             {dropdownTitle}
           </div>
           <div className="max-h-60 overflow-y-auto">
-            {layerOptions.length === 0 ? (
-              <div className="p-3 text-xs text-gray-500">No layers available</div>
-            ) : (
-              layerOptions.map((layer) => (
+              {layerOptions.length === 0 ? (
+                <div className="p-3 text-xs text-gray-500">No layers available</div>
+              ) : (
+              layerOptions.map((layer, i) => (
                 <div
                   key={layer}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer text-sm relative"
+                  className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 text-sm relative"
                   style={{ zIndex: 9999 }}
-                  onMouseDown={(e) => {
-                    console.log('MouseDown fired for layer:', layer);
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleLayerVisibility(layer);
-                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <input
-                    type="checkbox"
-                    checked={!hiddenLayers.has(layer)}
-                    readOnly
-                    className="rounded border-gray-300 pointer-events-none"
-                  />
-                  <span className={hiddenLayers.has(layer) ? 'line-through text-red-500' : 'text-gray-900'}>
-                    {layer}
-                  </span>
+                  <label className="flex items-center gap-2 cursor-pointer" onMouseDown={(e)=>e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={!hiddenLayers.has(layer)}
+                      onChange={() => toggleLayerVisibility(layer)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className={hiddenLayers.has(layer) ? 'line-through text-red-500' : 'text-gray-900'}>
+                      {layer}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="px-1 py-0.5 text-xs border rounded disabled:opacity-40"
+                      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); moveLayer(layer, 'up'); }}
+                      disabled={i === 0}
+                      title="Move up"
+                    >↑</button>
+                    <button
+                      className="px-1 py-0.5 text-xs border rounded disabled:opacity-40"
+                      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); moveLayer(layer, 'down'); }}
+                      disabled={i === layerOptions.length - 1}
+                      title="Move down"
+                    >↓</button>
+                  </div>
                 </div>
               ))
-            )}
-          </div>
+              )}
+            </div>
           {layerOptions.length > 0 && hiddenLayers.size < layerOptions.length && (
             <div className="p-2 border-t border-gray-200">
               <button

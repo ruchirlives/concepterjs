@@ -154,6 +154,7 @@ export const AppProvider = ({ children }) => {
     rowData,
     setRowData,
     layerOptions,
+    setLayerOptions,
     addLayer,
     removeLayer,
     activeLayers,

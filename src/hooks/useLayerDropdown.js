@@ -7,7 +7,8 @@ export const useLayerDropdown = () => {
     setLayerDropdownOpen,
     hiddenLayers,
     setHiddenLayers,
-    layerOptions
+    layerOptions,
+    setLayerOptions
   } = useAppContext();
 
   // Toggle layer visibility
@@ -32,6 +33,11 @@ export const useLayerDropdown = () => {
     setHiddenLayers(new Set());
   }, [setHiddenLayers]);
 
+  // Reorder layers by providing a new array order
+  const reorderLayers = useCallback((newOrder) => {
+    setLayerOptions(Array.isArray(newOrder) ? [...newOrder] : []);
+  }, [setLayerOptions]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -54,5 +60,6 @@ export const useLayerDropdown = () => {
     toggleLayerVisibility,
     showAllLayers,
     layerOptions,
+    reorderLayers,
   };
 };
