@@ -215,8 +215,10 @@ const AppDonut = ({ targetId }) => {
             const tags = sanitizeTags(row.Tags);
             if (tags.length === 0) return false;
             const inLayer = tags.includes(layer);
-            const notHidden = !tags.some(t => hiddenLayers.has(t));
-            return inLayer && notHidden;
+            const layerVisible = !hiddenLayers.has(layer);
+            // Show items that belong to this ticked layer even if they also
+            // have other tags that are currently hidden.
+            return inLayer && layerVisible;
           })
           .map(row => ({
             id: row.id?.toString(),
