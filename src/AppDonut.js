@@ -91,6 +91,38 @@ const AppDonut = ({ targetId }) => {
   const [isInternalClick, setIsInternalClick] = useState(false);
   const [showLayerRings, setShowLayerRings] = useState(false);
 
+  // Compute related IDs (clicked + all ancestors + all descendants)
+  const relatedIds = useMemo(() => {
+    if (!clickedSegmentId) return new Set();
+    const rel = new Set([clickedSegmentId?.toString()]);
+
+    // Descendants via childrenMap (parent -> [children])
+    const addDescendants = (id) => {
+      const children = childrenMap?.[id] || [];
+      for (const c of children) {
+        if (!rel.has(c)) {
+          rel.add(c);
+          addDescendants(c);
+        }
+      }
+    };
+
+    // Ancestors by scanning childrenMap for parents containing id
+    const addAncestors = (id) => {
+      if (!childrenMap) return;
+      Object.entries(childrenMap).forEach(([parent, kids]) => {
+        if (kids.includes(id) && !rel.has(parent)) {
+          rel.add(parent);
+          addAncestors(parent);
+        }
+      });
+    };
+
+    addDescendants(clickedSegmentId?.toString());
+    addAncestors(clickedSegmentId?.toString());
+    return rel;
+  }, [clickedSegmentId, childrenMap]);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
 
@@ -215,8 +247,10 @@ const AppDonut = ({ targetId }) => {
             const tags = sanitizeTags(row.Tags);
             if (tags.length === 0) return false;
             const inLayer = tags.includes(layer);
-            const notHidden = !tags.some(t => hiddenLayers.has(t));
-            return inLayer && notHidden;
+            const layerVisible = !hiddenLayers.has(layer);
+            // Show items that belong to this ticked layer even if they also
+            // have other tags that are currently hidden.
+            return inLayer && layerVisible;
           })
           .map(row => ({
             id: row.id?.toString(),
@@ -358,13 +392,27 @@ const AppDonut = ({ targetId }) => {
           .append("path")
           .attr("d", arcGenerator)
           .attr("fill", d => {
-            if (d.data.id === clickedSegmentId) {
-              return "#ff4444";
-            }
-            return colorByTag(layerEntry.layer) || "#ccc";
+            const base = colorByTag(layerEntry.layer) || "#ccc";
+            if (d.data.id?.toString() === clickedSegmentId?.toString()) return "#ff4444";
+            return base;
           })
-          .attr("stroke", d => d.data.id === clickedSegmentId ? "#cc0000" : "#fff")
-          .attr("stroke-width", d => d.data.id === clickedSegmentId ? 3 : 1)
+          .attr("stroke", d => {
+            const id = d.data.id?.toString();
+            if (id === clickedSegmentId?.toString()) return "#cc0000";
+            if (relatedIds.has(id)) return "#f59e0b"; // amber for related
+            return "#fff";
+          })
+          .attr("stroke-width", d => {
+            const id = d.data.id?.toString();
+            if (id === clickedSegmentId?.toString()) return 3;
+            if (relatedIds.has(id)) return 2;
+            return 1;
+          })
+          .style("opacity", d => {
+            if (!clickedSegmentId) return 1;
+            const id = d.data.id?.toString();
+            return relatedIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
+          })
           .style("cursor", "pointer")
           .on("click", handleSegmentClick)
           .on("contextmenu", handleSegmentContextMenu)
@@ -518,14 +566,28 @@ const AppDonut = ({ targetId }) => {
       .enter().append("path")
       .attr("d", arc)
       .attr("fill", d => {
-        if (d.data.id === clickedSegmentId) {
-          return "#ff4444";
-        }
-        const row = rowData.find(r => r.id?.toString() === d.data.id?.toString());
+        const id = d.data.id?.toString();
+        if (id === clickedSegmentId?.toString()) return "#ff4444";
+        const row = rowData.find(r => r.id?.toString() === id);
         return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
       })
-      .attr("stroke", d => d.data.id === clickedSegmentId ? "#cc0000" : "#fff")
-      .attr("stroke-width", d => d.data.id === clickedSegmentId ? 3 : 1)
+      .attr("stroke", d => {
+        const id = d.data.id?.toString();
+        if (id === clickedSegmentId?.toString()) return "#cc0000";
+        if (relatedIds.has(id)) return "#f59e0b";
+        return "#fff";
+      })
+      .attr("stroke-width", d => {
+        const id = d.data.id?.toString();
+        if (id === clickedSegmentId?.toString()) return 3;
+        if (relatedIds.has(id)) return 2;
+        return 1;
+      })
+      .style("opacity", d => {
+        if (!clickedSegmentId) return 1;
+        const id = d.data.id?.toString();
+        return relatedIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
+      })
       .style("cursor", "pointer")
       .on("click", handleSegmentClick)
       .on("contextmenu", handleSegmentContextMenu) // <-- Add this line
@@ -602,7 +664,8 @@ const AppDonut = ({ targetId }) => {
     showLayerRings,
     layersWithItems,
     viewportSize,
-    stripCommonWords
+    stripCommonWords,
+    relatedIds
   ]); // Added clickedSegmentId to dependencies
 
   // Reset clicked segment when changing root
