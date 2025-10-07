@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, useMenuHandlers } from "./useContextMenu";
-import { handleWriteBack } from "./effectsShared";
+import { writeBackData } from "../api";
 import { useAppContext } from "../AppContext";
 
 /**
@@ -22,6 +22,9 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const pendingPosRef = useRef(null);
     const lastAppliedRef = useRef(null);
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
+    // Debounced persistence of node updates (move/scale)
+    const persistQueueRef = useRef(new Map()); // id -> partial row
+    const persistTimerRef = useRef(null);
 
     // Keep refs in sync
     useEffect(() => {
@@ -572,7 +575,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             }
         };
 
-        const onUp = async () => {
+        const onUp = () => {
             // Capture state, then immediately clear to stop dragging
             const selectedId = selectedRef.current;
             const mode = dragModeRef.current;
@@ -587,6 +590,8 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
             // Save positions or radius back to original incomingNodes array
             let updated = false;
+            let queuedPartial = null;
+            // Data persistence is scheduled off the event handler thread
             if (selectedId != null) {
                 const n = nodesRef.current.find(n => n.id === selectedId);
                 if (n) {
@@ -597,20 +602,34 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                         }
                         setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, Position: { x: n.x, y: n.y } } : r));
                         updated = true;
+                        queuedPartial = { id: n.id, Position: { x: n.x, y: n.y } };
                     } else if (mode === 'scale') {
                         if (row) {
                             row.MapRadius = n.radius;
                         }
                         setRowData((prev) => prev.map(r => r.id === n.id ? { ...r, MapRadius: n.radius } : r));
                         updated = true;
+                        queuedPartial = { id: n.id, MapRadius: n.radius };
                     }
                 }
             }
-            if (updated) {
-                // Persist changes to backend
-                await handleWriteBack(
-                    typeof rowData === 'function' ? rowData() : rowData
-                );
+            if (updated && queuedPartial) {
+                // Queue minimal delta and debounce a small write-back batch
+                const id = queuedPartial.id;
+                persistQueueRef.current.set(id, { ...persistQueueRef.current.get(id), ...queuedPartial });
+                if (!persistTimerRef.current) {
+                    persistTimerRef.current = setTimeout(async () => {
+                        const payload = Array.from(persistQueueRef.current.values());
+                        persistQueueRef.current.clear();
+                        persistTimerRef.current = null;
+                        try {
+                            // Send only changed rows to backend
+                            await writeBackData(payload);
+                        } catch (e) {
+                            console.error('Debounced persist failed', e);
+                        }
+                    }, 300);
+                }
             }
         };
 
@@ -643,6 +662,10 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             infiniteCanvas.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup", onUp);
             infiniteCanvas.removeEventListener("contextmenu", onContextMenu);
+            if (persistTimerRef.current) {
+                clearTimeout(persistTimerRef.current);
+                persistTimerRef.current = null;
+            }
         };
     }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
 

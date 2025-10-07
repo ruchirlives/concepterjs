@@ -53,7 +53,8 @@
 .react-flow__node-group {
   min-width: 0 !important;
   min-height: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  /* Avoid forcing nodes to 100% size to prevent costly relayouts */
+  /* width: 100% !important; */
+  /* height: 100% !important; */
   flex: none !important;
 }

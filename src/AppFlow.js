@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
   addEdge, ControlButton
@@ -55,20 +55,45 @@ const App = ({ keepLayout, setKeepLayout }) => {
     ),
   }), [setEdges]);
 
+  // Snapshot positions when Keep Layout toggles on; avoid running on every drag frame
   useEffect(() => {
     if (!keepLayout) return;
-    const storedPositions = {};
-    nodes.forEach(node => {
-      storedPositions[node.id] = {
+    if (!nodes || nodes.length === 0) return;
+    const takeSnapshot = () => {
+      const storedPositions = {};
+      nodes.forEach(node => {
+        storedPositions[node.id] = {
+          x: node.position.x,
+          y: node.position.y,
+          ...(node.style?.width && node.style?.height
+            ? { width: node.style.width, height: node.style.height }
+            : {}),
+        };
+      });
+      setLayoutPositions(storedPositions);
+    };
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(takeSnapshot, { timeout: 1000 });
+      return () => window.cancelIdleCallback && window.cancelIdleCallback(id);
+    }
+    const t = setTimeout(takeSnapshot, 0);
+    return () => clearTimeout(t);
+  }, [keepLayout, setLayoutPositions, nodes]);
+
+  // Update persisted layout for the specific node when a drag stops
+  const onNodeDragStop = useCallback((evt, node) => {
+    if (!keepLayout || !node) return;
+    setLayoutPositions(prev => ({
+      ...(prev || {}),
+      [node.id]: {
         x: node.position.x,
         y: node.position.y,
         ...(node.style?.width && node.style?.height
           ? { width: node.style.width, height: node.style.height }
           : {}),
-      };
-    });
-    setLayoutPositions(storedPositions);
-  }, [keepLayout, nodes, setLayoutPositions]);
+      },
+    }));
+  }, [keepLayout, setLayoutPositions]);
 
   // Removed activeGroup broadcasting
 
@@ -203,6 +228,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
+              onNodeDragStop={onNodeDragStop}
               onEdgesChange={onEdgesChange}
               onEdgeDoubleClick={onEdgeDoubleClick}
               onConnect={onEdgeConnect}

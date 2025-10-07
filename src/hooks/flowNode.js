@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNodeId, Handle } from '@xyflow/react';
 import { useFlowMenu } from '../components/FlowMenuContext';
 
 const FlowNode = ({ data, style, selected }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const nodeId = useNodeId();
   const { handleNodeMenu } = useFlowMenu();
 
@@ -72,9 +71,7 @@ const FlowNode = ({ data, style, selected }) => {
     <div
       onDoubleClick={handleDoubleClick}
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg shadow-md border transition-colors 
+      className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg border 
         ${selected ? 'border-red-600 border-4' : 'border-gray-300'}
         ${data.highlighted ? 'bg-gray-400' : getBgColorClass()}`}
     >
@@ -122,15 +119,9 @@ const FlowNode = ({ data, style, selected }) => {
         )}
       </div>
 
-      {isHovered && data.Description && (
-        <div
-          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 bg-black bg-opacity-75 text-white text-sm px-2 py-1 rounded whitespace-no-wrap pointer-events-none"
-        >
-          {data.Description}
-        </div>
-      )}
+      {/* Description tooltip removed during drag for performance */}
     </div>
   );
 };
 
-export default FlowNode;
+export default React.memo(FlowNode);
