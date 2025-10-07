@@ -6,6 +6,22 @@ import API_URLS from "./globalconfig";
 import { useAppContext } from "AppContext";
 // ==================== UTILITIES ====================
 
+// Cache the initial fetch promise so React StrictMode doesn't trigger duplicate requests
+const initialFetchPromises = new WeakMap();
+
+const getInitialFetchPromise = (fetchFn) => {
+    if (!initialFetchPromises.has(fetchFn)) {
+        console.log("Fetching initial data...");
+        const promise = fetchFn().catch((error) => {
+            // Allow retries if the initial load fails
+            initialFetchPromises.delete(fetchFn);
+            throw error;
+        });
+        initialFetchPromises.set(fetchFn, promise);
+    }
+    return initialFetchPromises.get(fetchFn);
+};
+
 export const flashAndScrollToRow = (rowId, gridApiRef) => {
     const rowNode = getRowNodeSafely(gridApiRef, rowId);
     if (!rowNode) return;
@@ -45,18 +61,26 @@ export const useClearButtonEffect = (setRowData, setCurrentContainer) => {
 // Effect to fetch initial data
 export const useFetchData = (setRowData, fetchContainers) => {
     useEffect(() => {
-        console.log("Fetching initial data..."); // Debugging line
-        const fetchData = async () => {
-            const data = await fetchContainers();
-            if (!data || data.length === 0) {
-                console.warn("No data fetched from the server.");
-                return;
-            }
-            formatDateFields(data);
-            setRowData(data);
-        };
+        let isMounted = true;
 
-        fetchData();
+        getInitialFetchPromise(fetchContainers)
+            .then((data) => {
+                if (!isMounted) return;
+                if (!data || data.length === 0) {
+                    console.warn("No data fetched from the server.");
+                    return;
+                }
+                formatDateFields(data);
+                setRowData(data);
+            })
+            .catch((error) => {
+                if (!isMounted) return;
+                console.error("Error fetching containers:", error);
+            });
+
+        return () => {
+            isMounted = false;
+        };
     }, [setRowData, fetchContainers]);
 };
 
