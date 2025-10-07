@@ -163,7 +163,7 @@ export const useReloadEffect = () => {
         const handleLoadData = () => {
             console.log("Load data button clicked");
             loadContainers(lastLoadedFile).then((data) => {
-                console.log("Loaded data:", data);
+                // console.log("Loaded data:", data);
             });
             clearLayers();
             // Broadcast a message to requestRefreshChannel
