@@ -46,6 +46,7 @@ const HANDLERS = {
     embedPositionsAction,
     findSimilarPositionsAction,
     searchPositionZAction,
+    inheritPositionsAction,
 };
 
 export const menuItems = [
@@ -84,6 +85,7 @@ export const menuItems = [
     { handler: "embedPositionsAction", label: "Embed Positions", group: "Positions" },
     { handler: "findSimilarPositionsAction", label: "Find Similar Positions", group: "Positions" },
     { handler: "searchPositionZAction", label: "Search Position Z", group: "Positions" },
+    { handler: "inheritPositionsAction", label: "Inherit Positions (from Children)", group: "Positions" },
 
     // Groups
     { handler: "removeFromSelectedParent", label: "Remove from Selected Parent", group: "Groups" },
@@ -617,6 +619,31 @@ async function searchPositionZAction({ nodeId, selectedNodes }) {
         );
     } else {
         toast.error("No results found.");
+    }
+}
+
+async function inheritPositionsAction({ nodeId, selectedIds }) {
+    // prefer explicit selection; if none, use the clicked nodeId
+    let targets = selectedIds && selectedIds.length ? selectedIds : (nodeId ? [nodeId] : []);
+    if (!targets.length) {
+        toast.error("Select at least one group container.");
+        return;
+    }
+    let successes = 0;
+    for (const id of targets) {
+        const res = await api.inheritPositions(id);
+        if (res && !res.error) {
+            successes += 1;
+        } else {
+            const msg = res?.message || "Failed to inherit positions.";
+            toast.error(`${id}: ${msg}`);
+        }
+    }
+    if (successes) {
+        toast.success(`Inherited positions for ${successes} container(s).`);
+        // slight delay then refresh so UI can catch up
+        await new Promise(r => setTimeout(r, 200));
+        requestRefreshChannel();
     }
 }
 /* eslint-enable no-unused-vars */

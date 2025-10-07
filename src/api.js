@@ -843,6 +843,26 @@ export const findSimilarPositions = async (positionText) => {
 };
 
 /**
+ * Inherit positions from child containers into a group container.
+ * Backend: expects { container_id }
+ * @param {string} containerId
+ * @returns {Promise<Object|null>} API response with message
+ */
+export const inheritPositions = async (containerId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/inherit_positions`, {
+            container_id: containerId,
+        });
+        return response.data;
+    } catch (error) {
+        // Surface 4xx/5xx messages when available
+        const msg = error?.response?.data?.message || "Error inheriting positions";
+        console.error(msg, error);
+        return { message: msg, error: true };
+    }
+};
+
+/**
  * Fetch a single node by its ID from the backend.
  * @param {string} id - The node ID to load.
  * @returns {Promise<Object|null>} The node object, or null if not found.
