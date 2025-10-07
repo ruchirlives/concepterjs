@@ -47,6 +47,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [groupByLayers, setGroupByLayers] = useState(false);
   const [showGhostConnections, setShowGhostConnections] = useState(true);
   const [showGroupNodes, setShowGroupNodes] = useState(true);
+  const [dragging, setDragging] = useState(false);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -82,6 +83,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Update persisted layout for the specific node when a drag stops
   const onNodeDragStop = useCallback((evt, node) => {
+    setDragging(false);
     if (!keepLayout || !node) return;
     setLayoutPositions(prev => ({
       ...(prev || {}),
@@ -95,6 +97,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }));
   }, [keepLayout, setLayoutPositions]);
 
+  const onNodeDragStart = useCallback(() => {
+    setDragging(true);
+  }, []);
+
   // Removed activeGroup broadcasting
 
   // Flow effects hooks
@@ -105,6 +111,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
     groupByLayers,
     showGhostConnections,
     showGroupNodes,
+    // Pass explicit hint for early filtering
+    selectedContentLayer,
+    // Disable auto-fit to avoid forced reflows during updates
+    autoFit: false,
   });
 
   const onEdgesChange = useOnEdgeChange(setEdges);
@@ -228,6 +238,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
+              onNodeDragStart={onNodeDragStart}
               onNodeDragStop={onNodeDragStop}
               onEdgesChange={onEdgesChange}
               onEdgeDoubleClick={onEdgeDoubleClick}
@@ -247,7 +258,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
                   <GearIcon />
                 </ControlButton>
               </Controls>
-              <MiniMap />
+              {!dragging && <MiniMap />}
               <Background
                 variant="dots"
                 gap={12}

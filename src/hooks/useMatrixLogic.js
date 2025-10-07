@@ -44,12 +44,15 @@ export const useMatrixLogic = () => {
   }, [rowData]);
   // 1. Filter data by layers (including global hidden layers)
   const { fromLayerFilteredData, toLayerFilteredData } = useMemo(() => {
+    // Positive screen: only include rows that have at least one ticked (visible) layer
+    const visibleLayers = new Set((layerOptions || []).filter(l => !hiddenLayers.has(l)));
+
     const filterByLayer = (data, layer) => {
       return data.filter((container) => {
-        const tags = (container.Tags || '').split(',').map((t) => t.trim());
+        const tags = (container.Tags || '').split(',').map((t) => t.trim()).filter(Boolean);
         const inSelectedLayer = layer ? tags.includes(layer) : true;
-        const notHidden = !tags.some((t) => hiddenLayers.has(t));
-        return inSelectedLayer && notHidden;
+        const inVisible = visibleLayers.size === 0 ? false : tags.some((t) => visibleLayers.has(t));
+        return inSelectedLayer && inVisible;
       });
     };
 
@@ -57,7 +60,7 @@ export const useMatrixLogic = () => {
       fromLayerFilteredData: filterByLayer(rowData, selectedFromLayer),
       toLayerFilteredData: filterByLayer(rowData, selectedToLayer),
     };
-  }, [rowData, selectedFromLayer, selectedToLayer, hiddenLayers]);
+  }, [rowData, selectedFromLayer, selectedToLayer, hiddenLayers, layerOptions]);
 
   // 2. DERIVE relationships, forwardExists, childrenMap FIRST!
   const { relationships, forwardExists, childrenMap } = useMemo(() => {

@@ -347,7 +347,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
-    const { rowData, stateScores, getHighestScoringContainer, groupByLayers, showGhostConnections, showGroupNodes } = params;
+    const { rowData, stateScores, getHighestScoringContainer, groupByLayers, showGhostConnections, showGroupNodes, selectedContentLayer } = params;
     const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap, layerOptions } = useAppContext();
     const rowDataRef = useRef(rowData);
 
@@ -362,25 +362,41 @@ export const useCreateNodesAndEdges = (params) => {
             return;
         }
 
-        const filtered = rowData.filter(r => rowInLayers(r, activeLayers));
-        (async () => {
-            await generateNodesAndEdges({
-                ...params,
-                rowData: filtered,
-                stateScores,
-                getHighestScoringContainer,
-                parentChildMap,
-                setParentChildMap,
-                groupByLayers, // <-- pass this
-                activeLayers,  // <-- pass this
-                layerOptions,
-                showGhostConnections,
-                showGroupNodes
-            });
-        })();
+        // Early filter by content layer if provided (defensive; rowData may already be filtered upstream)
+        const preFiltered = Array.isArray(rowData) && selectedContentLayer
+            ? rowData.filter(container => {
+                const tags = (container.Tags || '')
+                    .split(',')
+                    .map(t => t.trim());
+                return tags.includes(selectedContentLayer);
+            })
+            : rowData;
+
+        // Then apply activeLayers visibility filter
+        const filtered = preFiltered.filter(r => rowInLayers(r, activeLayers));
+        // Debounce graph regeneration to avoid thrashing on rapid changes
+        const t = setTimeout(() => {
+            (async () => {
+                await generateNodesAndEdges({
+                    ...params,
+                    rowData: filtered,
+                    stateScores,
+                    getHighestScoringContainer,
+                    parentChildMap,
+                    setParentChildMap,
+                    groupByLayers,
+                    activeLayers,
+                    layerOptions,
+                    showGhostConnections,
+                    showGroupNodes,
+                });
+            })();
+        }, 120);
+        return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         rowData,
+        selectedContentLayer,
         activeLayers,
         stateScores,
         parentChildMap,

@@ -14,6 +14,7 @@ export async function generateNodesAndEdges(params) {
         keepLayout,         // <-- add this
         layoutPositions,    // <-- add this
         showGroupNodes,
+        autoFit = true,
     } = params;
 
     if (!rowData || rowData.length === 0) return;
@@ -185,7 +186,9 @@ export async function generateNodesAndEdges(params) {
     // No more activeGroup logic needed!
     // console.log(computedNodes);
     await fetchAndCreateEdges(computedNodes, params);
-    fitViewToFlow();
+    if (autoFit) {
+        fitViewToFlow();
+    }
 }
 
 

@@ -13,7 +13,7 @@ export const useFlowLogic = () => {
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
-  // Filter rowData based on hidden layers for Flow only
+  // Filter rowData based on ticked layers (positive screen) for Flow only
   const flowFilteredRowData = useMemo(() => {
     // console.log('Original rowData count:', rowData.length);
     // console.log('Hidden layers:', [...hiddenLayers]);
@@ -30,29 +30,20 @@ export const useFlowLogic = () => {
         })
       : rowData;
 
-    // 2) Negative filter by hidden layers (if any hidden)
-    if (hiddenLayers.size === 0) return positivelyFiltered;
+    // 2) Positive filter by ticked layers (visibleLayers)
+    // visibleLayers = all layerOptions that are NOT in hiddenLayers
+    const visibleLayers = new Set(
+      (layerOptions || []).filter(l => !hiddenLayers.has(l))
+    );
 
     const filtered = positivelyFiltered.filter(container => {
-      // Keep containers without Tags (no layer assigned)
-      if (!container.Tags || container.Tags.trim() === '') return true;
-
-      const containerTags = container.Tags
+      const containerTags = (container.Tags || '')
         .split(",")
         .map(tag => tag.trim())
         .filter(Boolean);
 
-      // Keep containers with empty tags after filtering
-      if (containerTags.length === 0) return true;
-
-      // Only filter out containers if their tags are:
-      // 1. In the layerOptions (recognized layers)
-      // 2. AND in hiddenLayers (unticked)
-      const shouldHide = containerTags.some(tag =>
-        layerOptions.includes(tag) && hiddenLayers.has(tag)
-      );
-
-      return !shouldHide;
+      // Include only if the container has at least one tag in visibleLayers
+      return visibleLayers.size > 0 && containerTags.some(tag => visibleLayers.has(tag));
     });
 
     console.log('Filtered rowData count:', filtered.length);
