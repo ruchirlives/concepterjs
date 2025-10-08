@@ -244,6 +244,72 @@ export const getPosition = async (sourceId, targetId) => {
     }
 };
 
+// Relationship APIs
+export const getRelationships = async (sourceId) => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/get_relationships/${sourceId}`);
+        return response.data || [];
+    } catch (error) {
+        if (error.response?.status === 404) {
+            console.warn(`Container ${sourceId} not found when fetching relationships`);
+            return [];
+        }
+        console.error("Error fetching relationships:", error);
+        return [];
+    }
+};
+
+export const addRelationship = async (containerId, sourceId, targetId, position = {}) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/add_relationship`, {
+            container_id: containerId,
+            source_id: sourceId,
+            target_id: targetId,
+            position: position,
+        });
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 404) {
+            console.warn("Container not found while adding relationship");
+        }
+        console.error("Error adding relationship:", error);
+        return { error: true, message: error?.response?.data?.message || "Failed to add relationship" };
+    }
+};
+
+export const removeRelationship = async (containerId, sourceId, targetId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/remove_relationship`, {
+            container_id: containerId,
+            source_id: sourceId,
+            target_id: targetId,
+        });
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 404) {
+            console.warn("Container not found while removing relationship");
+        }
+        console.error("Error removing relationship:", error);
+        return { error: true, message: error?.response?.data?.message || "Failed to remove relationship" };
+    }
+};
+
+export const getInfluencers = async (containerId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/get_influencers`, {
+            container_id: containerId,
+        });
+        return response.data?.containers || [];
+    } catch (error) {
+        if (error.response?.status === 400 || error.response?.status === 404) {
+            console.warn(error.response?.data?.message || "Failed to fetch influencers");
+            return [];
+        }
+        console.error("Error fetching influencers:", error);
+        return [];
+    }
+};
+
 // getNarratives
 export const getNarratives = async () => {
     try {
