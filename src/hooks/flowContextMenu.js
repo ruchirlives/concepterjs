@@ -46,7 +46,7 @@ const HANDLERS = {
     embedPositionsAction,
     findSimilarPositionsAction,
     searchPositionZAction,
-    inheritPositionsAction,
+    inheritPositionsAction
 };
 
 export const menuItems = [
