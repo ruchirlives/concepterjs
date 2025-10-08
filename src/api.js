@@ -294,19 +294,92 @@ export const removeRelationship = async (containerId, sourceId, targetId) => {
     }
 };
 
-export const getInfluencers = async (containerId) => {
+export const getInfluencers = async (pairsOrSourceId, maybeTargetId) => {
+    // Supports:
+    // - getInfluencers("A1", "B2")
+    // - getInfluencers({ source_id: "A1", target_id: "B2" })
+    // - getInfluencers({ pairs: [ { source_id: "A1", target_id: "B2" }, ["C3","D4"] ] })
+    // - getInfluencers([ ["A1","B2"], ["C3","D4"] ])
     try {
-        const response = await apiClient.post(`${getApiUrl()}/get_influencers`, {
-            container_id: containerId,
+        const makeKey = (s, t) => `${String(s)}::${String(t)}`;
+
+        // Normalize inputs to an array of [source, target] string tuples
+        const normalizePairs = (input) => {
+            const out = [];
+            if (Array.isArray(input)) {
+                // Could be [[s,t], ...] or [objects]
+                for (const item of input) {
+                    if (Array.isArray(item) && item.length >= 2) {
+                        const [s, t] = item;
+                        if (s != null && t != null) out.push([String(s), String(t)]);
+                    } else if (item && typeof item === 'object') {
+                        const s = item.source_id ?? item.source;
+                        const t = item.target_id ?? item.target;
+                        if (s != null && t != null) out.push([String(s), String(t)]);
+                    }
+                }
+            } else if (input && typeof input === 'object') {
+                if (Array.isArray(input.pairs)) return normalizePairs(input.pairs);
+                const s = input.source_id ?? input.source;
+                const t = input.target_id ?? input.target;
+                if (s != null && t != null) out.push([String(s), String(t)]);
+            }
+            return out;
+        };
+
+        let pairs = [];
+        if (maybeTargetId !== undefined) {
+            // Signature: (sourceId, targetId)
+            if (pairsOrSourceId != null && maybeTargetId != null) {
+                pairs = [[String(pairsOrSourceId), String(maybeTargetId)]];
+            }
+        } else {
+            pairs = normalizePairs(pairsOrSourceId);
+        }
+
+        // De-duplicate pairs
+        const seen = new Set();
+        pairs = pairs.filter(([s, t]) => {
+            const k = makeKey(s, t);
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
         });
-        return response.data?.containers || [];
+
+        if (pairs.length === 0) {
+            console.warn("getInfluencers: No valid pairs provided");
+            return {}; // Mirror 400 behavior with an empty result for frontend safety
+        }
+
+        // Build request body; always use pairs array to keep it consistent
+        const requestBody = { pairs };
+
+        const response = await apiClient.post(`${getApiUrl()}/get_influencers`, requestBody);
+        const data = response?.data || {};
+
+        // Ensure all requested keys are present even if backend omits empty arrays
+        const result = { ...(typeof data === 'object' ? data : {}) };
+        for (const [s, t] of pairs) {
+            const k = makeKey(s, t);
+            if (!Array.isArray(result[k])) result[k] = [];
+        }
+        return result;
     } catch (error) {
-        if (error.response?.status === 400 || error.response?.status === 404) {
-            console.warn(error.response?.data?.message || "Failed to fetch influencers");
-            return [];
+        const status = error?.response?.status;
+        if (status === 400) {
+            console.warn(error.response?.data?.message || "Invalid or missing pairs (400)");
+            return {};
+        }
+        if (status === 500) {
+            console.warn("Repository not configured server-side (500)");
+            return {};
+        }
+        if (status === 501) {
+            console.warn("Repository does not implement influencer lookup (501)");
+            return {};
         }
         console.error("Error fetching influencers:", error);
-        return [];
+        return {};
     }
 };
 
