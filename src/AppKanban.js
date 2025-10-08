@@ -297,6 +297,14 @@ function Header(props) {
             </div>
           )}
         </div>
+        {/* Hide Empty Toggle Button (Show All) */}
+        <button
+          className={`px-3 py-1 text-xs rounded transition-colors ${props.hideEmpty ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+          onClick={() => props.setHideEmpty(!props.hideEmpty)}
+          title={props.hideEmpty ? "Show all containers" : "Hide empty rows/columns"}
+        >
+          {props.hideEmpty ? "Show All" : "Hide Empty"}
+        </button>
         {/* Export to Excel Button */}
         <ExcelButton handleExportExcel={props.handleExportExcel} />
         {/* Flip Button - moved here */}
@@ -330,6 +338,8 @@ const AppKanban = () => {
     flowWrapperRef,
     collapsed,
     setCollapsed,
+    hideEmpty,
+    setHideEmpty,
     selectedFromLayer,
     setSelectedFromLayer,
     selectedToLayer,
@@ -714,6 +724,8 @@ const AppKanban = () => {
         _length={columns.length}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        hideEmpty={hideEmpty}
+        setHideEmpty={setHideEmpty}
         layerOptions={layerOptions}
         selectedLayers={selectedLayers}
         setSelectedLayers={setSelectedLayers}
