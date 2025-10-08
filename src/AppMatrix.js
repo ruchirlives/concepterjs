@@ -5,7 +5,7 @@ import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import LayerDropdown from './components/LayerDropdown';
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import ModalAddRow from "./components/ModalAddRow";
-import { addRelationship } from "./api";
+import { addRelationship, removeRelationship } from "./api";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 
 const AppMatrix = () => {
@@ -82,6 +82,7 @@ const AppMatrix = () => {
   const [influencersMap, setInfluencersMap] = React.useState({});
   const [showAddInfluencerModal, setShowAddInfluencerModal] = React.useState(false);
   const [modalCell, setModalCell] = React.useState({ sourceId: null, targetId: null });
+  const [influencerMenu, setInfluencerMenu] = React.useState({ open: false, x: 0, y: 0, sourceId: null, targetId: null, items: [] });
 
   // Create a stable signature for current visible pairs to avoid duplicate fetches
   const pairsSignature = React.useMemo(() => {
@@ -512,7 +513,22 @@ const AppMatrix = () => {
                                 }}
                                 onContextMenu={(event) => {
                                   event.preventDefault();
-                                  handleEdgeMenu(event, edge);
+                                  if (useInfluencersView) {
+                                    const sId = flipped ? String(targetContainer.id) : String(sourceContainer.id);
+                                    const tId = flipped ? String(sourceContainer.id) : String(targetContainer.id);
+                                    const infKey = `${sId}::${tId}`;
+                                    const items = Array.isArray(influencersMap[infKey]) ? influencersMap[infKey] : [];
+                                    setInfluencerMenu({
+                                      open: true,
+                                      x: event.clientX,
+                                      y: event.clientY,
+                                      sourceId: sId,
+                                      targetId: tId,
+                                      items,
+                                    });
+                                  } else {
+                                    handleEdgeMenu(event, edge);
+                                  }
                                 }}
                                 onMouseEnter={(e) => {
                                   setHoveredRowId(sourceContainer.id.toString()); // Highlight the row header
@@ -617,6 +633,39 @@ const AppMatrix = () => {
                     onClose={() => setShowAddInfluencerModal(false)}
                     onSelect={handleAddItem}
                   />
+
+                  {/* Influencer context menu */}
+                  {influencerMenu.open && (
+                    <div
+                      className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[280px] text-sm"
+                      style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+                      onMouseLeave={() => setInfluencerMenu((m) => ({ ...m, open: false }))}
+                    >
+                      <div className="px-3 py-2 text-gray-500 border-b border-gray-100">Remove</div>
+                      {influencerMenu.items.length === 0 ? (
+                        <div className="px-3 py-2 text-gray-400">No influencers</div>
+                      ) : (
+                        influencerMenu.items.map((it) => {
+                          const label = (it?.container_name || it?.container_id || "").toString();
+                          const cid = it?.container_id;
+                          return (
+                            <button
+                              key={`${influencerMenu.sourceId}::${influencerMenu.targetId}::${cid}`}
+                              className="block w-full text-left px-3 py-2 hover:bg-gray-100"
+                              onClick={async () => {
+                                if (!cid) return;
+                                await removeRelationship(cid, influencerMenu.sourceId, influencerMenu.targetId);
+                                await refreshInfluencerPair(influencerMenu.sourceId, influencerMenu.targetId);
+                                setInfluencerMenu((m) => ({ ...m, open: false }));
+                              }}
+                            >
+                              {label || cid}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
