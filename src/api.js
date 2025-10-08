@@ -357,6 +357,8 @@ export const getInfluencers = async (pairsOrSourceId, maybeTargetId) => {
         const response = await apiClient.post(`${getApiUrl()}/get_influencers`, requestBody);
         const data = response?.data || {};
 
+        console.log("getInfluencers response data:", data);
+
         // Ensure all requested keys are present even if backend omits empty arrays
         const result = { ...(typeof data === 'object' ? data : {}) };
         for (const [s, t] of pairs) {
