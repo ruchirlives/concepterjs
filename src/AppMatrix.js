@@ -4,6 +4,8 @@ import EdgeMenu from "./hooks/flowEdgeMenu";
 import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import LayerDropdown from './components/LayerDropdown';
 import { useMatrixLogic } from './hooks/useMatrixLogic';
+import ModalAddRow from "./components/ModalAddRow";
+import { addRelationship } from "./api";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 
 const AppMatrix = () => {
@@ -78,35 +80,83 @@ const AppMatrix = () => {
   const [headerContextMenu, setHeaderContextMenu] = React.useState(null);
   const [useInfluencersView, setUseInfluencersView] = React.useState(false);
   const [influencersMap, setInfluencersMap] = React.useState({});
+  const [showAddInfluencerModal, setShowAddInfluencerModal] = React.useState(false);
+  const [modalCell, setModalCell] = React.useState({ sourceId: null, targetId: null });
 
-  // Fetch influencers for currently visible pairs when toggled on or filters change
-  React.useEffect(() => {
-    const loadInfluencers = async () => {
-      try {
-        if (!useInfluencersView) return;
-        const pairs = [];
-        for (const s of filteredSources) {
-          for (const t of filteredTargets) {
-            if (!s?.id || !t?.id) continue;
-            if (s.id === t.id) continue; // skip diagonal
-            const sourceId = flipped ? t.id : s.id;
-            const targetId = flipped ? s.id : t.id;
-            pairs.push([String(sourceId), String(targetId)]);
-          }
-        }
-        if (pairs.length === 0) {
-          setInfluencersMap({});
-          return;
-        }
-        const result = await fetchInfluencers({ pairs });
-        setInfluencersMap(result || {});
-      } catch (e) {
-        console.warn("Failed to fetch influencers for matrix", e);
-        setInfluencersMap({});
+  // Create a stable signature for current visible pairs to avoid duplicate fetches
+  const pairsSignature = React.useMemo(() => {
+    const sigParts = [];
+    for (const s of filteredSources) {
+      for (const t of filteredTargets) {
+        if (!s?.id || !t?.id) continue;
+        if (s.id === t.id) continue;
+        const sourceId = flipped ? t.id : s.id;
+        const targetId = flipped ? s.id : t.id;
+        sigParts.push(`${String(sourceId)}::${String(targetId)}`);
       }
-    };
-    loadInfluencers();
-  }, [useInfluencersView, filteredSources, filteredTargets, flipped]);
+    }
+    // Preserve order; join to a single string
+    return sigParts.join("|");
+  }, [filteredSources, filteredTargets, flipped]);
+
+  // Build and fetch influencers for currently visible pairs; skip if signature unchanged
+  const lastSigRef = React.useRef("");
+  const refreshInfluencers = React.useCallback(async () => {
+    try {
+      if (!useInfluencersView) return;
+      if (lastSigRef.current === pairsSignature) return;
+      lastSigRef.current = pairsSignature;
+      // Reconstruct pairs from signature
+      const pairs = pairsSignature
+        ? pairsSignature.split("|").map(k => k.split("::"))
+        : [];
+      if (pairs.length === 0) {
+        setInfluencersMap({});
+        return;
+      }
+      const result = await fetchInfluencers({ pairs });
+      setInfluencersMap(result || {});
+    } catch (e) {
+      console.warn("Failed to fetch influencers for matrix", e);
+      setInfluencersMap({});
+    }
+  }, [useInfluencersView, pairsSignature]);
+
+  // Fetch influencers when toggled on or filters/flip change
+  React.useEffect(() => {
+    refreshInfluencers();
+  }, [refreshInfluencers]);
+
+  // Refresh a single cell's influencers and merge into cache
+  const refreshInfluencerPair = React.useCallback(async (sourceId, targetId) => {
+    try {
+      if (!useInfluencersView || !sourceId || !targetId) return;
+      const pairs = [[String(sourceId), String(targetId)]];
+      const result = await fetchInfluencers({ pairs });
+      const k = `${String(sourceId)}::${String(targetId)}`;
+      const arr = result && Array.isArray(result[k]) ? result[k] : [];
+      setInfluencersMap(prev => ({ ...prev, [k]: arr }));
+    } catch (e) {
+      console.warn("Failed to refresh influencers for pair", sourceId, targetId, e);
+    }
+  }, [useInfluencersView]);
+
+  // Handle adding influencer containers to a relationship
+  const handleAddItem = React.useCallback(async (newRows) => {
+    const { sourceId, targetId } = modalCell;
+    if (!Array.isArray(newRows) || !sourceId || !targetId) {
+      setShowAddInfluencerModal(false);
+      return;
+    }
+    for (const row of newRows) {
+      const containerId = row?.id;
+      if (!containerId) continue;
+      await addRelationship(containerId, sourceId, targetId, { label: "influences" });
+    }
+    // Refresh only this cell's influencers
+    await refreshInfluencerPair(sourceId, targetId);
+    setShowAddInfluencerModal(false);
+  }, [modalCell, refreshInfluencerPair]);
 
   const menuHandlers = useMenuHandlers({
     rowData,
@@ -403,7 +453,7 @@ const AppMatrix = () => {
                           {filteredTargets.map((targetContainer) => {
                             // Flip the key if flipped
                             const key = flipped ? `${targetContainer.id}--${sourceContainer.id}` : `${sourceContainer.id}--${targetContainer.id}`;
-                            const isEditing = editingCell?.key === key;
+                            const isEditing = !useInfluencersView && (editingCell?.key === key);
                             const baseValue = relationships[key] || "";
                             // Build display value depending on mode
                             let value = baseValue;
@@ -414,9 +464,11 @@ const AppMatrix = () => {
                               const infKey = `${sId}::${tId}`;
                               const influencers = Array.isArray(influencersMap[infKey]) ? influencersMap[infKey] : [];
                               if (influencers.length > 0) {
-                                const first = influencers[0];
-                                const firstLabel = (first?.container_name || first?.container_id || "").toString();
-                                value = `${influencers.length}${firstLabel ? ` - ${firstLabel}` : ""}`;
+                                const labels = influencers
+                                  .map((it) => (it?.container_name || it?.container_id || "").toString())
+                                  .filter(Boolean);
+                                // Show all labels, spaced with a blank line between
+                                value = labels.join("\n\n");
                               } else {
                                 value = "";
                               }
@@ -445,11 +497,19 @@ const AppMatrix = () => {
                                 key={key}
                                 className={`p-1 border border-gray-300 text-left cursor-pointer hover:bg-gray-50 min-w-30 max-w-30 w-30 ${forwardExists[key] ? getRelationshipColor(value, isDifferentFromComparator) : "bg-white"
                                   }`}
-                                onClick={() =>
+                                onClick={() => {
+                                  if (useInfluencersView) return; // suppress editing while influencers view is active
                                   flipped
                                     ? handleCellClick(targetContainer.id, sourceContainer.id)
-                                    : handleCellClick(sourceContainer.id, targetContainer.id)
-                                }
+                                    : handleCellClick(sourceContainer.id, targetContainer.id);
+                                }}
+                                onDoubleClick={() => {
+                                  if (!useInfluencersView) return;
+                                  const sId = flipped ? String(targetContainer.id) : String(sourceContainer.id);
+                                  const tId = flipped ? String(sourceContainer.id) : String(targetContainer.id);
+                                  setModalCell({ sourceId: sId, targetId: tId });
+                                  setShowAddInfluencerModal(true);
+                                }}
                                 onContextMenu={(event) => {
                                   event.preventDefault();
                                   handleEdgeMenu(event, edge);
@@ -549,6 +609,13 @@ const AppMatrix = () => {
                       )
                       .flat()}
                     setEdges={() => { }}
+                  />
+
+                  {/* Modal to add influencer containers to a relationship */}
+                  <ModalAddRow
+                    isOpen={showAddInfluencerModal}
+                    onClose={() => setShowAddInfluencerModal(false)}
+                    onSelect={handleAddItem}
                   />
                 </div>
               </div>
