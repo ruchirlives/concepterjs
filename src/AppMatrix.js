@@ -1,4 +1,5 @@
 import React from "react";
+import { getInfluencers as fetchInfluencers } from "./api";
 import EdgeMenu from "./hooks/flowEdgeMenu";
 import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import LayerDropdown from './components/LayerDropdown';
@@ -75,6 +76,37 @@ const AppMatrix = () => {
   // Add state for children tooltip
   const [childrenTooltip, setChildrenTooltip] = React.useState(null);
   const [headerContextMenu, setHeaderContextMenu] = React.useState(null);
+  const [useInfluencersView, setUseInfluencersView] = React.useState(false);
+  const [influencersMap, setInfluencersMap] = React.useState({});
+
+  // Fetch influencers for currently visible pairs when toggled on or filters change
+  React.useEffect(() => {
+    const loadInfluencers = async () => {
+      try {
+        if (!useInfluencersView) return;
+        const pairs = [];
+        for (const s of filteredSources) {
+          for (const t of filteredTargets) {
+            if (!s?.id || !t?.id) continue;
+            if (s.id === t.id) continue; // skip diagonal
+            const sourceId = flipped ? t.id : s.id;
+            const targetId = flipped ? s.id : t.id;
+            pairs.push([String(sourceId), String(targetId)]);
+          }
+        }
+        if (pairs.length === 0) {
+          setInfluencersMap({});
+          return;
+        }
+        const result = await fetchInfluencers({ pairs });
+        setInfluencersMap(result || {});
+      } catch (e) {
+        console.warn("Failed to fetch influencers for matrix", e);
+        setInfluencersMap({});
+      }
+    };
+    loadInfluencers();
+  }, [useInfluencersView, filteredSources, filteredTargets, flipped]);
 
   const menuHandlers = useMenuHandlers({
     rowData,
@@ -227,6 +259,16 @@ const AppMatrix = () => {
             Export to Excel
           </button>
 
+          {/* Influencers View Toggle */}
+          <label className="flex items-center gap-2 ml-2 text-xs text-gray-700" title="Show influencer containers per relationship">
+            <input
+              type="checkbox"
+              checked={useInfluencersView}
+              onChange={(e) => setUseInfluencersView(e.target.checked)}
+            />
+            Influencers
+          </label>
+
           <button
             className="px-3 py-1 text-xs rounded bg-purple-500 text-white hover:bg-purple-600"
             onClick={handleCalculateStateScores}
@@ -362,7 +404,23 @@ const AppMatrix = () => {
                             // Flip the key if flipped
                             const key = flipped ? `${targetContainer.id}--${sourceContainer.id}` : `${sourceContainer.id}--${targetContainer.id}`;
                             const isEditing = editingCell?.key === key;
-                            const value = relationships[key] || "";
+                            const baseValue = relationships[key] || "";
+                            // Build display value depending on mode
+                            let value = baseValue;
+                            if (useInfluencersView) {
+                              const [sId, tId] = flipped
+                                ? [String(targetContainer.id), String(sourceContainer.id)]
+                                : [String(sourceContainer.id), String(targetContainer.id)];
+                              const infKey = `${sId}::${tId}`;
+                              const influencers = Array.isArray(influencersMap[infKey]) ? influencersMap[infKey] : [];
+                              if (influencers.length > 0) {
+                                const first = influencers[0];
+                                const firstLabel = (first?.container_name || first?.container_id || "").toString();
+                                value = `${influencers.length}${firstLabel ? ` - ${firstLabel}` : ""}`;
+                              } else {
+                                value = "";
+                              }
+                            }
 
                             // Check if there's a difference for this specific relationship
                             const isDifferentFromComparator = comparatorState && (
