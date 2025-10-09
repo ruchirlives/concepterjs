@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
-import { listStates, switchState, removeState, clearStates, manyChildren } from './api';
+import { listStates, switchState, removeState, clearStates, manyChildren, getInfluencers as fetchInfluencers } from './api';
 import toast from "react-hot-toast";
 
 const AppContext = createContext();
@@ -48,6 +48,10 @@ export const AppProvider = ({ children }) => {
 
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);
+  
+  // Influencers cache shared across sub-apps
+  const [influencersMap, setInfluencersMap] = useState({});
+  const influencersSigRef = useRef("");
 
   useEffect(() => {
     async function fetchParentChildMap() {
@@ -150,6 +154,55 @@ export const AppProvider = ({ children }) => {
     setActiveLayers([]);
   }, []);
 
+  // Influencers helpers
+  const normalizePairs = (pairs) => {
+    if (!Array.isArray(pairs)) return [];
+    return pairs
+      .map(p => Array.isArray(p) ? p : [p?.source_id, p?.target_id])
+      .map(([s, t]) => [String(s || ""), String(t || "")])
+      .filter(([s, t]) => !!s && !!t && s !== t);
+  };
+
+  const signatureForPairs = (pairs) => normalizePairs(pairs).map(([s, t]) => `${s}::${t}`).join("|");
+
+  const refreshInfluencers = useCallback(async (pairs, { skipIfSame = true } = {}) => {
+    try {
+      const norm = normalizePairs(pairs);
+      const sig = signatureForPairs(norm);
+      if (skipIfSame && influencersSigRef.current === sig) {
+        return influencersMap;
+      }
+      influencersSigRef.current = sig;
+      if (norm.length === 0) {
+        setInfluencersMap({});
+        return {};
+      }
+      const result = await fetchInfluencers({ pairs: norm });
+      const safe = result || {};
+      setInfluencersMap(safe);
+      return safe;
+    } catch (e) {
+      console.warn("Failed to fetch influencers (context)", e);
+      setInfluencersMap({});
+      return {};
+    }
+  }, [influencersMap]);
+
+  const refreshInfluencerPair = useCallback(async (sourceId, targetId) => {
+    try {
+      const s = String(sourceId || "");
+      const t = String(targetId || "");
+      if (!s || !t) return;
+      const pairs = [[s, t]];
+      const result = await fetchInfluencers({ pairs });
+      const k = `${s}::${t}`;
+      const arr = result && Array.isArray(result[k]) ? result[k] : [];
+      setInfluencersMap(prev => ({ ...prev, [k]: arr }));
+    } catch (e) {
+      console.warn("Failed to refresh influencer pair (context)", sourceId, targetId, e);
+    }
+  }, []);
+
   const value = {
     rowData,
     setRowData,
@@ -219,6 +272,11 @@ export const AppProvider = ({ children }) => {
     // Parent-child relationship map
     parentChildMap,
     setParentChildMap,
+    // Influencers shared API
+    influencersMap,
+    setInfluencersMap,
+    refreshInfluencers,
+    refreshInfluencerPair,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

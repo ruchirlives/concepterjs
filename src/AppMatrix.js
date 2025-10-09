@@ -1,5 +1,5 @@
 import React from "react";
-import { getInfluencers as fetchInfluencers } from "./api";
+// influencers fetching is provided via AppContext
 import EdgeMenu from "./hooks/flowEdgeMenu";
 import StateDropdown, { ComparatorDropdown } from "./components/StateDropdown";
 import LayerDropdown from './components/LayerDropdown';
@@ -7,6 +7,7 @@ import { useMatrixLogic } from './hooks/useMatrixLogic';
 import ModalAddRow from "./components/ModalAddRow";
 import { addRelationship, removeRelationship } from "./api";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
+import { useAppContext } from "./AppContext";
 
 const AppMatrix = () => {
   const {
@@ -79,10 +80,12 @@ const AppMatrix = () => {
   const [childrenTooltip, setChildrenTooltip] = React.useState(null);
   const [headerContextMenu, setHeaderContextMenu] = React.useState(null);
   const [useInfluencersView, setUseInfluencersView] = React.useState(false);
-  const [influencersMap, setInfluencersMap] = React.useState({});
   const [showAddInfluencerModal, setShowAddInfluencerModal] = React.useState(false);
   const [modalCell, setModalCell] = React.useState({ sourceId: null, targetId: null });
   const [influencerMenu, setInfluencerMenu] = React.useState({ open: false, x: 0, y: 0, sourceId: null, targetId: null, items: [] });
+
+  // From context: shared influencers cache and helpers
+  const { influencersMap, refreshInfluencers, refreshInfluencerPair } = useAppContext();
 
   // Create a stable signature for current visible pairs to avoid duplicate fetches
   const pairsSignature = React.useMemo(() => {
@@ -100,47 +103,19 @@ const AppMatrix = () => {
     return sigParts.join("|");
   }, [filteredSources, filteredTargets, flipped]);
 
-  // Build and fetch influencers for currently visible pairs; skip if signature unchanged
-  const lastSigRef = React.useRef("");
-  const refreshInfluencers = React.useCallback(async () => {
-    try {
-      if (!useInfluencersView) return;
-      if (lastSigRef.current === pairsSignature) return;
-      lastSigRef.current = pairsSignature;
-      // Reconstruct pairs from signature
-      const pairs = pairsSignature
-        ? pairsSignature.split("|").map(k => k.split("::"))
-        : [];
-      if (pairs.length === 0) {
-        setInfluencersMap({});
-        return;
-      }
-      const result = await fetchInfluencers({ pairs });
-      setInfluencersMap(result || {});
-    } catch (e) {
-      console.warn("Failed to fetch influencers for matrix", e);
-      setInfluencersMap({});
-    }
-  }, [useInfluencersView, pairsSignature]);
+  // Build and fetch influencers for currently visible pairs using shared context
+  const refreshVisibleInfluencers = React.useCallback(async () => {
+    if (!useInfluencersView) return;
+    const pairs = pairsSignature
+      ? pairsSignature.split("|").map(k => k.split("::"))
+      : [];
+    await refreshInfluencers(pairs);
+  }, [useInfluencersView, pairsSignature, refreshInfluencers]);
 
   // Fetch influencers when toggled on or filters/flip change
   React.useEffect(() => {
-    refreshInfluencers();
-  }, [refreshInfluencers]);
-
-  // Refresh a single cell's influencers and merge into cache
-  const refreshInfluencerPair = React.useCallback(async (sourceId, targetId) => {
-    try {
-      if (!useInfluencersView || !sourceId || !targetId) return;
-      const pairs = [[String(sourceId), String(targetId)]];
-      const result = await fetchInfluencers({ pairs });
-      const k = `${String(sourceId)}::${String(targetId)}`;
-      const arr = result && Array.isArray(result[k]) ? result[k] : [];
-      setInfluencersMap(prev => ({ ...prev, [k]: arr }));
-    } catch (e) {
-      console.warn("Failed to refresh influencers for pair", sourceId, targetId, e);
-    }
-  }, [useInfluencersView]);
+    refreshVisibleInfluencers();
+  }, [refreshVisibleInfluencers]);
 
   // Handle adding influencer containers to a relationship
   const handleAddItem = React.useCallback(async (newRows) => {
