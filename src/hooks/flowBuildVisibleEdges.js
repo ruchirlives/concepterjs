@@ -32,13 +32,23 @@ export function buildVisibleEdges(params) {
 
             const edgeId = `${parentId}-to-${childId}`;
             if (!newEdges.some(e => e.id === edgeId)) {
+                const isGroupTag = (() => {
+                    if (parentNode?.type === 'group') return true;
+                    const tags = (parentNode?.data?.Tags || '')
+                        .toString()
+                        .toLowerCase()
+                        .split(',')
+                        .map(t => t.trim())
+                        .filter(Boolean);
+                    return tags.includes('group');
+                })();
                 newEdges.push({
                     id: edgeId,
                     source: parentId,
                     target: childId,
                     type: 'customEdge',
                     style: { stroke: colors.black },
-                    data: { label: c.position?.label || '' }, 
+                    data: { label: c.position?.label || '', isSourceGroup: isGroupTag }, 
                 });
             }
         });

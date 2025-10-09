@@ -144,11 +144,17 @@ const CustomEdge = ({
     // merge with any incoming style and set stroke color
     const edgeStyle = { ...style, stroke: strokeColor };
 
-    // Style priority: successor > influencers > default
+    // Style priority: successor > influencers > dashed-group > default
     if (data?.label === 'successor') {
         edgeStyle.strokeWidth = 8;
-    } else if (data?.hasInfluencers) {
-        edgeStyle.strokeWidth = 4;
+        edgeStyle.strokeDasharray = undefined;
+    } else {
+        if (data?.isSourceGroup) {
+            edgeStyle.strokeDasharray = '6 4';
+        }
+        if (data?.hasInfluencers) {
+            edgeStyle.strokeWidth = 4;
+        }
     }
 
     return (
@@ -190,7 +196,6 @@ const CustomEdge = ({
                     } catch {}
                 }
                 const getInfluencerLabel = (inf) => {
-                    console.log('inf', inf);
                     if (inf == null) return '';
                     if (typeof inf === 'string') return inf;
                     if (typeof inf === 'number') return String(inf);
