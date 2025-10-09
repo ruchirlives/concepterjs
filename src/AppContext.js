@@ -48,7 +48,7 @@ export const AppProvider = ({ children }) => {
 
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);
-  
+
   // Influencers cache shared across sub-apps
   const [influencersMap, setInfluencersMap] = useState({});
   const influencersSigRef = useRef("");
@@ -163,9 +163,9 @@ export const AppProvider = ({ children }) => {
       .filter(([s, t]) => !!s && !!t && s !== t);
   };
 
-  const signatureForPairs = (pairs) => normalizePairs(pairs).map(([s, t]) => `${s}::${t}`).join("|");
 
   const refreshInfluencers = useCallback(async (pairs, { skipIfSame = true } = {}) => {
+    const signatureForPairs = (pairs) => normalizePairs(pairs).map(([s, t]) => `${s}::${t}`).join("|");
     try {
       const norm = normalizePairs(pairs);
       const sig = signatureForPairs(norm);
