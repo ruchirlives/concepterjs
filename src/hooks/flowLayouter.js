@@ -104,9 +104,6 @@ export const getLayoutedElements = (
     nodesep = 35,
     ranksep = 100
 ) => {
-    // Declare grid parameters once
-    const gridColCount = 8;
-    const padding = 40;
 
     // 1. Compute group sizes based on their children
     const nodeSizes = {};
@@ -179,13 +176,9 @@ export const getLayoutedElements = (
 
     // After step 1: Compute group sizes based on their children
 
-    // STEP 1.5: Lay out group nodes in a grid with variable sizes so they don't overlap
+    // STEP 1.5: Lay out group nodes respecting edges between them
 
-    let colWidths = Array(gridColCount).fill(0);
-    let rowHeights = [];
-    let positions = [];
-    let col = 0, row = 0;
-
+    // Collect group nodes with computed sizes
     const groupNodes = nodes
         .filter(n => n.type === 'group')
         .map(n => ({
@@ -197,39 +190,30 @@ export const getLayoutedElements = (
             }
         }));
 
-    groupNodes.forEach((node, idx) => {
-        const width = node.style?.width || nodeSizes[node.id]?.width || 320;
-        const height = node.style?.height || nodeSizes[node.id]?.height || 180;
+    // Build a meta-graph of group dependencies: if any edge connects a child in group A to a child in group B, add A -> B
+    const groupIdSet = new Set(groupNodes.map(n => n.id));
+    const groupEdgesMap = new Map(); // key: "A=>B" value: {source:A,target:B}
 
-        // Calculate X position: sum widths of previous columns in this row
-        let x = padding;
-        for (let c = 0; c < col; c++) {
-            x += colWidths[c] + padding;
+    for (const e of edges) {
+        const sNode = allNodesById[e.source];
+        const tNode = allNodesById[e.target];
+
+        // Determine source/target group: if node is a group use itself; else use its parentId if that parent is a group
+        const sGroup = sNode?.type === 'group' ? sNode.id : (groupIdSet.has(sNode?.parentId) ? sNode?.parentId : undefined);
+        const tGroup = tNode?.type === 'group' ? tNode.id : (groupIdSet.has(tNode?.parentId) ? tNode?.parentId : undefined);
+
+        if (sGroup && tGroup && sGroup !== tGroup) {
+            const key = `${sGroup}=>${tGroup}`;
+            if (!groupEdgesMap.has(key)) {
+                groupEdgesMap.set(key, { source: sGroup, target: tGroup });
+            }
         }
+    }
 
-        // Calculate Y position: sum heights of previous rows
-        let y = padding;
-        for (let r = 0; r < row; r++) {
-            y += rowHeights[r] + padding;
-        }
+    const groupEdges = Array.from(groupEdgesMap.values());
 
-        positions.push({ x, y });
-
-        // Update column width and row height
-        colWidths[col] = Math.max(colWidths[col], width);
-        rowHeights[row] = Math.max(rowHeights[row] || 0, height);
-
-        col++;
-        if (col >= gridColCount) {
-            col = 0;
-            row++;
-        }
-    });
-
-    const layoutedGroups = groupNodes.map((node, idx) => ({
-        ...node,
-        position: positions[idx]
-    }));
+    // Use dagre-driven subset layout for groups; falls back to grid for isolated groups
+    const layoutedGroups = layoutSubset(groupNodes, groupEdges, direction, nodesep, ranksep, nodeSizes);
 
     // 2. Layout top-level nodes using computed group sizes
     const topNodes = nodes.filter(n => !n.parentId && n.type !== 'group');
