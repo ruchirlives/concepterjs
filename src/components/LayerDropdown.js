@@ -20,6 +20,7 @@ const LayerDropdown = ({
   } = useLayerDropdown();
 
   const [newLayer, setNewLayer] = useState("");
+  const UNTAGGED_KEY = '__UNTAGGED__';
 
   const handleAdd = () => {
     const name = newLayer.trim();
@@ -50,7 +51,7 @@ const LayerDropdown = ({
         }`}
         title={title}
       >
-        {buttonText} {layerOptions.length > 0 && `(${layerOptions.length - hiddenLayers.size}/${layerOptions.length})`}
+        {(() => { const hiddenReal = Array.from(hiddenLayers).filter(l => layerOptions.includes(l)).length; return (<>{buttonText} {layerOptions.length > 0 ? `(${layerOptions.length - hiddenReal}/${layerOptions.length})` : ''}</>); })()}
       </button>
 
       {layerDropdownOpen && (
@@ -80,7 +81,24 @@ const LayerDropdown = ({
           <div className="p-2 border-b border-gray-200 text-xs font-medium text-gray-600">
             {dropdownTitle}
           </div>
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-60 overflow-y-auto">              {/* Special option: Untagged */}
+              <div
+                className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 text-sm relative"
+                style={{ zIndex: 9999 }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <label className="flex items-center gap-2 cursor-pointer" onMouseDown={(e)=>e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={!hiddenLayers.has(UNTAGGED_KEY)}
+                    onChange={() => toggleLayerVisibility(UNTAGGED_KEY)}
+                    className="rounded border-gray-300"
+                  />
+                  <span className={hiddenLayers.has(UNTAGGED_KEY) ? 'line-through text-red-500' : 'text-gray-900'}>
+                    Untagged
+                  </span>
+                </label>
+              </div>
               {layerOptions.length === 0 ? (
                 <div className="p-3 text-xs text-gray-500">No layers available</div>
               ) : (
@@ -156,3 +174,5 @@ const LayerDropdown = ({
 };
 
 export default LayerDropdown;
+
+

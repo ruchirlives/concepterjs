@@ -42,7 +42,9 @@ export const useFlowLogic = () => {
         .map(tag => tag.trim())
         .filter(Boolean);
 
-      // Include only if the container has at least one tag in visibleLayers
+      if (containerTags.length === 0) {
+        return !hiddenLayers.has('__UNTAGGED__');
+      }      // Include only if the container has at least one tag in visibleLayers
       return visibleLayers.size > 0 && containerTags.some(tag => visibleLayers.has(tag));
     });
 
@@ -115,3 +117,4 @@ export const useFlowLogic = () => {
     screenToFlowPosition
   };
 };
+

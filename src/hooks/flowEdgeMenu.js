@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import useCreateNewRow from '../components/ModalNewContainer';
 import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship, addRelationship, removeRelationship } from "../api";
@@ -10,7 +10,8 @@ import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDouble
 
 export const useEdgeMenu = (flowWrapperRef) => {
     const menuRef = useRef(null);
-    const { setEdges } = useAppContext();
+    const [currentEdge, setCurrentEdge] = useState(null);
+    const { setEdges, refreshInfluencerPair, influencersMap } = useAppContext();
     const { tiptapContent, setTiptapContent } = useTiptapContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
     const newRowFunc = useCreateNewRow();
@@ -21,11 +22,12 @@ export const useEdgeMenu = (flowWrapperRef) => {
         event.preventDefault(); // Prevent default context menu
         menuRef.current.edgeId = edge?.id || null; // Store the edge ID if available
         menuRef.current.edge = edge; // Store full edge data
+        setCurrentEdge(edge); // Track current edge in state to drive menu rerender
 
         displayContextMenu(menuRef, event, { data: { id: "edge" } }, flowWrapperRef); // Display the context menu
     };
 
-    const onMenuItemClick = async (action, rowData, setRowData) => {
+    const onMenuItemClick = async (action, rowData, setRowData, edges, setEdgesArg) => {
         // Get source and target nodes from the stored edge
         const edge = menuRef.current.edge;
         if (!edge) return;
@@ -169,14 +171,40 @@ export const useEdgeMenu = (flowWrapperRef) => {
                 if (!containerId) continue;
                 await addRelationship(containerId, sourceNodeId, targetNodeId, { label: "influences" });
             }
-            requestRefreshChannel();
+            // refresh just this edge's influencers and update edge data
+            const items = await refreshInfluencerPair(sourceNodeId, targetNodeId);
+            const simplified = (Array.isArray(items) ? items : []).map(it => ({
+                id: (it && (it.container_id ?? it.id ?? it.ID)) ?? String(it),
+                name: (it && (it.container_name ?? it.Name ?? it.name ?? it.label ?? it.Label ?? it.title ?? it.Title))
+                    ?? (it && (it.id != null ? String(it.id) : undefined))
+                    ?? String(it),
+            }));
+            const updateEdge = setEdgesArg || setEdges;
+            updateEdge((eds) => eds.map(e => (
+                e.source === sourceNodeId && e.target === targetNodeId
+                    ? { ...e, data: { ...(e.data || {}), hasInfluencers: simplified.length > 0, influencers: simplified } }
+                    : e
+            )));
         }
         else if (typeof action === 'string' && action.startsWith("remove influencer::")) {
             const parts = action.split("::");
             const infId = parts[1];
             if (infId) {
                 await removeRelationship(infId, sourceNodeId, targetNodeId);
-                requestRefreshChannel();
+                // refresh just this edge's influencers and update edge data
+                const items = await refreshInfluencerPair(sourceNodeId, targetNodeId);
+                const simplified = (Array.isArray(items) ? items : []).map(it => ({
+                    id: (it && (it.container_id ?? it.id ?? it.ID)) ?? String(it),
+                    name: (it && (it.container_name ?? it.Name ?? it.name ?? it.label ?? it.Label ?? it.title ?? it.Title))
+                        ?? (it && (it.id != null ? String(it.id) : undefined))
+                        ?? String(it),
+                }));
+                const updateEdge = setEdgesArg || setEdges;
+                updateEdge((eds) => eds.map(e => (
+                    e.source === sourceNodeId && e.target === targetNodeId
+                        ? { ...e, data: { ...(e.data || {}), hasInfluencers: simplified.length > 0, influencers: simplified } }
+                        : e
+                )));
             }
         }
         ;
@@ -221,10 +249,10 @@ export const useEdgeMenu = (flowWrapperRef) => {
         if (menu) menu.style.display = "none";
     };
 
-    return { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu };
+    return { menuRef, handleEdgeMenu, onMenuItemClick, hideMenu, edge: currentEdge };
 }
 
-const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges, setEdges }, ref) => {
+const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges, setEdges, edge }, ref) => {
     const defaultActions = [
         "delete edge",
         "rename",
@@ -235,7 +263,8 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
         "suggest relationship",
         "add influencer",
     ];
-    const influencers = ref?.current?.edge?.data?.influencers || [];
+    // Build influencer removal items from the current edge prop
+    const influencers = edge?.data?.influencers || [];
     const removalActions = influencers.map((inf) => ({
         key: `remove influencer::${inf?.id}`,
         label: `Remove influencer: ${inf?.name || inf?.Name || inf?.id}`,

@@ -192,14 +192,16 @@ export const AppProvider = ({ children }) => {
     try {
       const s = String(sourceId || "");
       const t = String(targetId || "");
-      if (!s || !t) return;
+      if (!s || !t) return [];
       const pairs = [[s, t]];
       const result = await fetchInfluencers({ pairs });
       const k = `${s}::${t}`;
       const arr = result && Array.isArray(result[k]) ? result[k] : [];
       setInfluencersMap(prev => ({ ...prev, [k]: arr }));
+      return arr;
     } catch (e) {
       console.warn("Failed to refresh influencer pair (context)", sourceId, targetId, e);
+      return [];
     }
   }, []);
 

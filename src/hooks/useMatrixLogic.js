@@ -51,7 +51,9 @@ export const useMatrixLogic = () => {
       return data.filter((container) => {
         const tags = (container.Tags || '').split(',').map((t) => t.trim()).filter(Boolean);
         const inSelectedLayer = layer ? tags.includes(layer) : true;
-        const inVisible = visibleLayers.size === 0 ? false : tags.some((t) => visibleLayers.has(t));
+        const isUntagged = tags.length === 0;
+        const includeUntagged = !hiddenLayers.has('__UNTAGGED__');
+        const inVisible = isUntagged ? includeUntagged : (visibleLayers.size === 0 ? false : tags.some((t) => visibleLayers.has(t)));
         return inSelectedLayer && inVisible;
       });
     };
@@ -514,3 +516,4 @@ export const useMatrixLogic = () => {
     clearStateScores,
   };
 };
+

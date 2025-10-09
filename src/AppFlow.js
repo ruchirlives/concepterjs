@@ -145,6 +145,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     handleEdgeMenu,
     onMenuItemClick: onEdgeMenuItemClick,
     hideMenu: hideEdgeMenu,
+    edge: edgeMenuEdge,
   } = useEdgeMenu(flowWrapperRef);
 
   const hideMenu = () => {
@@ -279,6 +280,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               setRowData={setRowData}
               edges={edges}
               setEdges={setEdges}
+              edge={edgeMenuEdge}
             />
             <Toaster position="top-right" />
           </FlowMenuProvider>
