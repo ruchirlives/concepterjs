@@ -154,6 +154,64 @@ const CustomEdge = ({
     return (
         <>
             <BaseEdge id={id} path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
+            {Array.isArray(data?.influencers) && data.influencers.length > 0 && (() => {
+                const influencers = data.influencers;
+                const dotPositions = [];
+                if (edgePath && edgePath.startsWith('M')) {
+                    try {
+                        const nums = edgePath
+                            .replace(/[A-Za-z]/g, ' ')
+                            .split(/[ ,]/)
+                            .map(s => s.trim())
+                            .filter(Boolean)
+                            .map(parseFloat);
+                        if (nums.length >= 8) {
+                            const [x0, y0, x1, y1, x2, y2, x3, y3] = nums;
+                            const cubicPoint = (t) => {
+                                const mt = 1 - t;
+                                const mt2 = mt * mt;
+                                const t2 = t * t;
+                                const a = mt2 * mt;
+                                const b = 3 * mt2 * t;
+                                const c = 3 * mt * t2;
+                                const d = t * t2;
+                                return { x: a * x0 + b * x1 + c * x2 + d * x3, y: a * y0 + b * y1 + c * y2 + d * y3 };
+                            };
+                            const n = influencers.length;
+                            const startT = 0.2;
+                            const endT = 0.8;
+                            const step = n > 1 ? (endT - startT) / (n - 1) : 0;
+                            for (let i = 0; i < n; i++) {
+                                const t = n > 1 ? startT + i * step : 0.5;
+                                const p = cubicPoint(t);
+                                dotPositions.push({ ...p, idx: i });
+                            }
+                        }
+                    } catch {}
+                }
+                const getInfluencerLabel = (inf) => {
+                    console.log('inf', inf);
+                    if (inf == null) return '';
+                    if (typeof inf === 'string') return inf;
+                    if (typeof inf === 'number') return String(inf);
+                    if (typeof inf === 'object') return inf.name;
+                    return '';
+                };
+                return dotPositions.map((p) => (
+                    <circle
+                        key={`${id}-inf-${p.idx}`}
+                        cx={p.x}
+                        cy={p.y}
+                        r={6}
+                        fill="#111827"
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                        style={{ pointerEvents: 'auto' }}
+                    >
+                        <title>{getInfluencerLabel(influencers[p.idx])}</title>
+                    </circle>
+                ));
+            })()}
 
             {data?.label &&
              data.label !== 'successor' &&

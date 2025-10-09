@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import useCreateNewRow from '../components/ModalNewContainer';
-import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship } from "../api";
+import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship, addRelationship, removeRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from '../AppContext';
@@ -152,7 +152,34 @@ export const useEdgeMenu = (flowWrapperRef) => {
             console.log("Setting narrative to:", narrative);
             const response = await setNarrative(sourceNodeId, targetNodeId, narrative);
             console.log("Response from setNarrative:", response);
-        };
+        }
+        else if (action === "add influencer" && edgeId) {
+            // Add influencer containers to this edge's relationship
+            const result = await newRowFunc();
+            let newRows = [];
+            if (Array.isArray(result)) {
+                newRows = result;
+            } else if (result && (Array.isArray(result.loadedNodes) || Array.isArray(result.newRows))) {
+                const a = Array.isArray(result.loadedNodes) ? result.loadedNodes : [];
+                const b = Array.isArray(result.newRows) ? result.newRows : [];
+                newRows = [...a, ...b];
+            }
+            for (const row of newRows) {
+                const containerId = row?.id;
+                if (!containerId) continue;
+                await addRelationship(containerId, sourceNodeId, targetNodeId, { label: "influences" });
+            }
+            requestRefreshChannel();
+        }
+        else if (typeof action === 'string' && action.startsWith("remove influencer::")) {
+            const parts = action.split("::");
+            const infId = parts[1];
+            if (infId) {
+                await removeRelationship(infId, sourceNodeId, targetNodeId);
+                requestRefreshChannel();
+            }
+        }
+        ;
         hideMenu();
 
         function removeEdgeById(edgeId) {
@@ -198,19 +225,46 @@ export const useEdgeMenu = (flowWrapperRef) => {
 }
 
 const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges, setEdges }, ref) => {
+    const defaultActions = [
+        "delete edge",
+        "rename",
+        "insert node",
+        "flip edge",
+        "edit narrative",
+        "replace narrative",
+        "suggest relationship",
+        "add influencer",
+    ];
+    const influencers = ref?.current?.edge?.data?.influencers || [];
+    const removalActions = influencers.map((inf) => ({
+        key: `remove influencer::${inf?.id}`,
+        label: `Remove influencer: ${inf?.name || inf?.Name || inf?.id}`,
+    }));
     return (
         <div
             ref={ref}
             style={{ display: "none" }}
-            className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-56"
+            className="absolute max-h-64 overflow-y-auto bg-white border border-gray-300 rounded shadow-lg text-sm z-50 w-64"
         >
-            {["delete edge", "rename", "insert node", "flip edge", "edit narrative", "replace narrative", "suggest relationship"].map((action) => (
+            {defaultActions.map((action) => (
                 <div
                     key={action}
                     onClick={() => onMenuItemClick(action, rowData, setRowData, edges, setEdges)}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                 >
                     {action.replace(/_/g, " ").charAt(0).toUpperCase() + action.slice(1)}
+                </div>
+            ))}
+            {removalActions.length > 0 && (
+                <div className="px-3 py-1 text-xs text-gray-500 border-t border-gray-200">Influencers</div>
+            )}
+            {removalActions.map((item) => (
+                <div
+                    key={item.key}
+                    onClick={() => onMenuItemClick(item.key, rowData, setRowData, edges, setEdges)}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                >
+                    {item.label}
                 </div>
             ))}
         </div>

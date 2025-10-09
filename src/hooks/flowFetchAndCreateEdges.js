@@ -199,17 +199,28 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             const uniquePairsKey = new Set(edgePairs.map(([s, t]) => `${String(s)}::${String(t)}`));
             const pairs = Array.from(uniquePairsKey).map(k => k.split('::'));
             const infMap = await refreshInfluencers(pairs, { skipIfSame: true });
-            // annotate edges
+            // annotate edges with flags and attach simplified influencer list
             const hasInf = (s, t) => {
                 const k = `${String(s)}::${String(t)}`;
                 const arr = infMap && Array.isArray(infMap[k]) ? infMap[k] : [];
                 return arr.length > 0;
             };
+            const getInfList = (s, t) => {
+                const k = `${String(s)}::${String(t)}`;
+                const arr = infMap && Array.isArray(infMap[k]) ? infMap[k] : [];
+                return arr.map(it => {
+                    const id = (it && (it.container_id ?? it.id ?? it.ID)) ?? String(it);
+                    const name = (it && (it.container_name ?? it.Name ?? it.name ?? it.label ?? it.Label ?? it.title ?? it.Title))
+                        ?? (it && (it.id != null ? String(it.id) : undefined))
+                        ?? String(it);
+                    return { id, name };
+                });
+            };
             newEdges.forEach(e => {
                 const s0 = originalIdByNodeId[e.source] || e.source;
                 const t0 = originalIdByNodeId[e.target] || e.target;
                 if (!String(e.source).startsWith('ghost-') && !String(e.target).startsWith('ghost-')) {
-                    e.data = { ...(e.data || {}), hasInfluencers: hasInf(s0, t0) };
+                    e.data = { ...(e.data || {}), hasInfluencers: hasInf(s0, t0), influencers: getInfList(s0, t0) };
                 }
             });
         }
