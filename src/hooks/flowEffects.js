@@ -348,7 +348,7 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
     const { rowData, stateScores, getHighestScoringContainer, groupByLayers, showGhostConnections, showGroupNodes, selectedContentLayer } = params;
-    const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap, layerOptions } = useAppContext();
+    const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap, layerOptions, influencersMap, refreshInfluencers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
     useEffect(() => {
@@ -389,6 +389,9 @@ export const useCreateNodesAndEdges = (params) => {
                     layerOptions,
                     showGhostConnections,
                     showGroupNodes,
+                    // influencers support
+                    influencersMap,
+                    refreshInfluencers,
                 });
             })();
         }, 120);

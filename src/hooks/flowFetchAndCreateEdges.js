@@ -12,6 +12,8 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         groupByLayers,
         showGhostConnections = true,
         showGroupNodes = true,
+        // influencers support (from AppContext via params)
+        refreshInfluencers,
     } = params;
 
     if (!parentChildMap) return;
@@ -181,6 +183,38 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 });
             });
         });
+    }
+
+    // Influencers: fetch for all real edges and annotate
+    try {
+        if (typeof refreshInfluencers === 'function') {
+            // Build map from nodeId -> originalId
+            const originalIdByNodeId = Object.fromEntries(
+                allNodes.map(n => [n.id, n.data?.originalId || n.data?.id || n.id])
+            );
+            const edgePairs = newEdges
+                .filter(e => e && typeof e.source === 'string' && typeof e.target === 'string')
+                .filter(e => !String(e.source).startsWith('ghost-') && !String(e.target).startsWith('ghost-'))
+                .map(e => [originalIdByNodeId[e.source] || e.source, originalIdByNodeId[e.target] || e.target]);
+            const uniquePairsKey = new Set(edgePairs.map(([s, t]) => `${String(s)}::${String(t)}`));
+            const pairs = Array.from(uniquePairsKey).map(k => k.split('::'));
+            const infMap = await refreshInfluencers(pairs, { skipIfSame: true });
+            // annotate edges
+            const hasInf = (s, t) => {
+                const k = `${String(s)}::${String(t)}`;
+                const arr = infMap && Array.isArray(infMap[k]) ? infMap[k] : [];
+                return arr.length > 0;
+            };
+            newEdges.forEach(e => {
+                const s0 = originalIdByNodeId[e.source] || e.source;
+                const t0 = originalIdByNodeId[e.target] || e.target;
+                if (!String(e.source).startsWith('ghost-') && !String(e.target).startsWith('ghost-')) {
+                    e.data = { ...(e.data || {}), hasInfluencers: hasInf(s0, t0) };
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Influencers annotation failed', e);
     }
 
     // Layout & set state

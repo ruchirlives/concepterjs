@@ -144,10 +144,11 @@ const CustomEdge = ({
     // merge with any incoming style and set stroke color
     const edgeStyle = { ...style, stroke: strokeColor };
 
+    // Style priority: successor > influencers > default
     if (data?.label === 'successor') {
-        // thick solid style for successor relationships
         edgeStyle.strokeWidth = 8;
-        // Remove strokeDasharray to make it solid
+    } else if (data?.hasInfluencers) {
+        edgeStyle.strokeWidth = 4;
     }
 
     return (
