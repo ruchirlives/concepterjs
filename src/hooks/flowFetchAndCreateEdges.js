@@ -249,6 +249,38 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
         console.warn('Influencers annotation failed', e);
     }
 
+    // Normalize and de-duplicate nodes/edges to avoid React key collisions
+    // 1) Normalize ids to strings
+    computedNodes = (computedNodes || []).map(n => ({
+        ...n,
+        id: String(n.id),
+        data: {
+            ...(n.data || {}),
+            id: n.data?.id != null ? String(n.data.id) : n.data?.id,
+            originalId: n.data?.originalId != null ? String(n.data.originalId) : n.data?.originalId,
+        }
+    }));
+    const normalizedEdges = (newEdges || []).map(e => ({
+        ...e,
+        id: String(e.id),
+        source: String(e.source),
+        target: String(e.target),
+    }));
+
+    // 2) De-duplicate by id, keeping first occurrence
+    const seenNodeIds = new Set();
+    computedNodes = computedNodes.filter(n => {
+        if (seenNodeIds.has(n.id)) { return false; }
+        seenNodeIds.add(n.id);
+        return true;
+    });
+    const seenEdgeIds = new Set();
+    const uniqueEdges = normalizedEdges.filter(e => {
+        if (seenEdgeIds.has(e.id)) { return false; }
+        seenEdgeIds.add(e.id);
+        return true;
+    });
+
     // Layout & set state
     await deployNodesEdges();
 
@@ -259,9 +291,9 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                 position: layoutPositions[node.id] || node.position
             }));
             setNodes(restored);
-            setEdges(newEdges);
+            setEdges(uniqueEdges);
         } else {
-            const layouted = getLayoutedElements(computedNodes, newEdges, 'LR');
+            const layouted = getLayoutedElements(computedNodes, uniqueEdges, 'LR');
             setNodes(layouted.nodes);
             setEdges(layouted.edges);
             // Update layout positions in Zustand store
