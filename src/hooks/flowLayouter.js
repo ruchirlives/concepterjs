@@ -12,7 +12,7 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
 
     // Find all node IDs that are connected by edges
     const connectedIds = new Set();
-    edges.forEach(e => {
+    edges.forEach(e => { 
         connectedIds.add(e.source);
         connectedIds.add(e.target);
     });
