@@ -21,18 +21,19 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     // Build lookup of all node IDs currently present
     const presentIdSet = new Set(computedNodes.map(n => n.id));
 
-    // In GroupByLayers mode, nodes may be clones with ids like `${orig}__in__layer-<name>`
-    // Build a mapping from originalId -> array of clone nodes
+    // Build a mapping from originalId -> array of clone nodes whenever clones exist
+    // Clones are non-group nodes where `data.originalId` is set or id contains `__in__`
     const clonesByOriginal = {};
-    if (groupByLayers) {
-        computedNodes.forEach(n => {
-            if (n.type !== 'group') {
-                const original = n.data?.originalId || n.data?.id || n.id;
+    computedNodes.forEach(n => {
+        if (n.type !== 'group') {
+            const original = n.data?.originalId || n.data?.id || n.id;
+            // If a node has a parentId or id contains __in__, treat as a clone instance
+            if (n.parentId || String(n.id).includes('__in__')) {
                 if (!clonesByOriginal[original]) clonesByOriginal[original] = [];
                 clonesByOriginal[original].push(n);
             }
-        });
-    }
+        }
+    });
     // const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
 
     // Filter parentChildMap by originalIdSet and remove only 'successor' relations
@@ -63,14 +64,16 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
 
     // Build childMap: container_id → children objects
     let childMap;
-    if (!groupByLayers) {
+    const clonesExist = Object.keys(clonesByOriginal).length > 0;
+    if (!groupByLayers && !clonesExist) {
+        // Simple mapping: original ids
         childMap = Object.fromEntries(
             filteredParentChildMap.map(({ container_id, children }) => [
                 container_id.toString(),
                 children
             ])
         );
-    } else {
+    } else if (groupByLayers) {
         // Build a child map keyed by CLONE IDs inside each layer
         childMap = {};
         const getCloneGroup = (clone) => clone.parentId || clone.id.split('__in__')[1] || undefined;
@@ -88,6 +91,24 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                         childMap[key].push({ ...c, id: inSameLayer.id });
                     }
                 });
+            });
+        });
+    } else {
+        // Not grouping by layers, but clones exist for multi-membership.
+        // Map each parent group to its children using the clone that belongs to that parent (by parentId)
+        childMap = {};
+        filteredParentChildMap.forEach(({ container_id, children }) => {
+            const key = container_id.toString();
+            if (!childMap[key]) childMap[key] = [];
+            children.forEach(c => {
+                const clones = clonesByOriginal[c.id] || [];
+                const inSameGroup = clones.find(ch => ch.parentId === key);
+                if (inSameGroup) {
+                    childMap[key].push({ ...c, id: inSameGroup.id });
+                } else {
+                    // Fallback to original id if no clone (e.g., when showGroupNodes is off)
+                    childMap[key].push({ ...c, id: c.id.toString() });
+                }
             });
         });
     }

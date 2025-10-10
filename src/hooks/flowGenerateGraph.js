@@ -111,68 +111,111 @@ export async function generateNodesAndEdges(params) {
         computedNodes = [...layerGroups, ...childNodes];
     } else {
         // --- DEFAULT GROUP BY TAGS MODE ---
-        // Build a lookup: childId -> parentId (for group nodes)
+        // Allow multi-membership by cloning children into each parent group
+        // Build a lookup: groupIds and parentsByChild (childId -> [parentIds])
         const groupIds = rowData
             .filter(item => (item.Tags || '').toLowerCase().split(',').map(t => t.trim()).includes('group'))
             .map(item => item.id?.toString());
 
+        const parentsByChild = {};
         if (parentChildMap) {
             parentChildMap.forEach(({ container_id, children }) => {
-                if (groupIds.includes(container_id?.toString())) {
-                    children.forEach(child => {
-                        // Find the child node in rowData to check if it's a group
-                        const childItem = rowData.find(item => item.id?.toString() === child.id?.toString());
-                        const childTags = (childItem?.Tags || '').toLowerCase().split(',').map(t => t.trim());
-                        const childIsGroup = childTags.includes('group');
-                        // Only assign parentId if not a group and not a 'successor' relationship
-                        if (showGroupNodes && !childIsGroup && child.label !== 'successor') {
-                            childToGroup[child.id?.toString()] = container_id?.toString();
-                        }
-                    });
-                }
+                if (!groupIds.includes(container_id?.toString())) return;
+                const cleanChildren = children.filter(c => c.label !== 'successor');
+                cleanChildren.forEach(child => {
+                    // Skip if child itself is a group
+                    const childItem = rowData.find(r => r.id?.toString() === child.id?.toString());
+                    const childTags = (childItem?.Tags || '').toLowerCase().split(',').map(t => t.trim());
+                    const childIsGroup = childTags.includes('group');
+                    if (childIsGroup) return;
+                    const cid = child.id?.toString();
+                    if (!parentsByChild[cid]) parentsByChild[cid] = [];
+                    if (!parentsByChild[cid].includes(container_id?.toString())) {
+                        parentsByChild[cid].push(container_id?.toString());
+                    }
+                });
             });
         }
 
-        computedNodes = rowData.map((item, index) => {
+        computedNodes = [];
+        rowData.forEach((item, index) => {
             const tags = (item.Tags || '')
                 .toLowerCase()
                 .split(',')
                 .map(t => t.trim());
             const isGroup = tags.includes('group');
-            const parentId = childToGroup[item.id?.toString()];
+            const origId = item.id.toString();
 
-            let fallbackPosition;
-            if (parentId) {
-                const siblings = Object.entries(childToGroup)
-                    .filter(([cid, pid]) => pid === parentId)
-                    .map(([cid]) => cid);
-                const childIndex = siblings.indexOf(item.id?.toString());
-                const col = childIndex % 2;
-                const row = Math.floor(childIndex / 2);
-                fallbackPosition = { x: 40 + col * 120, y: 40 + row * 80 };
-            } else {
-                fallbackPosition = { x: 100 * index, y: 100 * index };
+            if (isGroup && showGroupNodes) {
+                computedNodes.push({
+                    id: origId,
+                    position: getNodePosition(origId, { x: 100 * index, y: 100 * index }),
+                    data: {
+                        id: item.id,
+                        Name: item.Name || `Node ${item.id}`,
+                        Description: item.Description || '',
+                        Budget: item.Budget || undefined,
+                        Cost: item.Cost || undefined,
+                        Tags: item.Tags || '',
+                        isHighestScoring: highestScoringId === item.id?.toString(),
+                        score: stateScores?.[item.id],
+                        normalizedScore: normalizeScore(stateScores?.[item.id]),
+                        PendingEdges: item.PendingEdges || [],
+                    },
+                    type: 'group',
+                    style: { width: GROUP_NODE_WIDTH, height: 180 },
+                });
+                return;
             }
 
-            return {
-                id: item.id.toString(),
-                position: getNodePosition(item.id.toString(), fallbackPosition), // <-- use getNodePosition
-                data: {
-                    id: item.id,
-                    Name: item.Name || `Node ${item.id}`,
-                    Description: item.Description || '',
-                    Budget: item.Budget || undefined,
-                    Cost: item.Cost || undefined,
-                    Tags: item.Tags || '',
-                    isHighestScoring: highestScoringId === item.id?.toString(),
-                    score: stateScores?.[item.id],
-                    normalizedScore: normalizeScore(stateScores?.[item.id]),
-                    PendingEdges: item.PendingEdges || [],
-                },
-                type: isGroup && showGroupNodes ? 'group' : 'custom',
-                style: isGroup && showGroupNodes ? { width: GROUP_NODE_WIDTH, height: 180 } : {},
-                ...(showGroupNodes && parentId ? { parentId, extent: 'parent' } : {}),
-            };
+            const parentIds = showGroupNodes ? (parentsByChild[origId] || []) : [];
+            if (parentIds.length > 0 && showGroupNodes) {
+                parentIds.forEach((parentId, pi) => {
+                    const cloneId = `${origId}__in__${parentId}`;
+                    computedNodes.push({
+                        id: cloneId,
+                        position: getNodePosition(
+                            cloneId,
+                            { x: 40 + ((index + pi) % 2) * 120, y: 40 + Math.floor((index + pi) / 2) * 80 }
+                        ),
+                        data: {
+                            id: item.id,
+                            originalId: item.id,
+                            Name: item.Name || `Node ${item.id}`,
+                            Description: item.Description || '',
+                            Budget: item.Budget || undefined,
+                            Cost: item.Cost || undefined,
+                            Tags: item.Tags || '',
+                            isHighestScoring: highestScoringId === item.id?.toString(),
+                            score: stateScores?.[item.id],
+                            normalizedScore: normalizeScore(stateScores?.[item.id]),
+                            PendingEdges: item.PendingEdges || [],
+                        },
+                        type: 'custom',
+                        parentId,
+                        extent: 'parent',
+                    });
+                });
+            } else {
+                // No parents or not showing groups: render single node
+                computedNodes.push({
+                    id: origId,
+                    position: getNodePosition(origId, { x: 100 * index, y: 100 * index }),
+                    data: {
+                        id: item.id,
+                        Name: item.Name || `Node ${item.id}`,
+                        Description: item.Description || '',
+                        Budget: item.Budget || undefined,
+                        Cost: item.Cost || undefined,
+                        Tags: item.Tags || '',
+                        isHighestScoring: highestScoringId === item.id?.toString(),
+                        score: stateScores?.[item.id],
+                        normalizedScore: normalizeScore(stateScores?.[item.id]),
+                        PendingEdges: item.PendingEdges || [],
+                    },
+                    type: 'custom',
+                });
+            }
         });
     }
 
