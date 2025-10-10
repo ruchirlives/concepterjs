@@ -11,7 +11,7 @@ import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDouble
 export const useEdgeMenu = (flowWrapperRef) => {
     const menuRef = useRef(null);
     const [currentEdge, setCurrentEdge] = useState(null);
-    const { setEdges, refreshInfluencerPair, influencersMap } = useAppContext();
+    const { setEdges, refreshInfluencerPair } = useAppContext();
     const { tiptapContent, setTiptapContent } = useTiptapContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
     const newRowFunc = useCreateNewRow();
