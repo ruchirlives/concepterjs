@@ -24,8 +24,13 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
     // If all nodes are disconnected, use grid fallback
     if (connectedNodes.length === 0) {
         const gridColCount = 8;
-        const gridSpacingX = 340;
-        const gridSpacingY = 120;
+        // Dynamically compute spacing based on node sizes to avoid overlap (esp. for group nodes)
+        const widths = nodes.map(n => nodeSizes[n.id]?.width || n.style?.width || 320);
+        const heights = nodes.map(n => nodeSizes[n.id]?.height || n.style?.height || estimateNodeHeight(n.data?.Name || '', (nodeSizes[n.id]?.width || n.style?.width || 320)));
+        const maxWidth = widths.length ? Math.max(...widths) : 320;
+        const maxHeight = heights.length ? Math.max(...heights) : 120;
+        const gridSpacingX = Math.max(340, maxWidth + 60); // add gap to ensure spacing between group nodes
+        const gridSpacingY = Math.max(120, maxHeight + 60);
         return nodes.map((node, idx) => {
             const col = idx % gridColCount;
             const row = Math.floor(idx / gridColCount);
@@ -55,8 +60,13 @@ function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {})
 
     // Lay out disconnected nodes in a grid
     const gridColCount = 8;
-    const gridSpacingX = 340;
-    const gridSpacingY = 120;
+    // For islands, also compute dynamic spacing to avoid overlap when sizes vary
+    const islandWidths = disconnectedNodes.map(n => nodeSizes[n.id]?.width || n.style?.width || 320);
+    const islandHeights = disconnectedNodes.map(n => nodeSizes[n.id]?.height || n.style?.height || estimateNodeHeight(n.data?.Name || '', (nodeSizes[n.id]?.width || n.style?.width || 320)));
+    const maxIslandWidth = islandWidths.length ? Math.max(...islandWidths) : 320;
+    const maxIslandHeight = islandHeights.length ? Math.max(...islandHeights) : 120;
+    const gridSpacingX = Math.max(340, maxIslandWidth + 60);
+    const gridSpacingY = Math.max(120, maxIslandHeight + 60);
     // Compute the bottom (max Y) of connected nodes so we can offset islands below
     let connectedBottomY = 0;
     connectedNodes.forEach((node) => {
@@ -213,7 +223,46 @@ export const getLayoutedElements = (
     const groupEdges = Array.from(groupEdgesMap.values());
 
     // Use dagre-driven subset layout for groups; falls back to grid for isolated groups
-    const layoutedGroups = layoutSubset(groupNodes, groupEdges, direction, nodesep, ranksep, nodeSizes);
+    let layoutedGroups = layoutSubset(groupNodes, groupEdges, direction, nodesep, ranksep, nodeSizes);
+
+    // If there are no edges between groups, pack group nodes tightly without overlap
+    if (groupNodes.length > 0 && groupEdges.length === 0) {
+        const margin = 20;
+        // Build rects list with sizes
+        const rects = layoutedGroups.map(g => ({
+            id: g.id,
+            width: nodeSizes[g.id]?.width || g.style?.width || 320,
+            height: nodeSizes[g.id]?.height || g.style?.height || 180,
+        }));
+        const totalArea = rects.reduce((acc, r) => acc + (r.width + margin) * (r.height + margin), 0);
+        const idealRowWidth = Math.max(600, Math.floor(Math.sqrt(totalArea))); // aim near-square
+
+        let x = 0;
+        let y = 0;
+        let rowHeight = 0;
+        const positionsById = {};
+        rects.forEach(r => {
+            if (x > 0 && x + r.width + margin > idealRowWidth) {
+                // new row
+                x = 0;
+                y += rowHeight + margin;
+                rowHeight = 0;
+            }
+            positionsById[r.id] = { x, y };
+            x += r.width + margin;
+            rowHeight = Math.max(rowHeight, r.height);
+        });
+
+        // Apply packed positions
+        layoutedGroups = layoutedGroups.map(n => {
+            const p = positionsById[n.id];
+            if (!p) return n;
+            return {
+                ...n,
+                position: { x: p.x, y: p.y }
+            };
+        });
+    }
 
     // 2. Layout top-level nodes using computed group sizes
     const topNodes = nodes.filter(n => !n.parentId && n.type !== 'group');
@@ -326,7 +375,45 @@ export const getLayoutedElements = (
         });
     });
 
-    // After laying out groups and before returning nodes
+    // After laying out groups, pack groups tightly if unconnected and we now know final sizes
+    if (groupEdges.length === 0) {
+        const margin = 20;
+        const groupsNow = layoutedNodes.filter(n => n.type === 'group');
+        // Compute target row width based on total area to keep a compact near-square packing
+        const totalArea = groupsNow.reduce((acc, g) => {
+            const w = (g.style?.width || 320) + margin;
+            const h = (g.style?.height || 180) + margin;
+            return acc + w * h;
+        }, 0);
+        const idealRowWidth = Math.max(600, Math.floor(Math.sqrt(totalArea)));
+
+        let x = 0;
+        let y = 0;
+        let rowHeight = 0;
+        const positionsById = {};
+        groupsNow.forEach(g => {
+            const gw = g.style?.width || 320;
+            const gh = g.style?.height || 180;
+            if (x > 0 && x + gw + margin > idealRowWidth) {
+                x = 0;
+                y += rowHeight + margin;
+                rowHeight = 0;
+            }
+            positionsById[g.id] = { x, y };
+            x += gw + margin;
+            rowHeight = Math.max(rowHeight, gh);
+        });
+
+        // Apply new positions to group nodes only; children remain relative
+        layoutedNodes = layoutedNodes.map(n => {
+            if (n.type !== 'group') return n;
+            const p = positionsById[n.id];
+            if (!p) return n;
+            return { ...n, position: { x: p.x, y: p.y } };
+        });
+    }
+
+    // After laying out groups and optional packing, before returning nodes
     // 1. Collect group bounding boxes
     const groupBoxes = layoutedNodes
         .filter(n => n.type === 'group')
