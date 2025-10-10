@@ -482,22 +482,39 @@ const AppKanban = () => {
       if (!(childrenMap[sourceId] || []).includes(cid)) {
         await addChildren(sourceId, [cid]);
       }
-      // Add the layer tag to the child if not present
-      const child = rowData.find(r => r.id.toString() === cid);
-      if (child && !(child.Tags || "").split(",").map(t => t.trim()).includes(layer)) {
-        child.Tags = child.Tags ? `${child.Tags}, ${layer}` : layer;
-        setRowData([...rowData]);
-      }
+      // Add the layer tag to the child if not present (use functional update to avoid stale state)
+      setRowData(prev => {
+        const idx = prev.findIndex(r => r.id.toString() === cid);
+        if (idx === -1) return prev;
+        const child = prev[idx];
+        const tagsArr = (child.Tags || "")
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean);
+        if (tagsArr.includes(layer)) return prev; // no change
+        const next = prev.slice();
+        next[idx] = { ...child, Tags: [...tagsArr, layer].join(", ") };
+        return next;
+      });
     } else {
       // Flipped: add source as child to row (parent)
       if (!(childrenMap[cid] || []).includes(sourceId.toString())) {
         await addChildren(cid, [sourceId.toString()]);
       }
-      // Add the layer tag to the parent if not present
-      if (row && !(row.Tags || "").split(",").map(t => t.trim()).includes(layer)) {
-        row.Tags = row.Tags ? `${row.Tags}, ${layer}` : layer;
-        setRowData([...rowData]);
-      }
+      // Add the layer tag to the parent if not present (use functional update)
+      setRowData(prev => {
+        const idx = prev.findIndex(r => r.id.toString() === cid);
+        if (idx === -1) return prev;
+        const parent = prev[idx];
+        const tagsArr = (parent.Tags || "")
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean);
+        if (tagsArr.includes(layer)) return prev; // no change
+        const next = prev.slice();
+        next[idx] = { ...parent, Tags: [...tagsArr, layer].join(", ") };
+        return next;
+      });
     }
   };
 
