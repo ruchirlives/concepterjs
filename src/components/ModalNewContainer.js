@@ -1,7 +1,7 @@
 import { createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
-import { handleWriteBack } from "hooks/effectsShared";
+import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
 
 export default function useCreateNewRow() {
     const { rowData, setRowData, selectedContentLayer } = useAppContext();
@@ -81,6 +81,9 @@ export default function useCreateNewRow() {
 
         handleWriteBack(updatedLoadedNodes);
         console.log(updatedLoadedNodes);
+
+        // Notify listeners (Kanban, Grid, Flow) to refresh derived data
+        requestRefreshChannel();
         return {
             newRows,
             loadedNodes: updatedLoadedNodes

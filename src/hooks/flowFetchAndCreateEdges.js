@@ -36,13 +36,18 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
     });
     // const groupSet = new Set(computedNodes.filter(n => n.type === 'group').map(n => n.id));
 
-    // Filter parentChildMap by originalIdSet and remove only 'successor' relations
+    // Filter parentChildMap by what's visible and remove only 'successor' relations
     let filteredParentChildMap;
     if (!groupByLayers) {
         filteredParentChildMap = parentChildMap
-            .filter(({ container_id, children }) =>
-                presentIdSet.has(container_id) || children.some(child => presentIdSet.has(child.id))
-            )
+            .filter(({ container_id, children }) => {
+                const parentVisible = presentIdSet.has(String(container_id));
+                // If clones exist, a child can be represented by a clone even if the original id isn't present
+                const hasVisibleChild = children.some(child =>
+                    presentIdSet.has(String(child.id)) || (clonesByOriginal[String(child.id)]?.length > 0)
+                );
+                return parentVisible || hasVisibleChild;
+            })
             .map(({ container_id, children }) => ({
                 container_id,
                 children: children.filter(c => c.label !== 'successor')
@@ -109,6 +114,26 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
                     // Fallback to original id if no clone (e.g., when showGroupNodes is off)
                     childMap[key].push({ ...c, id: c.id.toString() });
                 }
+            });
+        });
+
+        // Additionally, create mappings for non-group parent clones to their children clones within the same group.
+        // This enables visualizing edges between clone nodes when a group is active.
+        filteredParentChildMap.forEach(({ container_id, children }) => {
+            const parentClones = clonesByOriginal[container_id] || [];
+            if (!parentClones.length) return;
+            parentClones.forEach(parentClone => {
+                const parentGroup = parentClone.parentId;
+                if (!parentGroup) return;
+                const cloneKey = parentClone.id; // use clone id as the parent key
+                if (!childMap[cloneKey]) childMap[cloneKey] = [];
+                children.forEach(c => {
+                    const childClones = clonesByOriginal[c.id] || [];
+                    const childInSameGroup = childClones.find(ch => ch.parentId === parentGroup);
+                    if (childInSameGroup) {
+                        childMap[cloneKey].push({ ...c, id: childInSameGroup.id });
+                    }
+                });
             });
         });
     }

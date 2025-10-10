@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useAppContext, rowInLayers } from '../AppContext';
 import { applyEdgeChanges, } from '@xyflow/react';
-import { setPosition } from '../api';
+import { setPosition, addChildren } from '../api';
+import { requestRefreshChannel } from "./effectsShared";
 import useCreateNewRow from '../components/ModalNewContainer';
 import { generateNodesAndEdges } from './flowGenerateGraph';
 import { handleEdgeConnection, handleEdgeRemoval, requestAddChild } from './flowFunctions';
@@ -84,6 +85,14 @@ export const useOnConnectEnd = (params) => {
                 const targetArray = newNodes.map(node => node.id);
                 console.log("Target array:", targetArray);
 
+                // Helper to get the underlying container id for any node (handles group clones)
+                const getLogicalId = (n) => {
+                    if (!n) return '';
+                    if (n.data && n.data.id != null) return String(n.data.id);
+                    const raw = String(n.id ?? '');
+                    return raw.includes('__in__') ? raw.split('__in__')[0] : raw;
+                };
+
                 await Promise.all(newNodes.map(async (node) => {
                     // Check if fromNode has a handleId and determine connection direction
                     let connectionParams;
@@ -97,15 +106,15 @@ export const useOnConnectEnd = (params) => {
                         if (isInputHandle) {
                             // Input handle: fromNode becomes target, new node becomes source
                             connectionParams = {
-                                source: node.id,
-                                target: connectionState.fromNode.id,
+                                source: getLogicalId(node),
+                                target: getLogicalId(connectionState.fromNode),
                             };
 
                         } else {
                             // Output handle: fromNode becomes source, new node becomes target
                             connectionParams = {
-                                source: connectionState.fromNode.id,
-                                target: node.id,
+                                source: getLogicalId(connectionState.fromNode),
+                                target: getLogicalId(node),
                             };
 
                         }
@@ -115,9 +124,18 @@ export const useOnConnectEnd = (params) => {
                         return;
 
                     }
-                    await requestAddChild(connectionParams.source, [connectionParams.target]);
+                    // Persist relationship immediately (ensure it works even if Grid isn't mounted)
+                    try {
+                        const p = String(connectionParams.source);
+                        const c = String(connectionParams.target);
+                        await addChildren(p, [c]);
+                    } catch (e) {
+                        console.warn('Failed to persist child link (connectEnd)', e);
+                    }
                     handleEdgeConnection({ connectionParams, setEdges, addEdge });
                 }));
+                // Let other views recompute after batch
+                requestRefreshChannel();
 
                 // position the new nodes in the flow at the drop position
                 const dropPosition = screenToFlowPosition({
@@ -249,33 +267,53 @@ export const useOnConnect = (setEdges, addEdge, rowData) => {
 
         if (isOutChildHandle) {
             console.log('Sourcehandle:', connectionParams.sourceHandle);
-            // "out-child-<parentId>-on-<ancId>"
+            // Format: "out-child-<parentId>-on-<childId>"
             const [, after] = connectionParams.sourceHandle.split('out-child-');
-            // after === "<parentId>-on-<ancId>"
-            const [parentId] = after.split('-on-');
-            sourceId = parentId;
+            const parts = after.split('-on-');
+            const parentId = parts[0];
+            const childId = parts[1];
+            // When connecting from a child representation inside a group,
+            // the logical source should be the child itself, not the group/parent.
+            sourceId = childId || parentId;
         }
 
         if (isInChildHandle) {
-            // "in-child-<childId>-on-<ancId>"
+            // Format: "in-child-<childId>-on-<parentId>"
             const [, ids] = connectionParams.targetHandle.split('in-child-');
             const [childId] = ids.split('-on-');
             targetId = childId;
         }
 
+        // Normalize ids: map clone ids like "<id>__in__<parent>" back to underlying container ids
+        const normalizeId = (val) => {
+            const s = String(val ?? '');
+            return s.includes('__in__') ? s.split('__in__')[0] : s;
+        };
+        sourceId = normalizeId(sourceId);
+        targetId = normalizeId(targetId);
+
         console.log('Source ID:', sourceId);
         console.log('Target ID:', targetId);
 
         // Debug names from source and target id
-        const sourceNode = rowData.find(row => row.id === sourceId);
-        const targetNode = rowData.find(row => row.id === targetId);
+        // const sourceNode = rowData.find(row => row.id === sourceId);
+        // const targetNode = rowData.find(row => row.id === targetId);
 
-        console.log('Source node:', sourceNode.Name);
-        console.log('Target node:', targetNode.Name);
+        // console.log('Source node:', sourceNode.Name);
+        // console.log('Target node:', targetNode.Name);
 
 
-        await requestAddChild(sourceId, [targetId]);
-    }, [setEdges, addEdge, rowData]);
+        // Persist relationship immediately (ensure it works even if Grid isn't mounted)
+        try {
+            const p = String(sourceId);
+            const c = String(targetId);
+            await addChildren(p, [c]);
+        } catch (e) {
+            console.warn('Failed to persist child link (connect)', e);
+        }
+        // Notify other views to refresh derived data
+        requestRefreshChannel();
+    }, [setEdges, addEdge]);
 
     return onConnect;
 };
