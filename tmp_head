@@ -1,0 +1,200 @@
+import axios from "axios";
+import { getApiUrl, getPasscode } from "./apiConfig";
+import { requestRefreshChannel } from "hooks/effectsShared";
+
+const apiClient = axios.create({
+    baseURL: getApiUrl(), // Set the base URL for all requests
+});
+
+// Add request interceptor to include passcode in all requests
+apiClient.interceptors.request.use((config) => {
+    const passcode = getPasscode();
+    if (passcode) {
+        // Add passcode to headers
+        config.headers['X-Passcode'] = passcode;
+
+        // Alternatively, you could add it to the request body for POST requests:
+        // if (config.method === 'post' && config.data) {
+        //     config.data.passcode = passcode;
+        // }
+    }
+    return config;
+});
+
+export default apiClient;
+
+// Fetch single container by ID
+export const fetchContainerById = async (id) => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/get_container/${id}`);
+        const containers = response.data.containers;
+        // Return the first container object, or null if none
+        return Array.isArray(containers) && containers.length > 0
+            ? containers[0]
+            : null;
+    } catch (error) {
+        console.error("Error fetching container by ID:", error);
+        return null;
+    }
+}
+
+// Fetch all containers
+export const fetchContainers = async () => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/get_containers`);
+        let containers = response.data.containers;
+        console.log("Fetched containers:", containers.length);
+
+        // Duplicate check (warn)
+        if (Array.isArray(containers)) {
+            const idCounts = containers.reduce((acc, c) => {
+                acc[c.id] = (acc[c.id] || 0) + 1;
+                return acc;
+            }, {});
+            const dupes = Object.entries(idCounts).filter(([id, count]) => count > 1);
+            if (dupes.length > 0) {
+                console.warn("Duplicate container IDs found in fetchContainers:", dupes.map(([id, count]) => `${id} (x${count})`));
+            }
+
+            // Deduplicate by id
+            const seen = new Set();
+            containers = containers.filter(c => {
+                if (seen.has(c.id)) return false;
+                seen.add(c.id);
+                return true;
+            });
+        }
+
+        return containers;
+    } catch (error) {
+        console.error("Error fetching containers:", error);
+    }
+};
+
+// Create a new container in backend
+export const createContainer = async () => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/create_container`);
+        return response.data.id;
+    } catch (error) {
+        console.error("Error creating container:", error);
+        return null;
+    }
+};
+
+
+// Get Mermaid json
+export const get_mermaid = async (rowId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/get_mermaid`, {
+            "container_id": rowId,
+        });
+        // api returns the mermaid as json with mermaid key
+        return response.data.mermaid;
+    } catch (error) {
+        console.error("Error fetching Mermaid json:", error);
+        return "";
+    }
+};
+
+// Get Gantt
+export const get_gantt = async (rowId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/get_gantt`, {
+            "container_id": rowId,
+        });
+        return response.data.mermaid;
+    } catch (error) {
+        console.error("Error fetching Gantt json:", error);
+        return "";
+    }
+};
+
+// request rename_container using just id
+export const renameContainer = async (id) => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/rename_container/${id}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error renaming container:", error);
+        return null;
+    }
+};
+
+
+
+// Get docx as a downloadable Blob URL
+export const get_docx = async (rowId) => {
+    try {
+        const response = await apiClient.post(
+            `${getApiUrl()}/get_docx`,
+            { container_id: rowId },
+            { responseType: "blob" }  // Configure to expect binary data
+        );
+        // Create a URL from the Blob data
+        const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+        const url = window.URL.createObjectURL(blob);
+        return url;
+    } catch (error) {
+        console.error("Error fetching docx:", error);
+        return "";
+    }
+};
+
+// Get OneNote content
+export const get_onenote = async (rowId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/get_onenote`, {
+            "container_id": rowId,
+        });
+        return response.data.onenote;
+    } catch (error) {
+        console.error("Error fetching OneNote content:", error);
+        return "";
+    }
+};
+
+// Fetch parent containers
+export const fetchParentContainers = async (rowId) => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/get_parents/${rowId}`);
+        return response.data.containers;
+    } catch (error) {
+        console.error("Error fetching parent containers:", error);
+        return [];
+    }
+};
+
+// Function to fetch children dynamically
+export const fetchChildren = async (parentId) => {
+    try {
+        const response = await apiClient.get(`${getApiUrl()}/children/${parentId}`);
+        console.log(`${getApiUrl()}/children/${parentId}`);
+        // console.log(response.data.containers);
+        return response.data.containers;
+    }
+    catch (error) {
+        console.error("Error fetching children:", error);
+        return [];
+    }
+};
+
+// Function to submit an array of containerIDs to the API which will return an array of containerIDs with a subarray of children for each
+export const manyChildren = async (containerIds) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/manyChildren`, {
+            container_ids: containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching children by IDs:", error);
+        return null;
+    }
+};
+
+export const suggestRelationship = async (sourceId, targetId) => {
+    try {
+        console.log(`Suggesting relationship from API: ${sourceId} -> ${targetId}`);
+        const response = await apiClient.post(`${getApiUrl()}/suggest_relationship`, {
+            source_id: sourceId,
+            target_id: targetId,

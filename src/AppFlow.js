@@ -18,6 +18,8 @@ import { FlowMenuProvider } from './components/FlowMenuContext';
 import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import { saveNodes } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 
@@ -164,6 +166,28 @@ const App = ({ keepLayout, setKeepLayout }) => {
         comparatorState={comparatorState}
         stateScores={stateScores}
       >
+        {/* Save visible nodes */}
+        <button
+          className="ml-4 px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+          onClick={async () => {
+            try {
+              const ids = (flowFilteredRowData || []).map(c => c.id).filter(Boolean);
+              if (!ids.length) {
+                toast("No nodes to save from current filter.");
+                return;
+              }
+              const res = await saveNodes(ids);
+              const msg = res?.message || "Nodes saved successfully";
+              toast.success(msg);
+            } catch (e) {
+              console.error("Save nodes failed", e);
+              toast.error("Failed to save nodes");
+            }
+          }}
+          title="Save all currently visible nodes"
+        >
+          Save Nodes
+        </button>
         {/* Group By Layers tickbox */}
         <div className="flex items-center gap-2 ml-4">
           <input

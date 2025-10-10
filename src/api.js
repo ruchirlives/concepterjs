@@ -1063,3 +1063,16 @@ export const searchPositionZ = async (searchTerm, top_n = 5) => {
         return [];
     }
 };
+
+// Save all nodes to the backend database
+export const saveNodes = async (nodeIds) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/save_nodes`, {
+            nodeIds: nodeIds,
+        });
+        return response.data; // { message: "Nodes saved successfully" }
+    } catch (error) {
+        console.error("Error saving nodes:", error);
+        return null;
+    }
+};

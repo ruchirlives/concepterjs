@@ -5,7 +5,7 @@ import { setPosition, addChildren } from '../api';
 import { requestRefreshChannel } from "./effectsShared";
 import useCreateNewRow from '../components/ModalNewContainer';
 import { generateNodesAndEdges } from './flowGenerateGraph';
-import { handleEdgeConnection, handleEdgeRemoval, requestAddChild } from './flowFunctions';
+import { handleEdgeConnection, handleEdgeRemoval } from './flowFunctions';
 
 
 export const useOnConnectEnd = (params) => {

@@ -1,0 +1,200 @@
+    }
+};
+
+// Compare states for given containers (refactored to accept source and target)
+export const compareStates = async (sourceState, targetState, containerIds) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/compare_states`, {
+            sourceState,
+            targetState,
+            containerIds,
+        });
+        return response.data.differences_all || [];
+    } catch (error) {
+        console.error("Error comparing states:", error);
+        throw error;
+    }
+};
+
+// Apply differences to specified containers
+export const applyDifferences = async (containerIds, differences, targetState) => {
+    try {
+        console.log("Applying differences:", { containerIds, differences, targetState });
+        const response = await apiClient.post(`${getApiUrl()}/apply_differences`, {
+            containerIds: containerIds,
+            differences: differences,
+            targetState: targetState,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error applying differences:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// Revert differences from specified containers
+export const revertDifferences = async (containerIds, differences, targetState) => {
+    try {
+        console.log("Reverting differences:", { containerIds, differences, targetState });
+        const response = await apiClient.post(`${getApiUrl()}/revert_differences`, {
+            containerIds: containerIds,
+            differences: differences,
+            targetState: targetState,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error reverting differences:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+// Calculate state scores for containers
+export const calculateStateScores = async (baseState) => {
+    try {
+        console.log("Calculating state scores for base state:", baseState);
+        const response = await apiClient.post(`${getApiUrl()}/calculate_state_scores`, {
+            baseState: baseState,
+        });
+        return response.data.scores || {};
+    } catch (error) {
+        console.error("Error calculating state scores:", error);
+        throw error; // Re-throw to let the caller handle the error display
+    }
+};
+
+export const getContainerBudgetApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/get_container_budget`, { container_ids: containerIds });
+    return response.data.budgets;
+};
+
+export const convertToBudgetContainerApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/convert_to_budget_container`, { container_ids: containerIds });
+    return response.data;
+};
+
+export const addFinanceContainerApi = async (containerIds) => {
+    const response = await apiClient.post(`${getApiUrl()}/add_finance_container`, { container_ids: containerIds });
+    return response.data;
+};
+
+export async function joinSimilarContainers(containerIds) {
+    const res = await apiClient.post(`${getApiUrl()}/join_similar`, { container_ids: containerIds });
+    console.log("joinSimilarContainers response:", res);
+    if (res.status !== 200) throw new Error("Failed to join similar containers");
+    return res.data;
+}
+
+/**
+ * Generate embeddings for relationship positions.
+ * @param {string[]} containerIds
+ * @returns {Promise<Object>} API response
+ */
+export const embedPositions = async (containerIds) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/embed_positions`, {
+            container_ids: containerIds,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error embedding positions:", error);
+        return null;
+    }
+};
+
+/**
+ * Find similar positions based on embeddings.
+ * @param {string} positionText
+ * @returns {Promise<Object>} API response
+ */
+export const findSimilarPositions = async (positionText) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/find_similar_positions`, {
+            position_text: positionText,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error finding similar positions:", error);
+        return null;
+    }
+};
+
+/**
+ * Inherit positions from child containers into a group container.
+ * Backend: expects { container_id }
+ * @param {string} containerId
+ * @returns {Promise<Object|null>} API response with message
+ */
+export const inheritPositions = async (containerId) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/inherit_positions`, {
+            container_id: containerId,
+        });
+        return response.data;
+    } catch (error) {
+        // Surface 4xx/5xx messages when available
+        const msg = error?.response?.data?.message || "Error inheriting positions";
+        console.error(msg, error);
+        return { message: msg, error: true };
+    }
+};
+
+/**
+ * Fetch a single node by its ID from the backend.
+ * @param {string} id - The node ID to load.
+ * @returns {Promise<Object|null>} The node object, or null if not found.
+ */
+export const loadNode = async (id) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/load_node`, { id: id });
+        const containers = response.data.containers;
+        // Return the first container object, or null if none
+        return Array.isArray(containers) && containers.length > 0
+            ? containers[0]
+            : null;
+    } catch (error) {
+        if (error.response?.status === 404) {
+            console.warn(`Node with ID ${id} not found (404 error expected)`);
+            return null; // Return null for 404 errors
+        }
+        console.error("Error loading node:", error);
+        return null;
+    }
+};
+
+/**
+ * Search nodes by a search term.
+ * @param {string} searchTerm - The term to search for.
+ * @returns {Promise<Array>} Array of matching node results.
+ */
+export const searchNodes = async (searchTerm, tags) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/search_nodes`, {
+            search_term: searchTerm,
+            tags: tags
+        });
+        return response.data.results || [];
+    } catch (error) {
+        console.error("Error searching nodes:", error);
+        return [];
+    }
+};
+
+/**
+ * Search for position.z using vector search.
+ * @param {string} searchTerm - The search term for position.z.
+ * @param {number} [top_n=10] - Number of top results to return.
+ * @returns {Promise<Array>} Array of names matching the search.
+ * 
+ */
+export const searchPositionZ = async (searchTerm, top_n = 5) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/search_position_z`, {
+            searchTerm,
+            top_n
+        });
+        return response.data.result || [];
+    } catch (error) {
+        console.error("Error searching position.z:", error);
+        return [];
+    }
+};
