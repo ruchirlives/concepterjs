@@ -132,7 +132,7 @@ export function getVisOptions({
           if (idSet.has(s) && idSet.has(t)) links.push({ source: s, target: t });
         });
 
-        return { hierarchy, links };
+        return { hierarchy, links, parentCount: state.parentCountById || {} };
       },
       options: { k: 6 },
     },

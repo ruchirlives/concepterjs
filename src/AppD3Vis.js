@@ -32,7 +32,7 @@ const AppD3Vis = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
   const controllerRef = useRef(null);
-  const { rowData, setRowData, hiddenLayers } = useAppContext();
+  const { rowData, setRowData, hiddenLayers, parentChildMap } = useAppContext();
   // Simple visualization selector state
   const [visType, setVisType] = useState("donut");
 
@@ -333,6 +333,37 @@ const AppD3Vis = ({ targetId }) => {
       relatedIds,
       ancestorIds,
       relationships,
+      parentCountById: (() => {
+        const m = {};
+        const pcm = parentChildMap || [];
+        if (Array.isArray(pcm)) {
+          // Expect [{ container_id, children: [{id,label,...}, ...] }, ...]
+          pcm.forEach(entry => {
+            const kids = entry?.children || [];
+            kids.forEach(child => {
+              if (child && child.label !== 'successor') {
+                const cid = String(child.id ?? child);
+                m[cid] = (m[cid] || 0) + 1;
+              }
+            });
+          });
+        } else if (pcm && typeof pcm === 'object') {
+          // Fallback: object/map of parent -> children (array/object/single)
+          Object.values(pcm).forEach(kids => {
+            let arr = [];
+            if (Array.isArray(kids)) arr = kids;
+            else if (kids && typeof kids === 'object') arr = Object.values(kids);
+            else if (kids != null) arr = [kids];
+            arr.forEach(child => {
+              if (child && child.label !== 'successor') {
+                const cid = String(child.id ?? child);
+                m[cid] = (m[cid] || 0) + 1;
+              }
+            });
+          });
+        }
+        return m;
+      })(),
       sankeyLinkColor,
       sankeyNodeAlign,
     },
@@ -354,6 +385,7 @@ const AppD3Vis = ({ targetId }) => {
     relatedIds,
     ancestorIds,
     relationships,
+    parentChildMap,
     sankeyLinkColor,
     sankeyNodeAlign,
   ]);

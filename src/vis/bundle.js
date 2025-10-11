@@ -53,8 +53,8 @@ export function createBundle({ svgEl, data, options = {} }) {
     // Compute stable radius and margins so labels/edges fit inside canvas
     const W = Math.max(300, width);
     const R = W / 2;
-    const ringMargin = 140; // distance from outer radius to leaf ring
-    const vbPad = 60;       // extra padding on viewBox to avoid clipping
+    const ringMargin = 100; // distance from outer radius to leaf ring
+    const vbPad = 80;       // extra padding on viewBox to avoid clipping
 
     const tree = d3.cluster().size([2 * Math.PI, R - ringMargin]);
     const clustered = tree(root);
@@ -71,6 +71,15 @@ export function createBundle({ svgEl, data, options = {} }) {
 
     const leaves = clustered.leaves();
 
+    // Dynamic font size based on number of leaves and radius
+    const N = Math.max(1, leaves.length);
+    const theta = (2 * Math.PI) / N;
+    const minFs = 10;
+    const maxFs = 100;
+    const fsFromTheta = Math.max(minFs, Math.min(maxFs, (theta / 0.25) * maxFs));
+    const radiusFactor = Math.max(0.85, Math.min(1.15, (R / 400)));
+    const dynamicFontSize = Math.max(minFs, Math.min(maxFs, fsFromTheta * radiusFactor));
+
     const node = g.append("g")
       .selectAll(null)
       .data(leaves)
@@ -82,7 +91,7 @@ export function createBundle({ svgEl, data, options = {} }) {
       .attr("x", d => d.x < Math.PI ? 6 : -6)
       .attr("text-anchor", d => d.x < Math.PI ? "start" : "end")
       .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
-      .style("font-size", "25px") // increased label size
+      .style("font-size", `${dynamicFontSize}px`)
       .text(d => d.data.name ?? d.data.id)
       .append("title")
       .text(d => `${id(d)}\n${d.outgoing?.length || 0} outgoing\n${d.incoming?.length || 0} incoming`);
@@ -91,6 +100,13 @@ export function createBundle({ svgEl, data, options = {} }) {
       .curve(d3.curveBundle)
       .radius(d => d.y)
       .angle(d => d.x);
+
+    // Prepare width scale based on parent counts (source node parents)
+    const parentCount = payload.parentCount || {};
+    const countValues = Object.values(parentCount);
+    const cMin = countValues.length ? Math.min(...countValues) : 1;
+    const cMax = countValues.length ? Math.max(...countValues) : 1;
+    const widthScale = d3.scaleSqrt().domain([cMin, cMax]).range([0.5, 4]);
 
     // Build all paths
     const allPaths = clustered.leaves().flatMap(leaf => (leaf.outgoing || []).map(([s, t]) => [s, t]));
@@ -108,7 +124,11 @@ export function createBundle({ svgEl, data, options = {} }) {
         return ctx.toString();
       })
       .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", 1);
+      .attr("stroke-width", d => {
+        const sid = String(d[0].data.id ?? d[0].data.name);
+        const cnt = parentCount[sid] || cMin;
+        return widthScale(cnt);
+      });
 
     // Ctrl+wheel zoom and drag pan
     const zoom = d3.zoom()
