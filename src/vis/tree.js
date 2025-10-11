@@ -2,6 +2,7 @@
 import * as d3 from "d3";
 
 export function createTree({ svgEl, data, options = {} }) {
+  const handlers = options.handlers || {};
   const render = (payload) => {
     const payloadData = payload?.data || data || {};
     const nodes = payloadData.treeData || payloadData.donutTree || [];
@@ -9,7 +10,10 @@ export function createTree({ svgEl, data, options = {} }) {
     const svg = d3.select(svgEl);
     svg.selectAll("*").remove();
 
-    const width = options.width ?? (svgEl?.clientWidth || 928);
+    // Resolve width safely; prefer explicit option, else DOM width, else default
+    const cw = Number(svgEl?.clientWidth);
+    const widthFromEl = Number.isFinite(cw) && cw > 0 ? cw : 928;
+    const width = Number.isFinite(options.width) ? options.width : widthFromEl;
     const dx = 14;
 
     // Build a simple hierarchical object from flat donutTree if provided
@@ -34,10 +38,19 @@ export function createTree({ svgEl, data, options = {} }) {
       rootData = byKey.get(rootKey) || null;
     }
 
-    if (!rootData) return;
+    if (!rootData) {
+      // Safe minimal viewBox to avoid NaN attributes
+      svg.attr("viewBox", "0 0 1 1").attr("preserveAspectRatio", "xMidYMid meet");
+      return;
+    }
 
     const root = d3.hierarchy(rootData);
-    const dy = width / (root.height + 1 || 1);
+    const breadth = (root.height + 1) || 1;
+    const dy = width / breadth;
+    if (!Number.isFinite(dy) || dy <= 0) {
+      svg.attr("viewBox", "0 0 1 1").attr("preserveAspectRatio", "xMidYMid meet");
+      return;
+    }
     const tree = d3.cluster().nodeSize([dx, dy]);
     root.sort((a, b) => d3.ascending(a.data.name, b.data.name));
     tree(root);
@@ -80,7 +93,11 @@ export function createTree({ svgEl, data, options = {} }) {
       .attr("text-anchor", d => (d.children ? "end" : "start"))
       .text(d => d.data.name)
       .attr("stroke", "white")
-      .attr("paint-order", "stroke");
+      .attr("paint-order", "stroke")
+      .style("cursor", "pointer")
+      .on("click", (event, d) => handlers.handleSegmentClick?.(event, { data: { id: d.data.id, name: d.data.name } }))
+      .on("contextmenu", (event, d) => handlers.handleSegmentContextMenu?.(event, { data: { id: d.data.id, name: d.data.name } }))
+      .on("mousedown", (event, d) => handlers.handleSegmentMouseDown?.(event, { data: { id: d.data.id, name: d.data.name } }));
   };
 
   render({ data });
@@ -91,4 +108,3 @@ export function createTree({ svgEl, data, options = {} }) {
 }
 
 export default createTree;
-

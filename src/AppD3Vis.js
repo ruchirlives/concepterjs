@@ -64,13 +64,14 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
     // Find related ids for next level
     const parentIds = [];
     if (!useChildren) {
+      // ancestry upward (parents)
       Object.entries(childrenMap).forEach(([parentId, children]) => {
         if (children.includes(firstItem.id)) {
           parentIds.push(parentId);
         }
       });
     } else {
-      // Descendants: next level are children of the firstItem
+      // descendants (children)
       const kids = childrenMap[firstItem.id] || [];
       parentIds.push(...kids);
     }
@@ -138,6 +139,7 @@ const AppD3Vis = ({ targetId }) => {
   // Compute ancestor IDs (direct parent(s) only) for separate highlighting
   const ancestorIds = useMemo(() => {
     if (!clickedSegmentId || !childrenMap) return new Set();
+    if (reverseAncestry) return new Set();
     const rootId = clickedSegmentId?.toString();
     const directParents = new Set();
     Object.entries(childrenMap).forEach(([parent, kids]) => {
@@ -146,7 +148,7 @@ const AppD3Vis = ({ targetId }) => {
       }
     });
     return directParents;
-  }, [clickedSegmentId, childrenMap]);
+  }, [clickedSegmentId, childrenMap, reverseAncestry]);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -282,6 +284,7 @@ const AppD3Vis = ({ targetId }) => {
       .filter(entry => entry.items.length > 0);
   }, [useLayers, visibleLayers, rowData, hiddenLayers]);
 
+  const activeVisKey = visType;
   // Track viewport size to re-render responsive chart on resize
   const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -294,50 +297,62 @@ const AppD3Vis = ({ targetId }) => {
   // Function to handle segment clicks
   const handleSegmentClick = useCallback((event, d) => {
     event.stopPropagation();
+    // Normalize payload from donut (d.data.*) and tree (custom payload)
+    const clickedId = d?.data?.id?.toString?.() ?? d?.data?.id ?? d?.id;
+    const clickedLevel = d?.data?.level;
 
-    // Extract the level and id from the clicked segment
-    const clickedId = d.data.id;
-    const clickedLevel = d.data.level;
+    if (!clickedId) return;
 
     setIsInternalClick(true);
+    setClickedSegmentId(clickedId);
 
-    // Broadcast the selected segment's id
+    // Broadcast (keep your existing behavior)
     const channel = new BroadcastChannel('selectNodeChannel');
     channel.postMessage({ nodeId: clickedId });
 
-    setClickedSegmentId(clickedId);
-
-    if (useLayers || typeof clickedLevel !== "number") {
+    // 1) Layers mode: do not rebuild
+    if (useLayers) {
       setFocusedNodeId(null);
       return;
     }
 
-    // Step 1: Clear all items with level > clickedLevel from donutTree (keep the clicked level)
-    const filteredTree = donutTree.filter(item => item.level <= clickedLevel);
+    // 2) Tree mode: re-root on click (labels don’t carry level)
+    if (activeVisKey === 'tree') {
+      setFocusedNodeId(null);
+      setId(clickedId); // triggers central rebuild; tree sees new root
+      return;
+    }
 
-    // Step 2: Get the subtree starting from the clicked segment (but starting at level 0)
-    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 1, 0);
+    // 3) Donut mode: one-level expand only if we have a numeric level
+    if (typeof clickedLevel !== 'number') {
+      // Optional: fallback to re-root in donut if no level is provided
+      setFocusedNodeId(null);
+      setId(clickedId);
+      return;
+    }
 
-    // Step 3: Adjust subtree levels to be children of the clicked segment
-    // Remove the root of subtree (which is the clicked segment itself) and shift all other levels
-    const adjustedSubtree = subtree
-      .filter(item => item.level > 0) // Remove the root (level 0) which duplicates clicked segment
-      .map((item, index, array) => ({
+    // Donut one-level expand logic (your existing code, with a tiny guard)
+    // Step 1: Clear all items with level > clickedLevel
+    const filteredTree = donutTree.filter(item => Number.isFinite(item.level) && item.level <= clickedLevel);
+
+    // Step 2: Build a subtree (depth 1) from clickedId (respect reverseAncestry)
+    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 1, 0, reverseAncestry);
+
+    // Step 3: Shift subtree levels to be children of the clicked segment
+    const adjustedSubtree = (subtree || [])
+      .filter(item => Number.isFinite(item.level) && item.level > 0) // remove root (level 0)
+      .map(item => ({
         ...item,
-        level: item.level + clickedLevel, // Shift levels to be children of clicked segment
-        parentId: item.level === 1 ? clickedId : item.parentId // First level's parent is clicked segment
+        level: item.level + clickedLevel, // shift
+        parentId: item.level === 1 ? clickedId : item.parentId
       }));
 
-    // Step 4: Merge the filtered tree with the adjusted subtree
+    // Step 4/5: Merge + de-dupe (keep subtree preference)
     const mergedTree = [...filteredTree, ...adjustedSubtree];
-
-    // Step 5: Remove duplicates (keep items from adjustedSubtree if there are conflicts)
     const uniqueTree = [];
     const seen = new Set();
-
-    // Process in reverse order so adjustedSubtree items take precedence
     [...mergedTree].reverse().forEach(item => {
-      const key = `${item.id}-${item.level}`;
+      const key = `${ item.id }-${ item.level }`;
       if (!seen.has(key)) {
         seen.add(key);
         uniqueTree.unshift(item);
@@ -345,7 +360,16 @@ const AppD3Vis = ({ targetId }) => {
     });
 
     setDonutTree(uniqueTree);
-  }, [donutTree, nameById, childrenMap, useLayers]);
+  }, [
+    useLayers,
+    activeVisKey,
+    donutTree,
+    nameById,
+    childrenMap,
+    reverseAncestry,
+    setId,
+    setFocusedNodeId,
+  ]);
 
   // Add right-click handler for donut segments
   const handleSegmentContextMenu = useCallback((event, d) => {
@@ -438,9 +462,9 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
-  const controllerRegistry = useMemo(() => ({donut: createDonut,layers: createDonut,tree: createTree}), []);
+  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree }), []);
 
-  const activeVisKey = visType;
+  
 
   useEffect(() => {
     const svgEl = svgRef.current;
@@ -458,11 +482,15 @@ const AppD3Vis = ({ targetId }) => {
         relatedIds,
         ancestorIds,
         useLayers,
+        reverseAncestry,
       },
       options: {
         mode: activeVisKey,
         useLayers,
+        reverseAncestry,
         colorByTag,
+        width: svgRef.current?.clientWidth || undefined,
+        height: svgRef.current?.clientHeight || undefined,
         tooltipEl: tooltipRef.current,
         handlers: {
           handleSegmentClick,
@@ -480,6 +508,7 @@ const AppD3Vis = ({ targetId }) => {
       relatedIds,
       ancestorIds,
       useLayers,
+      reverseAncestry,
     });
 
     return () => controller.destroy?.();
@@ -498,7 +527,8 @@ const AppD3Vis = ({ targetId }) => {
     relatedIds,
     useLayers,
     stripCommonWords,
-    viewportSize
+    viewportSize,
+    reverseAncestry,
   ]);
 
   // Reset clicked segment when changing root
@@ -542,7 +572,7 @@ const AppD3Vis = ({ targetId }) => {
         </svg>
       )}
       <div className="flex justify-between items-center mb-2 w-full gap-4">
-      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <h2 className="font-semibold">Vis View (D3)</h2>
           <select
             value={visType}
@@ -550,7 +580,8 @@ const AppD3Vis = ({ targetId }) => {
             className="px-2 py-1 border rounded text-sm"
             aria-label="Select visualization"
           >
-            <option value="donut">Ancestry Donut</option>        <option value="layers">Layer Rings</option>        <option value="tree">Cluster Tree</option>
+            <option value="donut">Ancestry Donut</option>
+            <option value="tree">Cluster Tree</option>
           </select>
           <label className="flex items-center gap-1 text-sm">
             <input

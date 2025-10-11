@@ -409,17 +409,30 @@ export function createDonut({ svgEl, data, options = {} }) {
     const relatedIds = payloadData.relatedIds instanceof Set ? payloadData.relatedIds : new Set(payloadData.relatedIds || []);
     const ancestorIds = payloadData.ancestorIds instanceof Set ? payloadData.ancestorIds : new Set(payloadData.ancestorIds || []);
 
-    const fallbackWidth = svgEl?.clientWidth || 700;
-    const width = options.width ?? fallbackWidth;
-    const fallbackHeight = svgEl?.clientHeight || fallbackWidth;
-    const height = options.height ?? fallbackHeight;
+    // Resolve dimensions safely
+    const cw = Number(svgEl?.clientWidth);
+    const ch = Number(svgEl?.clientHeight);
+    const fallbackWidth = Number.isFinite(cw) && cw > 0 ? cw : 700;
+    const width = Number.isFinite(options.width) ? options.width : fallbackWidth;
+    const fallbackHeight = Number.isFinite(ch) && ch > 0 ? ch : fallbackWidth;
+    const height = Number.isFinite(options.height) ? options.height : fallbackHeight;
 
     const svg = d3.select(svgEl);
     svg.selectAll("*").remove();
 
-    svg
-      .attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet");
+    // If invalid dimensions, set a safe minimal viewBox and bail
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      svg.attr("viewBox", `0 0 1 1`).attr("preserveAspectRatio", "xMidYMid meet");
+      return;
+    }
+
+    const vbX = -width / 2;
+    const vbY = -height / 2;
+    if (Number.isFinite(vbX) && Number.isFinite(vbY)) {
+      svg.attr("viewBox", `${vbX} ${vbY} ${width} ${height}`).attr("preserveAspectRatio", "xMidYMid meet");
+    } else {
+      svg.attr("viewBox", `0 0 ${Math.max(1, width)} ${Math.max(1, height)}`).attr("preserveAspectRatio", "xMidYMid meet");
+    }
 
     if (mode === "layers") {
       renderLayerRings({
@@ -434,6 +447,11 @@ export function createDonut({ svgEl, data, options = {} }) {
         handlers,
         tooltipEl,
       });
+      return;
+    }
+
+    // Guard radius and data before rendering ancestry donut
+    if (!donutTree.length) {
       return;
     }
 
