@@ -512,9 +512,9 @@ const AppD3Vis = ({ targetId }) => {
       className="bg-white rounded shadow p-4 "
       style={{
         width: "100%",
-        height: "100vh",
+        height: "90vh",
         transition: "height 0.3s",
-        overflow: "hidden",
+        overflow: "auto",
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -612,6 +612,7 @@ const AppD3Vis = ({ targetId }) => {
           No visible layers with items to display.
         </div>
       )}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
         <svg
           ref={svgRef}
           width="100%"
@@ -621,6 +622,7 @@ const AppD3Vis = ({ targetId }) => {
           }}
           preserveAspectRatio="xMidYMid meet"
         />
+      </div>
       <div
         ref={tooltipRef}
         style={{
