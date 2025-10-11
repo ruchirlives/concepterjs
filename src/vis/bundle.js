@@ -72,16 +72,17 @@ export function createBundle({ svgEl, data, options = {} }) {
       .selectAll(null)
       .data(leaves)
       .join("g")
-        .attr("transform", d => `rotate(${(d.x * 180 / Math.PI) - 90}) translate(${d.y},0)`);
+      .attr("transform", d => `rotate(${(d.x * 180 / Math.PI) - 90}) translate(${d.y},0)`);
 
     node.append("text")
       .attr("dy", "0.31em")
       .attr("x", d => d.x < Math.PI ? 6 : -6)
       .attr("text-anchor", d => d.x < Math.PI ? "start" : "end")
       .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null)
+      .style("font-size", "25px") // increased label size
       .text(d => d.data.name ?? d.data.id)
       .append("title")
-        .text(d => `${id(d)}\n${d.outgoing?.length || 0} outgoing\n${d.incoming?.length || 0} incoming`);
+      .text(d => `${id(d)}\n${d.outgoing?.length || 0} outgoing\n${d.incoming?.length || 0} incoming`);
 
     const line = d3.lineRadial()
       .curve(d3.curveBundle)
@@ -96,15 +97,15 @@ export function createBundle({ svgEl, data, options = {} }) {
       .selectAll(null)
       .data(allPaths)
       .join("path")
-        .style("mix-blend-mode", "darken")
-        .attr("stroke", (_, i) => color(d3.easeQuad((i % ((1 << k))) / ((1 << k) - 1))))
-        .attr("d", d => {
-          const ctx = d3.path();
-          line.context(ctx)(d[0].path(d[1]));
-          return ctx.toString();
-        })
-        .attr("stroke-opacity", 0.6)
-        .attr("stroke-width", 1);
+      .style("mix-blend-mode", "darken")
+      .attr("stroke", (_, i) => color(d3.easeQuad((i % ((1 << k))) / ((1 << k) - 1))))
+      .attr("d", d => {
+        const ctx = d3.path();
+        line.context(ctx)(d[0].path(d[1]));
+        return ctx.toString();
+      })
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", 1);
   };
 
   render();
