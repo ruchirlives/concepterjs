@@ -309,11 +309,10 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
+  // Controller registry (stable)
   const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey, bundle: createBundle }), []);
   const [sankeyLinkColor, setSankeyLinkColor] = useState('source-target');
   const [sankeyNodeAlign, setSankeyNodeAlign] = useState('sankeyLeft');
-
-  // Remove in-component builder (moved to module scope)
 
   // Visualization configuration map: controller + data builder + defaults
   const visOptions = useMemo(() => getVisOptions({
@@ -390,6 +389,7 @@ const AppD3Vis = ({ targetId }) => {
     sankeyNodeAlign,
   ]);
 
+  // Main effect: initialize/rebuild controller on visType or data/options change
   useEffect(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
