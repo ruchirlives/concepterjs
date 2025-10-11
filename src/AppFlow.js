@@ -47,8 +47,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
   } = useFlowLogic();
 
   const [groupByLayers, setGroupByLayers] = useState(false);
-  const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [showGroupNodes, setShowGroupNodes] = useState(false);
+  const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [dragging, setDragging] = useState(false);
 
   // Memoize edgeTypes so it's not recreated on every render
