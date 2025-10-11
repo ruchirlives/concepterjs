@@ -9,9 +9,6 @@ export function getVisOptions({
   controllers,
 }) {
   const {
-    layersWithItems,
-    rowData,
-    relationships,
     sankeyLinkColor = 'source-target',
     sankeyNodeAlign = 'sankeyLeft',
   } = state;
@@ -53,17 +50,28 @@ export function getVisOptions({
     sankey: {
       name: 'Sankey',
       controller: createSankey,
-      buildData: () => buildNodesLinks(rowData || [], relationships || {}, {
-        idKey: 'id',
-        nameKey: 'Name',
-        parentKey: 'ParentId',
-        relationshipDelimiter: '--',
-        layerResolver: (row) => {
-          const layerEntry = (layersWithItems || []).find(l => (l.items || []).some(it => it?.original?.id?.toString() === row?.id?.toString()));
-          return layerEntry ? `L${layerEntry.layer}` : undefined;
-        },
-        includeOrphans: true,
-      }),
+      buildData: () => {
+        const sanitizeTags = (tags) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        const visibleLayers = (state.availableLayerOptions || []).filter(l => !state.hiddenLayers.has(l));
+
+        const filteredRows = (state.rowData || []).filter(row => {
+          const tags = sanitizeTags(row?.Tags);
+          return tags.some(tag => visibleLayers.includes(tag));
+        });
+
+        return buildNodesLinks(filteredRows, state.relationships || {}, {
+          idKey: 'id',
+          nameKey: 'Name',
+          parentKey: 'ParentId',
+          relationshipDelimiter: '--',
+          layerResolver: (row) => {
+            const tags = sanitizeTags(row?.Tags);
+            const layer = tags.find(tag => visibleLayers.includes(tag));
+            return layer ? `L${layer}` : undefined;
+          },
+          includeOrphans: false,
+        });
+      },
       options: { linkColor: sankeyLinkColor, nodeAlign: sankeyNodeAlign },
     },
   };

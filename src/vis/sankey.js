@@ -29,7 +29,7 @@ export function createSankey({ svgEl, data, options = {} }) {
     // Guard: require minimal data
     if (!Array.isArray(nodesIn) || !Array.isArray(linksIn) || nodesIn.length === 0) {
       svg.attr("viewBox", `0 0 ${Math.max(1, width)} ${Math.max(1, height)}`)
-         .attr("preserveAspectRatio", "xMidYMid meet");
+        .attr("preserveAspectRatio", "xMidYMid meet");
       return;
     }
 
@@ -146,7 +146,7 @@ export function createSankey({ svgEl, data, options = {} }) {
   render({ data });
   return {
     update(next) { render({ data: next }); },
-    destroy() {}
+    destroy() { }
   };
 }
 
