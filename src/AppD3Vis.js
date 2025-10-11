@@ -506,7 +506,7 @@ const AppD3Vis = ({ targetId }) => {
         style={{ width: "100%", height: "100vh", overflow: "hidden" }}
       >
         <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold">Donut View (D3)</h2>
+          <h2 className="font-semibold">Vis View (D3)</h2>
         </div>
         <p>No node selected</p>
       </div>
@@ -536,14 +536,14 @@ const AppD3Vis = ({ targetId }) => {
       )}
       <div className="flex justify-between items-center mb-2 w-full gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="font-semibold">Donut View (D3)</h2>
+          <h2 className="font-semibold">Vis View (D3)</h2>
           <select
             value={visType}
             onChange={(e) => setVisType(e.target.value)}
             className="px-2 py-1 border rounded text-sm"
             aria-label="Select visualization"
           >
-            <option value="donut">Ancestry Donut</option>
+            <option value="donut">Ancestry Vis</option>
             <option value="layers">Layer Rings</option>
           </select>
           <label className="flex items-center gap-1 text-sm">

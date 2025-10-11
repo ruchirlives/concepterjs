@@ -41,7 +41,7 @@ const tabs = [
         <AppState />
       </Suspense>
     ) },
-  { key: 'donut', label: 'Donut', render: () => <AppD3Vis /> },
+  { key: 'donut', label: 'Vis', render: () => <AppD3Vis /> },
   { key: 'editor', label: 'Editor', render: () => (
       <Suspense fallback={<div className="p-4">Loading editor...</div>}>
         <AppTiptap />

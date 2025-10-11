@@ -1,4 +1,4 @@
-// Consolidated Donut visualization entry point.
+// Consolidated Vis visualization entry point.
 // Provides ancestry and layer ring rendering so AppD3Vis stays slim.
 
 import * as d3 from "d3";
