@@ -51,7 +51,7 @@ const AppD3Vis = ({ targetId }) => {
   const [manualMouseTracking, setManualMouseTracking] = useState(false);
   const rafIdRef = useRef(null);
 
-const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
+  const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
 
 
   useEffect(() => { dragItemRef.current = dragItem; }, [dragItem]);
@@ -352,8 +352,6 @@ const { childrenMap, nameById, layerOptions: availableLayerOptions, relationship
     sankeyNodeAlign,
   ]);
 
-  
-
   useEffect(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
@@ -391,7 +389,7 @@ const { childrenMap, nameById, layerOptions: availableLayerOptions, relationship
     // Keep a ref and ensure cleanup clears the SVG
     controllerRef.current = controller;
     return () => {
-      try { controllerRef.current?.destroy?.(); } catch {}
+      try { controllerRef.current?.destroy?.(); } catch { }
       d3.select(svgEl).selectAll('*').remove();
       controllerRef.current = null;
     };
