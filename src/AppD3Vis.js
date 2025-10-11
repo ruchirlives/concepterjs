@@ -306,10 +306,6 @@ const AppD3Vis = ({ targetId }) => {
     setIsInternalClick(true);
     setClickedSegmentId(clickedId);
 
-    // Broadcast (keep your existing behavior)
-    const channel = new BroadcastChannel('selectNodeChannel');
-    channel.postMessage({ nodeId: clickedId });
-
     // 1) Layers mode: do not rebuild
     if (useLayers) {
       setFocusedNodeId(null);
