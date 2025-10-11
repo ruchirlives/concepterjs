@@ -1,19 +1,15 @@
 // Centralized visualization configuration map
 // Builds options using provided state, builders, and controllers
 
+import { buildDonutTreePayload } from "./builders";
+
 export function getVisOptions({
   state,
   builders,
   controllers,
 }) {
   const {
-    donutTree,
     layersWithItems,
-    clickedSegmentId,
-    relatedIds,
-    ancestorIds,
-    useLayers,
-    reverseAncestry,
     rowData,
     relationships,
     sankeyLinkColor = 'source-target',
@@ -23,33 +19,35 @@ export function getVisOptions({
   const { buildNodesLinks } = builders;
   const { createDonut, createTree, createSankey } = controllers;
 
+  const { buildAncestryTree } = builders;
+
+  const buildDonutTreePayloadWrapper = () => buildDonutTreePayload({
+    id: state.id,
+    focusedNodeId: state.focusedNodeId,
+    useLayers: state.useLayers,
+    reverseAncestry: state.reverseAncestry,
+    nameById: state.nameById,
+    childrenMap: state.childrenMap,
+    rowData: state.rowData,
+    hiddenLayers: state.hiddenLayers,
+    availableLayerOptions: state.availableLayerOptions,
+    clickedSegmentId: state.clickedSegmentId,
+    relatedIds: state.relatedIds,
+    ancestorIds: state.ancestorIds,
+    buildAncestryTree,
+  });
+
   return {
     donut: {
       name: 'Ancestry Donut',
       controller: createDonut,
-      buildData: () => ({
-        donutTree,
-        layersWithItems,
-        clickedSegmentId,
-        relatedIds,
-        ancestorIds,
-        useLayers,
-        reverseAncestry,
-      }),
+      buildData: () => buildDonutTreePayloadWrapper(),
       options: {},
     },
     tree: {
       name: 'Cluster Tree',
       controller: createTree,
-      buildData: () => ({
-        donutTree,
-        layersWithItems,
-        clickedSegmentId,
-        relatedIds,
-        ancestorIds,
-        useLayers,
-        reverseAncestry,
-      }),
+      buildData: () => buildDonutTreePayloadWrapper(),
       options: {},
     },
     sankey: {

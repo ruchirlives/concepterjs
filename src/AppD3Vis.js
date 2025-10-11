@@ -11,8 +11,10 @@ import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Ad
 import LayerDropdown from "./components/LayerDropdown";
 import { setPosition } from "./api";
 import { requestRefreshChannel } from "hooks/effectsShared";
-import { buildAncestryTree } from "vis/buildAncestryTree";
 import { buildNodesLinks } from "vis/buildNodesLinks";
+
+import { buildAncestryTree } from "./vis/buildAncestryTree";
+
 
 // Match AppKanban behavior: prompt for label and save link
 async function linkItems(sourceItem, targetItem, relationships) {
@@ -30,7 +32,6 @@ const AppD3Vis = ({ targetId }) => {
   const tooltipRef = useRef();
   const controllerRef = useRef(null);
   const { rowData, setRowData, hiddenLayers } = useAppContext();
-  const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
   // Simple visualization selector state
   const [visType, setVisType] = useState("donut");
 
@@ -38,7 +39,6 @@ const AppD3Vis = ({ targetId }) => {
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
   );
   const [focusedNodeId, setFocusedNodeId] = useState(null);
-  const [donutTree, setDonutTree] = useState([]);
   const [reverseAncestry, setReverseAncestry] = useState(false);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
@@ -50,6 +50,9 @@ const AppD3Vis = ({ targetId }) => {
   const [dragLine, setDragLine] = useState(null); // { from: {x,y}, to: {x,y} }
   const [manualMouseTracking, setManualMouseTracking] = useState(false);
   const rafIdRef = useRef(null);
+
+const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
+
 
   useEffect(() => { dragItemRef.current = dragItem; }, [dragItem]);
 
@@ -120,27 +123,7 @@ const AppD3Vis = ({ targetId }) => {
     return () => channel.close();
   }, [isInternalClick]);
 
-  // Build the donut tree whenever id changes
-  useEffect(() => {
-    if (useLayers) {
-      setFocusedNodeId(null);
-      return;
-    }
-
-    // Determine which node to use as the root
-    const rootNodeId = focusedNodeId || id;
-
-    if (!rootNodeId || !childrenMap || !nameById) {
-      setDonutTree([]);
-      return;
-    }
-
-    // Build ancestry tree starting from the determined root node
-    const tree = reverseAncestry
-      ? buildAncestryTree(rootNodeId, nameById, childrenMap, 6, 0, true)
-      : buildAncestryTree(rootNodeId, nameById, childrenMap);
-    setDonutTree(tree);
-  }, [id, focusedNodeId, nameById, childrenMap, useLayers, reverseAncestry]);
+  // Donut/tree data is now built via visOptions builders to keep AppD3Vis modular
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
@@ -175,41 +158,7 @@ const AppD3Vis = ({ targetId }) => {
   }, [allTags]);
 
   // Get the root node's full label
-  const visibleLayers = useMemo(() => {
-    return (availableLayerOptions || []).filter(layer => !hiddenLayers.has(layer));
-  }, [availableLayerOptions, hiddenLayers]);
-
-  const layersWithItems = useMemo(() => {
-    if (!useLayers) return [];
-    const sanitizeTags = tags =>
-      (tags || "")
-        .split(",")
-        .map(t => t.trim())
-        .filter(Boolean);
-
-    return visibleLayers
-      .map(layer => {
-        const items = rowData
-          .filter(row => {
-            const tags = sanitizeTags(row.Tags);
-            if (tags.length === 0) return false;
-            const inLayer = tags.includes(layer);
-            const layerVisible = !hiddenLayers.has(layer);
-            // Show items that belong to this ticked layer even if they also
-            // have other tags that are currently hidden.
-            return inLayer && layerVisible;
-          })
-          .map(row => ({
-            id: row.id?.toString(),
-            name: row.Name || row.id?.toString(),
-            layer,
-            original: row,
-            level: layer
-          }));
-        return { layer, items };
-      })
-      .filter(entry => entry.items.length > 0);
-  }, [useLayers, visibleLayers, rowData, hiddenLayers]);
+  // visibleLayers and layersWithItems are computed by the vis builder when needed
 
   const activeVisKey = visType;
   // Track viewport size to re-render responsive chart on resize
@@ -255,41 +204,14 @@ const AppD3Vis = ({ targetId }) => {
       return;
     }
 
-    // Donut one-level expand logic (your existing code, with a tiny guard)
-    // Step 1: Clear all items with level > clickedLevel
-    const filteredTree = donutTree.filter(item => Number.isFinite(item.level) && item.level <= clickedLevel);
 
-    // Step 2: Build a subtree (depth 1) from clickedId (respect reverseAncestry)
-    const subtree = buildAncestryTree(clickedId, nameById, childrenMap, 1, 0, reverseAncestry);
+    // Simplify: signal focus to builder; it will derive expansion deterministically
+    setFocusedNodeId(clickedId);
+    return;
 
-    // Step 3: Shift subtree levels to be children of the clicked segment
-    const adjustedSubtree = (subtree || [])
-      .filter(item => Number.isFinite(item.level) && item.level > 0) // remove root (level 0)
-      .map(item => ({
-        ...item,
-        level: item.level + clickedLevel, // shift
-        parentId: item.level === 1 ? clickedId : item.parentId
-      }));
-
-    // Step 4/5: Merge + de-dupe (keep subtree preference)
-    const mergedTree = [...filteredTree, ...adjustedSubtree];
-    const uniqueTree = [];
-    const seen = new Set();
-    [...mergedTree].reverse().forEach(item => {
-      const key = `${ item.id }-${ item.level }`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueTree.unshift(item);
-      }
-    });
-
-    setDonutTree(uniqueTree);
+    // Legacy incremental expansion removed; builder computes donutTree from focusedNodeId
   }, [
     useLayers,
-    donutTree,
-    nameById,
-    childrenMap,
-    reverseAncestry,
     setId,
     setFocusedNodeId,
   ]);
@@ -394,29 +316,37 @@ const AppD3Vis = ({ targetId }) => {
   // Visualization configuration map: controller + data builder + defaults
   const visOptions = useMemo(() => getVisOptions({
     state: {
-      donutTree,
-      layersWithItems,
+      id,
+      focusedNodeId,
+      useLayers,
+      reverseAncestry,
+      nameById,
+      childrenMap,
+      rowData,
+      hiddenLayers,
+      availableLayerOptions,
       clickedSegmentId,
       relatedIds,
       ancestorIds,
-      useLayers,
-      reverseAncestry,
-      rowData,
       relationships,
       sankeyLinkColor,
       sankeyNodeAlign,
     },
-    builders: { buildNodesLinks },
+    builders: { buildNodesLinks, buildAncestryTree },
     controllers: { createDonut, createTree, createSankey },
   }), [
-    donutTree,
-    layersWithItems,
+    id,
+    focusedNodeId,
+    useLayers,
+    reverseAncestry,
+    nameById,
+    childrenMap,
+    rowData,
+    hiddenLayers,
+    availableLayerOptions,
     clickedSegmentId,
     relatedIds,
     ancestorIds,
-    useLayers,
-    reverseAncestry,
-    rowData,
     relationships,
     sankeyLinkColor,
     sankeyNodeAlign,
@@ -472,11 +402,9 @@ const AppD3Vis = ({ targetId }) => {
     clickedSegmentId,
     colorByTag,
     controllerRegistry,
-    donutTree,
     handleSegmentClick,
     handleSegmentContextMenu,
     handleSegmentMouseDown,
-    layersWithItems,
     relatedIds,
     useLayers,
     stripCommonWords,
@@ -604,11 +532,6 @@ const AppD3Vis = ({ targetId }) => {
           )}
         </div>
       </div>
-      {useLayers && layersWithItems.length === 0 && (
-        <div style={{ marginBottom: "10px", color: "#666" }}>
-          No visible layers with items to display.
-        </div>
-      )}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
         <svg
           ref={svgRef}
