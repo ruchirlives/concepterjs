@@ -54,7 +54,7 @@ export function createBundle({ svgEl, data, options = {} }) {
     const W = Math.max(300, width);
     const R = W / 2;
     const ringMargin = 140; // distance from outer radius to leaf ring
-    const vbPad = 24;       // extra padding on viewBox to avoid clipping
+    const vbPad = 60;       // extra padding on viewBox to avoid clipping
 
     const tree = d3.cluster().size([2 * Math.PI, R - ringMargin]);
     const clustered = tree(root);
@@ -66,9 +66,12 @@ export function createBundle({ svgEl, data, options = {} }) {
       .attr("height", "100%")
       .attr("style", "max-width: 100%; font: 10px sans-serif;");
 
+    // Zoom/pan container
+    const g = svg.append("g").attr("class", "content");
+
     const leaves = clustered.leaves();
 
-    const node = svg.append("g")
+    const node = g.append("g")
       .selectAll(null)
       .data(leaves)
       .join("g")
@@ -92,7 +95,7 @@ export function createBundle({ svgEl, data, options = {} }) {
     // Build all paths
     const allPaths = clustered.leaves().flatMap(leaf => (leaf.outgoing || []).map(([s, t]) => [s, t]));
 
-    svg.append("g")
+    g.append("g")
       .attr("fill", "none")
       .selectAll(null)
       .data(allPaths)
@@ -106,6 +109,29 @@ export function createBundle({ svgEl, data, options = {} }) {
       })
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", 1);
+
+    // Ctrl+wheel zoom and drag pan
+    const zoom = d3.zoom()
+      .scaleExtent([0.5, 8])
+      // Constrain panning to keep most content within canvas
+      .translateExtent([[
+        -(R + vbPad) * 2, -(R + vbPad) * 2
+      ], [
+        (R + vbPad) * 2, (R + vbPad) * 2
+      ]])
+      .filter((event) => event.ctrlKey || event.type === "mousedown" || event.type === "dblclick")
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+    svg.call(zoom);
+
+    // Prevent browser page zoom while Ctrl+wheel is used over the SVG
+    // Use non-passive listener so preventDefault works for wheel
+    svg.on("wheel.prevent", (event) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+      }
+    }, { passive: false });
   };
 
   render();
