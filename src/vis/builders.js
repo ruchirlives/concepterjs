@@ -2,9 +2,11 @@
 
 export function buildDonutTreePayload({
   id,
+  expandTargetId,
   focusedNodeId,
   useLayers,
   reverseAncestry,
+  expandDepth,
   nameById,
   childrenMap,
   rowData,
@@ -44,11 +46,44 @@ export function buildDonutTreePayload({
       })
       .filter(entry => entry.items.length > 0);
   } else {
-    const rootNodeId = focusedNodeId || id;
+    // Keep root fixed as 'id'
+    const rootNodeId = id;
     if (rootNodeId && nameById && childrenMap && typeof buildAncestryTree === 'function') {
-      donutTree = reverseAncestry
-        ? buildAncestryTree(rootNodeId, nameById, childrenMap, 6, 0, true)
-        : buildAncestryTree(rootNodeId, nameById, childrenMap);
+      // Base tree from root with default depth
+      const baseDepth = Number.isFinite(expandDepth) ? expandDepth : 6;
+      const baseTree = reverseAncestry
+        ? buildAncestryTree(rootNodeId, nameById, childrenMap, baseDepth, 0, true)
+        : buildAncestryTree(rootNodeId, nameById, childrenMap, baseDepth);
+
+      // Optional one-hop expansion under expandTargetId, preserving root context
+      if (expandTargetId) {
+        // Find clicked level within baseTree
+        const clicked = baseTree.find(it => it.id?.toString() === expandTargetId?.toString());
+        if (clicked) {
+          const oneHop = buildAncestryTree(expandTargetId, nameById, childrenMap, 1, 0, reverseAncestry) || [];
+          const adjusted = oneHop
+            .filter(n => Number.isFinite(n.level) && n.level > 0)
+            .map(n => ({
+              ...n,
+              level: n.level + clicked.level, // shift under clicked level
+              parentId: n.level === 1 ? clicked.id : n.parentId,
+            }));
+          // Merge with de-dupe; prefer adjusted entries
+          const merged = [...baseTree, ...adjusted];
+          const seen = new Set();
+          const unique = [];
+          for (let i = merged.length - 1; i >= 0; i--) {
+            const m = merged[i];
+            const key = `${m.id}-${m.level}`;
+            if (!seen.has(key)) { seen.add(key); unique.unshift(m); }
+          }
+          donutTree = unique;
+        } else {
+          donutTree = baseTree;
+        }
+      } else {
+        donutTree = baseTree;
+      }
     }
   }
 
@@ -62,4 +97,3 @@ export function buildDonutTreePayload({
     reverseAncestry,
   };
 }
-

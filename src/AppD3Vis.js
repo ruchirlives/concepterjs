@@ -41,6 +41,7 @@ const AppD3Vis = ({ targetId }) => {
   const [focusedNodeId, setFocusedNodeId] = useState(null);
   const [reverseAncestry, setReverseAncestry] = useState(false);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
+  const [expandTargetId, setExpandTargetId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
   const [useLayers, setUseLayers] = useState(true);
   // Drag/link state (mirrors AppKanban)
@@ -205,8 +206,8 @@ const AppD3Vis = ({ targetId }) => {
     }
 
 
-    // Simplify: signal focus to builder; it will derive expansion deterministically
-    setFocusedNodeId(clickedId);
+    // Signal expansion target; builder will expand one-hop under this while keeping root id
+    setExpandTargetId(clickedId);
     return;
 
     // Legacy incremental expansion removed; builder computes donutTree from focusedNodeId
@@ -316,10 +317,12 @@ const AppD3Vis = ({ targetId }) => {
   // Visualization configuration map: controller + data builder + defaults
   const visOptions = useMemo(() => getVisOptions({
     state: {
-      id,
-      focusedNodeId,
+      id, // root id remains stable
+      expandTargetId,
+      focusedNodeId, // still available if builders need it
       useLayers,
       reverseAncestry,
+      expandDepth: 1,
       nameById,
       childrenMap,
       rowData,
@@ -336,9 +339,11 @@ const AppD3Vis = ({ targetId }) => {
     controllers: { createDonut, createTree, createSankey },
   }), [
     id,
+    expandTargetId,
     focusedNodeId,
     useLayers,
     reverseAncestry,
+    // expandDepth is fixed at 1 for now
     nameById,
     childrenMap,
     rowData,

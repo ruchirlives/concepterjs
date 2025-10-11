@@ -20,9 +20,11 @@ export function getVisOptions({
 
   const buildDonutTreePayloadWrapper = () => buildDonutTreePayload({
     id: state.id,
+    expandTargetId: state.expandTargetId,
     focusedNodeId: state.focusedNodeId,
     useLayers: state.useLayers,
     reverseAncestry: state.reverseAncestry,
+    expandDepth: state.expandDepth,
     nameById: state.nameById,
     childrenMap: state.childrenMap,
     rowData: state.rowData,
