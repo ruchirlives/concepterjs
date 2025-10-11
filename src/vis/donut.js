@@ -123,9 +123,11 @@ function renderAncestryPartition({
     .data(root.descendants())
     .join("text")
     .attr("transform", (d) => {
-      const x = (d.x0 + d.x1) / 2;
-      const y = (d.y0 + d.y1) / 2;
-      return `rotate(${(x * 180) / Math.PI - 90}) translate(${y},0) rotate(${x >= Math.PI ? 180 : 0})`;
+      const angle = (d.x0 + d.x1) / 2 - Math.PI / 2;
+      const radiusAtMid = (d.y0 + d.y1) / 2;
+      const x = Math.cos(angle) * radiusAtMid;
+      const y = Math.sin(angle) * radiusAtMid;
+      return `translate(${x},${y})`;
     })
     .attr("dy", "0.35em")
     .style("font-size", "10px")
