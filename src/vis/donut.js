@@ -5,6 +5,99 @@ import * as d3 from "d3";
 
 const CLAMPED_TRUNCATION_SUFFIX = "...";
 
+function wrapLabel(text, maxChars, maxLines = 2) {
+  maxChars = Math.max(3, maxChars|0);
+  const cleanText = (text || "").trim();
+  if (!cleanText) return [""];
+
+  const words = cleanText.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  let index = 0;
+
+  while (index < words.length) {
+    const word = words[index];
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars || !current) {
+      current = candidate.length > maxChars ? candidate.substring(0, maxChars) : candidate;
+      if (candidate.length > maxChars) {
+        index += 1;
+        break;
+      }
+      index += 1;
+    } else {
+      lines.push(current);
+      current = "";
+      if (lines.length === maxLines - 1) break;
+    }
+  }
+
+  if (lines.length === maxLines - 1 && index < words.length) {
+    const remaining = words.slice(index).join(" ");
+    current = remaining.substring(0, maxChars);
+    index = words.length;
+  }
+
+  if (current) {
+    lines.push(current.length > maxChars ? current.substring(0, maxChars) : current);
+  }
+
+  let truncated = index < words.length;
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    truncated = true;
+  }
+
+  if (truncated && lines.length) {
+    const lastIndex = lines.length - 1;
+    let last = lines[lastIndex];
+    if (last.length > maxChars - CLAMPED_TRUNCATION_SUFFIX.length) {
+      last = last.substring(0, Math.max(0, maxChars - CLAMPED_TRUNCATION_SUFFIX.length));
+    }
+    if (!last.endsWith(CLAMPED_TRUNCATION_SUFFIX)) {
+      last = `${last}${CLAMPED_TRUNCATION_SUFFIX}`;
+    }
+    lines[lastIndex] = last;
+  }
+
+  return lines.length ? lines : [cleanText.substring(0, maxChars)];
+}
+
+function estimateCharsForAngles(angleStart, angleEnd, radiusAtMid, fallbackWidth) {
+  const delta = Math.abs(angleEnd - angleStart);
+  const sweeps = Math.max(8, Math.ceil(delta / (Math.PI / 36)));
+
+  // Chord width is a strong baseline for available width
+  const chordWidth = Math.abs(2 * radiusAtMid * Math.sin(delta / 2));
+
+  // Sample across the arc to catch asymmetric cases
+  let minX = Infinity;
+  let maxX = -Infinity;
+  if (radiusAtMid > 0) {
+    for (let i = 0; i <= sweeps; i++) {
+      const t = angleStart + (delta * i) / sweeps;
+      const x = radiusAtMid * Math.cos(t - Math.PI / 2);
+      if (!Number.isNaN(x)) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+  }
+  const sampledWidth = maxX > minX ? (maxX - minX) : 0;
+
+  // Floor based on diameter portion to avoid degeneracy near center
+  const diameterFloor = radiusAtMid > 0 ? radiusAtMid * 0.6 : 0;
+  const safeFallback = fallbackWidth && fallbackWidth > 0 ? fallbackWidth : 0;
+
+  const availableWidth = Math.max(chordWidth, sampledWidth, diameterFloor, safeFallback);
+
+  // Convert width (px) to approx characters; clamp to useful range
+  const padding = 8;
+  const pxPerChar = 6.5; // tuned for 10px font size
+  const estimated = Math.floor((availableWidth - padding) / pxPerChar);
+  return Math.max(3, Math.min(estimated, 40));
+}
+
 function buildHierarchy(donutTree = []) {
   if (!donutTree.length) return null;
 
@@ -119,6 +212,8 @@ function renderAncestryPartition({
     .append("g")
     .attr("pointer-events", "none")
     .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle")
+    .attr("dominant-baseline", "middle")
     .selectAll("text")
     .data(root.descendants())
     .join("text")
@@ -129,21 +224,27 @@ function renderAncestryPartition({
       const y = Math.sin(angle) * radiusAtMid;
       return `translate(${x},${y})`;
     })
-    .attr("dy", "0.35em")
     .style("font-size", "10px")
     .style("fill", "#374151")
-    .text((d) => {
+    .each(function (d) {
       const arcLength = Math.abs(d.x1 - d.x0);
       const r = (d.y0 + d.y1) / 2;
-      const estMaxChars = Math.floor((arcLength * r) / (10 * 0.7));
-      let name = scrub(d.data.name || "");
-      if (arcLength < 0.35 || estMaxChars < 3) {
-        return name.length >= 5 ? name.substring(0, 5) : name;
-      }
-      if (name.length > estMaxChars && estMaxChars > 1) {
-        return name.substring(0, estMaxChars - 1) + CLAMPED_TRUNCATION_SUFFIX;
-      }
-      return name;
+      const fallbackWidth = Math.abs(2 * r * Math.sin(arcLength / 2));
+      const estMaxChars = estimateCharsForAngles(d.x0, d.x1, r, fallbackWidth);
+      const name = scrub(d.data.name || "");
+      const lines = wrapLabel(name, estMaxChars, 2);
+      const lineCount = lines.length;
+      const lineHeight = 1.1;
+      const startDy = lineCount > 1 ? `-${((lineCount - 1) / 2) * lineHeight}em` : "0";
+      const node = d3.select(this);
+      node.selectAll("tspan").remove();
+      lines.forEach((line, idx) => {
+        node
+          .append("tspan")
+          .attr("x", 0)
+          .attr("dy", idx === 0 ? startDy : `${lineHeight}em`)
+          .text(line);
+      });
     });
 }
 
@@ -259,18 +360,25 @@ function renderLayerRings({
       .attr("dominant-baseline", "middle")
       .attr("fill", "#374151")
       .style("font-size", `${fontSize}px`)
-      .text((d) => {
+      .each(function (d) {
         const arcLen = Math.abs(d.endAngle - d.startAngle);
         const rMid = (innerRadius + outerRadius) / 2;
-        const estMaxChars = Math.floor((arcLen * rMid) / (fontSize * 0.7));
+        const fallbackWidth = Math.abs(2 * rMid * Math.sin(arcLen / 2));
+        const estMaxChars = estimateCharsForAngles(d.startAngle, d.endAngle, rMid, fallbackWidth);
         const label = scrub(d.data.name || "");
-        if (arcLen < 0.25 || estMaxChars < 3) {
-          return label.length >= 5 ? label.substring(0, 5) : label;
-        }
-        if (label.length > estMaxChars) {
-          return label.substring(0, Math.max(1, estMaxChars - 1)) + CLAMPED_TRUNCATION_SUFFIX;
-        }
-        return label;
+        const lines = wrapLabel(label, estMaxChars, 2);
+        const lineCount = lines.length;
+        const lineHeight = 1.1;
+        const startDy = lineCount > 1 ? `-${((lineCount - 1) / 2) * lineHeight}em` : "0";
+        const node = d3.select(this);
+        node.selectAll("tspan").remove();
+        lines.forEach((line, idx) => {
+          node
+            .append("tspan")
+            .attr("x", 0)
+            .attr("dy", idx === 0 ? startDy : `${lineHeight}em`)
+            .text(line);
+        });
       });
 
     const labelRadius = innerRadius + ringWidth / 2;
