@@ -18,6 +18,30 @@ export function getVisOptions({
 
   const { buildAncestryTree } = builders;
 
+  // Reusable helper: filter rows to visible layers and build nodes/links
+  const buildLayerFilteredSankey = () => {
+    const sanitizeTags = (tags) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const visibleLayers = (state.availableLayerOptions || []).filter(l => !state.hiddenLayers.has(l));
+
+    const filteredRows = (state.rowData || []).filter(row => {
+      const tags = sanitizeTags(row?.Tags);
+      return tags.some(tag => visibleLayers.includes(tag));
+    });
+
+    return buildNodesLinks(filteredRows, state.relationships || {}, {
+      idKey: 'id',
+      nameKey: 'Name',
+      parentKey: 'ParentId',
+      relationshipDelimiter: '--',
+      layerResolver: (row) => {
+        const tags = sanitizeTags(row?.Tags);
+        const layer = tags.find(tag => visibleLayers.includes(tag));
+        return layer ? `L${layer}` : undefined;
+      },
+      includeOrphans: false,
+    });
+  };
+
   const buildDonutTreePayloadWrapper = () => buildDonutTreePayload({
     id: state.id,
     expandTargetId: state.expandTargetId,
@@ -52,28 +76,7 @@ export function getVisOptions({
     sankey: {
       name: 'Sankey',
       controller: createSankey,
-      buildData: () => {
-        const sanitizeTags = (tags) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
-        const visibleLayers = (state.availableLayerOptions || []).filter(l => !state.hiddenLayers.has(l));
-
-        const filteredRows = (state.rowData || []).filter(row => {
-          const tags = sanitizeTags(row?.Tags);
-          return tags.some(tag => visibleLayers.includes(tag));
-        });
-
-        return buildNodesLinks(filteredRows, state.relationships || {}, {
-          idKey: 'id',
-          nameKey: 'Name',
-          parentKey: 'ParentId',
-          relationshipDelimiter: '--',
-          layerResolver: (row) => {
-            const tags = sanitizeTags(row?.Tags);
-            const layer = tags.find(tag => visibleLayers.includes(tag));
-            return layer ? `L${layer}` : undefined;
-          },
-          includeOrphans: false,
-        });
-      },
+      buildData: () => buildLayerFilteredSankey(),
       options: { linkColor: sankeyLinkColor, nodeAlign: sankeyNodeAlign },
     },
   };
