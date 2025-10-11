@@ -58,7 +58,9 @@ export function createTree({ svgEl, data, options = {} }) {
     let x0 = Infinity;
     let x1 = -x0;
     root.each(d => { if (d.x > x1) x1 = d.x; if (d.x < x0) x0 = d.x; });
-    const height = x1 - x0 + dx * 2;
+    // Reset viewBox for this vis with an intrinsic height based on layout
+    const minHeight = 600;
+    const height = Math.max(minHeight, x1 - x0 + dx * 2);
 
     svg
       .attr("viewBox", [-(dy / 3), x0 - dx, width, height])
