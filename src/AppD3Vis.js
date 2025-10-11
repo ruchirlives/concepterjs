@@ -3,12 +3,16 @@ import * as d3 from "d3";
 // Use consolidated donut entry point
 import { createDonut } from "./vis/donut";
 import { createTree } from "./vis/tree";
+import { createSankey } from "./vis/sankey";
+import getVisOptions from "./vis/visOptions";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
 import LayerDropdown from "./components/LayerDropdown";
 import { setPosition } from "./api";
 import { requestRefreshChannel } from "hooks/effectsShared";
+import { buildAncestryTree } from "buildAncestryTree";
+import { buildNodesLinks } from "buildNodesLinks";
 
 // Match AppKanban behavior: prompt for label and save link
 async function linkItems(sourceItem, targetItem, relationships) {
@@ -21,87 +25,10 @@ async function linkItems(sourceItem, targetItem, relationships) {
   }
 }
 
-// Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
-function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0, useChildren = false) {
-  const tree = [];
-
-  // Step 1: Add root item at level 0
-  if (startingLevel === 0) {
-    tree.push({
-      id: nodeId,
-      level: 0,
-      label: nameById[nodeId] || nodeId,
-      parentId: null // Root has no parent
-    });
-  }
-
-  // Step 2: Build levels iteratively
-  for (let level = startingLevel; level < maxDepth; level++) {
-    // Get all items at current level
-    let currentLevelItems = tree.filter(item => item.level === level);
-
-    // Special case: if we're at startingLevel > 0 and there are no items yet, add the starting node
-    if (currentLevelItems.length === 0 && level === startingLevel && startingLevel > 0) {
-      const startingItem = {
-        id: nodeId,
-        level: startingLevel,
-        label: nameById[nodeId] || nodeId,
-        parentId: null // Will be set by the calling function if needed
-      };
-      tree.push(startingItem);
-      // Update currentLevelItems to include the node we just added
-      currentLevelItems = [startingItem];
-    }
-
-    // If still no items at this level, break
-    if (currentLevelItems.length === 0) {
-      break;
-    }
-
-    // Take the first item of current level
-    const firstItem = currentLevelItems[0];
-
-    // Find related ids for next level
-    const parentIds = [];
-    if (!useChildren) {
-      // ancestry upward (parents)
-      Object.entries(childrenMap).forEach(([parentId, children]) => {
-        if (children.includes(firstItem.id)) {
-          parentIds.push(parentId);
-        }
-      });
-    } else {
-      // descendants (children)
-      const kids = childrenMap[firstItem.id] || [];
-      parentIds.push(...kids);
-    }
-
-
-    // Add parents as next level
-    parentIds.forEach(parentId => {
-      // Check if this parent is already in the tree
-      if (!tree.find(item => item.id === parentId)) {
-        const parentItem = {
-          id: parentId,
-          level: level + 1,
-          label: nameById[parentId] || parentId,
-          parentId: firstItem.id // This parent's child is the firstItem
-        };
-        tree.push(parentItem);
-      }
-    });
-
-    if (parentIds.length === 0) {
-      break;
-    }
-  }
-
-  return tree;
-}
-
 const AppD3Vis = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
+  const controllerRef = useRef(null);
   const { rowData, setRowData, hiddenLayers } = useAppContext();
   const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
   // Simple visualization selector state
@@ -458,46 +385,15 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
-  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree }), []);
+  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey }), []);
+  const [sankeyLinkColor, setSankeyLinkColor] = useState('source-target');
+  const [sankeyNodeAlign, setSankeyNodeAlign] = useState('sankeyLeft');
 
-  
+  // Remove in-component builder (moved to module scope)
 
-  useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-
-    const controllerFactory = controllerRegistry[activeVisKey];
-    if (!controllerFactory) return;
-
-    const controller = controllerFactory({
-      svgEl,
-      data: {
-        donutTree,
-        layersWithItems,
-        clickedSegmentId,
-        relatedIds,
-        ancestorIds,
-        useLayers,
-        reverseAncestry,
-      },
-      options: {
-        mode: activeVisKey,
-        useLayers,
-        reverseAncestry,
-        colorByTag,
-        width: svgRef.current?.clientWidth || undefined,
-        height: svgRef.current?.clientHeight || undefined,
-        tooltipEl: tooltipRef.current,
-        handlers: {
-          handleSegmentClick,
-          handleSegmentContextMenu,
-          handleSegmentMouseDown,
-          stripCommonWords,
-        },
-      },
-    });
-
-    controller.update({
+  // Visualization configuration map: controller + data builder + defaults
+  const visOptions = useMemo(() => getVisOptions({
+    state: {
       donutTree,
       layersWithItems,
       clickedSegmentId,
@@ -505,9 +401,73 @@ const AppD3Vis = ({ targetId }) => {
       ancestorIds,
       useLayers,
       reverseAncestry,
+      rowData,
+      relationships,
+      sankeyLinkColor,
+      sankeyNodeAlign,
+    },
+    builders: { buildNodesLinks },
+    controllers: { createDonut, createTree, createSankey },
+  }), [
+    donutTree,
+    layersWithItems,
+    clickedSegmentId,
+    relatedIds,
+    ancestorIds,
+    useLayers,
+    reverseAncestry,
+    rowData,
+    relationships,
+    sankeyLinkColor,
+    sankeyNodeAlign,
+  ]);
+
+  
+
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const cfg = visOptions[activeVisKey];
+    if (!cfg) return;
+
+    const baseOptions = {
+      mode: activeVisKey,
+      useLayers,
+      reverseAncestry,
+      colorByTag,
+      width: svgRef.current?.clientWidth || undefined,
+      height: svgRef.current?.clientHeight || undefined,
+      tooltipEl: tooltipRef.current,
+      handlers: {
+        handleSegmentClick,
+        handleSegmentContextMenu,
+        handleSegmentMouseDown,
+        stripCommonWords,
+      },
+    };
+
+    const dataPayload = cfg.buildData ? cfg.buildData() : {};
+    if (activeVisKey === 'sankey') {
+      if (!dataPayload || !Array.isArray(dataPayload.nodes) || dataPayload.nodes.length === 0) return;
+    }
+
+    // Clear SVG before creating the new controller
+    d3.select(svgEl).selectAll('*').remove();
+
+    const controller = cfg.controller({
+      svgEl,
+      data: dataPayload,
+      options: { ...baseOptions, ...(cfg.options || {}) },
     });
 
-    return () => controller.destroy?.();
+    // Keep a ref and ensure cleanup clears the SVG
+    controllerRef.current = controller;
+    return () => {
+      try { controllerRef.current?.destroy?.(); } catch {}
+      d3.select(svgEl).selectAll('*').remove();
+      controllerRef.current = null;
+    };
 
   }, [
     activeVisKey,
@@ -525,6 +485,7 @@ const AppD3Vis = ({ targetId }) => {
     stripCommonWords,
     viewportSize,
     reverseAncestry,
+    visOptions,
   ]);
 
   // Reset clicked segment when changing root
@@ -548,7 +509,7 @@ const AppD3Vis = ({ targetId }) => {
 
   return (
     <div
-      className="bg-white rounded shadow p-4"
+      className="bg-white rounded shadow p-4 "
       style={{
         width: "100%",
         height: "100vh",
@@ -578,8 +539,38 @@ const AppD3Vis = ({ targetId }) => {
           >
             <option value="donut">Ancestry Donut</option>
             <option value="tree">Cluster Tree</option>
-
+            <option value="sankey">Sankey</option>
           </select>
+          {visType === 'sankey' && (
+            <div className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-1">
+                <span>Link</span>
+                <select
+                  value={sankeyLinkColor}
+                  onChange={(e) => setSankeyLinkColor(e.target.value)}
+                  className="px-1 py-0.5 border rounded text-sm"
+                >
+                  <option value="source-target">Source→Target</option>
+                  <option value="source">Source</option>
+                  <option value="target">Target</option>
+                  <option value="#999">#999</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-1">
+                <span>Align</span>
+                <select
+                  value={sankeyNodeAlign}
+                  onChange={(e) => setSankeyNodeAlign(e.target.value)}
+                  className="px-1 py-0.5 border rounded text-sm"
+                >
+                  <option value="sankeyLeft">Left</option>
+                  <option value="sankeyRight">Right</option>
+                  <option value="sankeyCenter">Center</option>
+                  <option value="sankeyJustify">Justify</option>
+                </select>
+              </label>
+            </div>
+          )}
           <button
             type="button"
             onClick={handleRebuild}
@@ -621,7 +612,6 @@ const AppD3Vis = ({ targetId }) => {
           No visible layers with items to display.
         </div>
       )}
-      <div style={{ flex: 1, minHeight: 0 }}>
         <svg
           ref={svgRef}
           width="100%"
@@ -631,7 +621,6 @@ const AppD3Vis = ({ targetId }) => {
           }}
           preserveAspectRatio="xMidYMid meet"
         />
-      </div>
       <div
         ref={tooltipRef}
         style={{
