@@ -1,0 +1,61 @@
+*** Begin Patch
+*** Update File: src/hooks/flowLayouter.js
+@@
+-    // After laying out groups, pack groups tightly if unconnected and we now know final sizes
+-    if (groupEdges.length === 0) {
++    // After laying out groups, pack groups tightly if unconnected and we now know final sizes
++    if (groupEdges.length === 0) {
+@@
+-        });
+-    }
++        });
++    }
++
++    // Vertical packing for groups (applies to both connected and unconnected groups):
++    // Keep dagre-determined X positions for connected groups, but nudge Y downwards to
++    // remove vertical overlaps while minimizing movement. This prevents tall groups from
++    // overlapping when dagre ranksep is insufficient.
++    {
++        const groupsNow = layoutedNodes.filter(n => n.type === 'group');
++        if (groupsNow.length > 0) {
++            const marginY = 20; // minimal vertical gap between groups
++
++            // Build list with size and positions
++            const items = groupsNow.map(g => ({
++                id: g.id,
++                x: g.position?.x ?? 0,
++                y: g.position?.y ?? 0,
++                w: g.style?.width || 320,
++                h: g.style?.height || 180
++            }));
++
++            // Sort by x then y to stabilize; we will scan by rows (similar Xs) and push down to avoid overlap
++            items.sort((a, b) => (a.x - b.x) || (a.y - b.y));
++
++            // Greedy pass: for each item, ensure it doesn't overlap any previously placed item
++            for (let i = 0; i < items.length; i++) {
++                const a = items[i];
++                let requiredY = a.y; // minimal Y to avoid overlaps above
++                for (let j = 0; j < i; j++) {
++                    const b = items[j];
++                    const overlapX = (a.x < b.x + b.w) && (a.x + a.w > b.x);
++                    if (!overlapX) continue; // only care about vertical packing where columns overlap
++                    const bBottom = b.y + b.h + marginY;
++                    if (bBottom > requiredY) requiredY = bBottom;
++                }
++                if (requiredY !== a.y) {
++                    a.y = requiredY;
++                }
++            }
++
++            // Apply adjusted Y back to layoutedNodes (groups only)
++            const yById = Object.fromEntries(items.map(it => [it.id, it.y]));
++            layoutedNodes = layoutedNodes.map(n => {
++                if (n.type !== 'group') return n;
++                const newY = yById[n.id];
++                if (newY == null) return n;
++                return { ...n, position: { x: n.position.x, y: newY } };
++            });
++        }
++    }
+*** End Patch
