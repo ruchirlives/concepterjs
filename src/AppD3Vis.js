@@ -4,6 +4,7 @@ import * as d3 from "d3";
 import { createDonut } from "./vis/donut";
 import { createTree } from "./vis/tree";
 import { createSankey } from "./vis/sankey";
+import { createBundle } from "./vis/bundle";
 import getVisOptions from "./vis/visOptions";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
@@ -308,7 +309,7 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
-  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey }), []);
+  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey, bundle: createBundle }), []);
   const [sankeyLinkColor, setSankeyLinkColor] = useState('source-target');
   const [sankeyNodeAlign, setSankeyNodeAlign] = useState('sankeyLeft');
 
@@ -336,7 +337,7 @@ const AppD3Vis = ({ targetId }) => {
       sankeyNodeAlign,
     },
     builders: { buildNodesLinks, buildAncestryTree },
-    controllers: { createDonut, createTree, createSankey },
+    controllers: { createDonut, createTree, createSankey, createBundle },
   }), [
     id,
     expandTargetId,
@@ -468,6 +469,7 @@ const AppD3Vis = ({ targetId }) => {
             <option value="donut">Ancestry Donut</option>
             <option value="tree">Cluster Tree</option>
             <option value="sankey">Sankey</option>
+            <option value="bundle">Bundle</option>
           </select>
           {visType === 'sankey' && (
             <div className="flex items-center gap-2 text-sm">
