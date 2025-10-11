@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import * as d3 from "d3";
-import { renderDonutAncestry } from "./vis/renderers/donutAncestry";
+// Use consolidated donut entry point
+import { createDonut } from "./vis/donut";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
@@ -235,15 +236,6 @@ const AppD3Vis = ({ targetId }) => {
   }, [allTags]);
 
   // Get the root node's full label
-  const rootLabel = useMemo(() => {
-    if (useLayers) {
-      return "Layer View";
-    }
-    if (donutTree.length === 0) return "";
-    const rootItem = donutTree.find(item => item.level === 0);
-    return rootItem ? rootItem.label : "";
-  }, [donutTree, useLayers]);
-
   const visibleLayers = useMemo(() => {
     return (availableLayerOptions || []).filter(layer => !hiddenLayers.has(layer));
   }, [availableLayerOptions, hiddenLayers]);
@@ -436,20 +428,33 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
+  const controllerRegistry = useMemo(() => ({
+    donut: createDonut,
+  }), []);
+
+  const activeVisKey = useLayers ? "layers" : visType;
+
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const svg = d3.select(svgEl);
     svg.selectAll("*").remove();
 
-    const svgEl = svgRef.current;
-    const width = svgEl ? svgEl.clientWidth : 700;
-    const height = svgEl ? svgEl.clientHeight : width; // keep square if auto
-    const radius = Math.min(width, height) / 2 - 20;
-    svg.attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`).attr("preserveAspectRatio","xMidYMid meet"); const g = svg.append("g");
+    const width = svgEl.clientWidth || 700;
+    const height = svgEl.clientHeight || width; // keep square if auto
 
-    if (useLayers) {
+    svg
+      .attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`)
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    if (activeVisKey === "layers") {
       if (layersWithItems.length === 0) {
         return;
       }
+
+      const radius = Math.min(width, height) / 2 - 20;
+      const g = svg.append("g");
 
       // Reserve an inner blank root circle by adding one extra ring slot
       const ringCount = layersWithItems.length + 1;
@@ -460,6 +465,7 @@ const AppD3Vis = ({ targetId }) => {
         .attr("fill", "none")
         .attr("stroke", "#eee")
         .attr("stroke-width", 1);
+
       const layerPie = d3.pie().sort(null).value(() => 1);
 
       layersWithItems.forEach((layerEntry, layerIndex) => {
@@ -556,7 +562,7 @@ const AppD3Vis = ({ targetId }) => {
               return label.length >= 5 ? label.substring(0, 5) : label;
             }
             if (label.length > estMaxChars) {
-              return label.substring(0, Math.max(1, estMaxChars - 1)) + "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦";
+              return label.substring(0, Math.max(1, estMaxChars - 1)) + "ǟ�'�'��ǟ��ǽ�'����'��ǟ�?s�'��";
             }
             return label;
           });
@@ -576,75 +582,79 @@ const AppD3Vis = ({ targetId }) => {
       return;
     }
 
-    // Default ancestry view below
-    // Default ancestry view
-    renderDonutAncestry({
-      svg: d3.select(svgRef.current),
-      width,
-      height,
-      donutTree,
-      colorByTag,
-      handleSegmentClick,
-      handleSegmentContextMenu,
-      handleSegmentMouseDown,
-      clickedSegmentId,
-      stripCommonWords,
-      relatedIds,
-      ancestorIds,
+    const controllerFactory = controllerRegistry[activeVisKey];
+    if (!controllerFactory) {
+      return;
+    }
+
+    const controller = controllerFactory({
+      svgEl,
+      data: {
+        donutTree,
+        colorByTag,
+        clickedSegmentId,
+        relatedIds,
+        ancestorIds,
+      },
+      options: {
+        width,
+        height,
+        handlers: {
+          handleSegmentClick,
+          handleSegmentContextMenu,
+          handleSegmentMouseDown,
+          stripCommonWords,
+        },
+      },
     });
-    return;
+
+    controller.update({ donutTree, colorByTag, clickedSegmentId, relatedIds, ancestorIds });
+
+    return () => controller.destroy?.();
 
   }, [
-    donutTree,
-    rowData,
+    activeVisKey,
+    ancestorIds,
+    clickedSegmentId,
     colorByTag,
+    controllerRegistry,
+    donutTree,
     handleSegmentClick,
     handleSegmentContextMenu,
-    clickedSegmentId,
-    useLayers,
-    layersWithItems,
-    viewportSize,
-    stripCommonWords,
-    relatedIds,
     handleSegmentMouseDown,
-    ancestorIds
-  ]); // Added clickedSegmentId to dependencies
+    layersWithItems,
+    relatedIds,
+    stripCommonWords,
+    viewportSize
+  ]);
 
   // Reset clicked segment when changing root
   useEffect(() => {
     setClickedSegmentId(null);
   }, [id, useLayers]);
 
-  const [collapsed, setCollapsed] = useState(false);
-
   if (!id) {
     return (
-      <div style={{ width: '100%', height: collapsed ? 48 : '100vh', transition: 'height 0.3s', overflow: 'hidden' }} className="bg-white rounded shadow p-4">
+      <div
+        className="bg-white rounded shadow p-4"
+        style={{ width: "100%", height: "100vh", overflow: "hidden" }}
+      >
         <div className="flex justify-between items-center mb-2">
           <h2 className="font-semibold">Donut View (D3)</h2>
-          <button
-            className="px-2 py-1 border rounded text-sm"
-            onClick={() => setCollapsed(c => !c)}
-            aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
-          >
-            {collapsed ? "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¼" : "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â²"}
-          </button>
         </div>
-        {!collapsed && <p>No node selected</p>}
+        <p>No node selected</p>
       </div>
     );
   }
-
-
 
   return (
     <div
       className="bg-white rounded shadow p-4"
       style={{
-        width: '100%',
-        height: collapsed ? 48 : '100vh',
-        transition: 'height 0.3s',
-        overflow: 'hidden',
+        width: "100%",
+        height: "100vh",
+        transition: "height 0.3s",
+        overflow: "hidden",
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -686,100 +696,45 @@ const AppD3Vis = ({ targetId }) => {
             />
           )}
         </div>
-        <button
-          className="px-2 py-1 border rounded text-sm"
-          onClick={() => setCollapsed(c => !c)}
-          aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
-        >
-          {collapsed ? "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¼" : "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â²"}
-        </button>
       </div>
-      {!collapsed && <>
-        <div style={{ fontWeight: "bold", fontSize: "1 rem", marginBottom: "2px" }}>
-          {rootLabel}
-          {!useLayers && focusedNodeId && (
-            <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
-              Focused on: {nameById[focusedNodeId]}
-            </div>
-          )}
+      {useLayers && layersWithItems.length === 0 && (
+        <div style={{ marginBottom: "10px", color: "#666" }}>
+          No visible layers with items to display.
         </div>
-        {!useLayers && focusedNodeId && (
-          <button
-            onClick={() => setFocusedNodeId(null)}
-            style={{
-              marginBottom: "10px",
-              padding: "5px 10px",
-              background: "#f0f0f0",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-          >
-            Show All Lineage
-          </button>
-        )}
-        {clickedSegmentId && (
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "8px", fontSize: "12px", color: "#374151" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ display: "inline-block", width: 12, height: 12, background: "#ff4444", border: "2px solid #cc0000", borderRadius: 2 }} />
-              <span>Clicked</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ display: "inline-block", width: 12, height: 12, background: "transparent", border: "2px solid #f59e0b", borderRadius: 2 }} />
-              <span>Descendant</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ display: "inline-block", width: 12, height: 12, background: "transparent", border: "2px solid #3b82f6", borderRadius: 2 }} />
-              <span>Parent</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ display: "inline-block", width: 12, height: 12, background: "#9ca3af", opacity: 0.35, borderRadius: 2 }} />
-              <span>Other</span>
-            </div>
-          </div>
-        )}
-        {useLayers && layersWithItems.length === 0 && (
-          <div style={{ marginBottom: "10px", color: "#666" }}>
-            No visible layers with items to display.
-          </div>
-        )}
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <svg
-            ref={svgRef}
-            width="100%"
-            height="100%"
-            style={{
-              display: "block"
-            }}
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </div>
-        <div
-          ref={tooltipRef}
+      )}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
           style={{
-            position: "fixed",
-            pointerEvents: "none",
-            background: "rgba(0,0,0,0.8)",
-            color: "#fff",
-            padding: "4px 8px",
-            borderRadius: "4px",
-            fontSize: "14px",
-            display: "none",
-            zIndex: 1000
+            display: "block"
           }}
+          preserveAspectRatio="xMidYMid meet"
         />
-        {/* Context menu for donut segments */}
-        <ContextMenu
-          contextMenu={contextMenu}
-          setContextMenu={setContextMenu}
-          menuOptions={visMenuOptions}
-        />
-      </>}
+      </div>
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "fixed",
+          pointerEvents: "none",
+          background: "rgba(0,0,0,0.8)",
+          color: "#fff",
+          padding: "4px 8px",
+          borderRadius: "4px",
+          fontSize: "14px",
+          display: "none",
+          zIndex: 1000
+        }}
+      />
+      {/* Context menu for donut segments */}
+      <ContextMenu
+        contextMenu={contextMenu}
+        setContextMenu={setContextMenu}
+        menuOptions={visMenuOptions}
+      />
     </div>
   );
 };
 
 export default AppD3Vis;
-
-
-
