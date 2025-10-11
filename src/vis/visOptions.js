@@ -148,8 +148,9 @@ export function getVisOptions({
           const tags = sanitizeTags(row?.Tags);
           return tags.some(tag => visibleLayers.includes(tag));
         });
+        const stripCommonWords = state.stripCommonWords;
         const nodeSet = new Set(filteredRows.map(r => String(r.id)));
-        const nodes = Array.from(nodeSet).map(id => ({ id }));
+        const nodes = filteredRows.map(r => ({ id: String(r.id), name: stripCommonWords(r.Name), hoverName: r.Name, category: sanitizeTags(r.Tags)[0] || 'Uncategorized' }));
 
         // Build links from relationships that connect visible nodes
         const links = [];

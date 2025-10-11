@@ -333,6 +333,7 @@ const AppD3Vis = ({ targetId }) => {
       relatedIds,
       ancestorIds,
       relationships,
+      stripCommonWords,
       parentCountById: (() => {
         const m = {};
         const pcm = parentChildMap || [];
@@ -383,6 +384,7 @@ const AppD3Vis = ({ targetId }) => {
     hiddenLayers,
     availableLayerOptions,
     clickedSegmentId,
+    stripCommonWords,
     relatedIds,
     ancestorIds,
     relationships,
