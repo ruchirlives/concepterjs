@@ -65,6 +65,7 @@ export function createTree({ svgEl, data, options = {} }) {
     svg
       .attr("viewBox", [-(dy / 3), x0 - dx, width, height])
       .attr("preserveAspectRatio", "xMidYMid meet")
+      .attr("height", "100%")
       .style("font", "10px sans-serif");
 
     svg.append("g")

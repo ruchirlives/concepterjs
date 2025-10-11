@@ -84,26 +84,40 @@ export function getVisOptions({
       name: 'Bundle',
       controller: createBundle,
       buildData: () => {
-        // Reuse donut/tree builder to get flat donutTree, then reconstruct hierarchy and links
+        // Reuse donut/tree builder; if empty, fall back to simple hierarchy from filtered rows
         const payload = buildDonutTreePayloadWrapper();
-        const flat = payload.donutTree || [];
+        let flat = payload.donutTree || [];
         // Reconstruct hierarchy from flat items
-        const byKey = new Map();
-        flat.forEach(n => {
-          const key = `${n.id}-${n.level}`;
-          byKey.set(key, { id: n.id, name: n.name || n.label, children: [] });
-        });
-        let rootKey = null; let minLevel = Infinity;
-        flat.forEach(n => {
-          const key = `${n.id}-${n.level}`;
-          if (n.parentId != null && n.level > 0) {
-            const pKey = `${n.parentId}-${n.level - 1}`;
-            const p = byKey.get(pKey);
-            if (p) p.children.push(byKey.get(key));
-          }
-          if (n.parentId == null || n.level < minLevel) { minLevel = n.level; rootKey = key; }
-        });
-        const hierarchy = byKey.get(rootKey) || null;
+        let hierarchy = null;
+        if (flat.length) {
+          const byKey = new Map();
+          flat.forEach(n => {
+            const key = `${n.id}-${n.level}`;
+            byKey.set(key, { id: n.id, name: n.name || n.label, children: [] });
+          });
+          let rootKey = null; let minLevel = Infinity;
+          flat.forEach(n => {
+            const key = `${n.id}-${n.level}`;
+            if (n.parentId != null && n.level > 0) {
+              const pKey = `${n.parentId}-${n.level - 1}`;
+              const p = byKey.get(pKey);
+              if (p) p.children.push(byKey.get(key));
+            }
+            if (n.parentId == null || n.level < minLevel) { minLevel = n.level; rootKey = key; }
+          });
+          hierarchy = byKey.get(rootKey) || null;
+        } else {
+          // Fallback: build a flat hierarchy under a synthetic root from visible rows
+          const sanitizeTags = (tags) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
+          const visibleLayers = (state.availableLayerOptions || []).filter(l => !state.hiddenLayers.has(l));
+          const filteredRows = (state.rowData || []).filter(row => {
+            const tags = sanitizeTags(row?.Tags);
+            return tags.some(tag => visibleLayers.includes(tag));
+          });
+          const children = filteredRows.map(r => ({ id: r.id?.toString(), name: r.Name || r.id?.toString() }));
+          hierarchy = { id: 'root', name: 'root', children };
+          flat = children.map((c, i) => ({ id: c.id, name: c.name, level: 1, parentId: 'root' }));
+        }
 
         // Build cross-links from relationships where endpoints exist in flat list
         const idSet = new Set(flat.map(n => n.id?.toString()));

@@ -42,21 +42,29 @@ export function createBundle({ svgEl, data, options = {} }) {
       svg.attr("viewBox", "0 0 1 1").attr("preserveAspectRatio", "xMidYMid meet");
       return;
     }
+    // Debug: ensure we have nodes/links
+    // console.log('Bundle payload', { hasHierarchy: !!hierarchyData, linkCount: linkPairs.length });
 
     // Attach links to leaf nodes by id
     // We store for each leaf a list of target ids in data.links
     const root = d3.hierarchy(hierarchyData)
       .sort((a, b) => d3.ascending(a.height, b.height) || d3.ascending(a.data.name, b.data.name));
 
-    const radius = width / 2;
-    const tree = d3.cluster().size([2 * Math.PI, radius - 100]);
+    // Compute stable radius and margins so labels/edges fit inside canvas
+    const W = Math.max(300, width);
+    const R = W / 2;
+    const ringMargin = 140; // distance from outer radius to leaf ring
+    const vbPad = 24;       // extra padding on viewBox to avoid clipping
+
+    const tree = d3.cluster().size([2 * Math.PI, R - ringMargin]);
     const clustered = tree(root);
     safeBilink(clustered, linkPairs);
 
     svg
-      .attr("viewBox", [-width / 2, -width / 2, width, width])
+      .attr("viewBox", [-(R + vbPad), -(R + vbPad), 2 * (R + vbPad), 2 * (R + vbPad)])
       .attr("preserveAspectRatio", "xMidYMid meet")
-      .attr("style", "max-width: 100%; width: 100%; height: auto; font: 10px sans-serif;");
+      .attr("height", "100%")
+      .attr("style", "max-width: 100%; font: 10px sans-serif;");
 
     const leaves = clustered.leaves();
 

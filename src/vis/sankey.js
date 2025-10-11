@@ -36,7 +36,8 @@ export function createSankey({ svgEl, data, options = {} }) {
     svg
       .attr("viewBox", [0, 0, width, height])
       .attr("preserveAspectRatio", "xMidYMid meet")
-      .attr("style", "max-width: 100%; width: 100%; height: auto; font: 10px sans-serif;");
+      .attr("height", "100%")
+      .attr("style", "max-width: 100%; font: 10px sans-serif;");
 
     // Configure sankey
     const alignMap = { sankeyLeft, sankeyRight, sankeyCenter, sankeyJustify };
