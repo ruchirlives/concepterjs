@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import * as d3 from "d3";
+import { renderDonutAncestry } from "./vis/renderers/donutAncestry";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
@@ -94,6 +95,8 @@ const AppD3Vis = ({ targetId }) => {
   const tooltipRef = useRef();
   const { rowData, setRowData, hiddenLayers } = useAppContext();
   const { childrenMap, nameById, layerOptions: availableLayerOptions, relationships } = useMatrixLogic();
+  // Simple visualization selector state
+  const [visType, setVisType] = useState("donut");
 
   const [id, setId] = useState(
     targetId || (rowData && rowData.length > 0 ? rowData[0].id.toString() : "")
@@ -102,7 +105,7 @@ const AppD3Vis = ({ targetId }) => {
   const [donutTree, setDonutTree] = useState([]);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
-  const [showLayerRings, setShowLayerRings] = useState(true);
+  const [useLayers, setUseLayers] = useState(true);
   // Drag/link state (mirrors AppKanban)
   const [dragItem, setDragItem] = useState(null); // { cid, ctrl }
   const dragItemRef = useRef(dragItem);
@@ -143,13 +146,13 @@ const AppD3Vis = ({ targetId }) => {
   const menuHandlers = useMenuHandlers({
     rowData,
     setRowData,
-    removeChildFromLayer: async () => {},
+    removeChildFromLayer: async () => { },
     flipped: false,
     childrenMap,
   });
 
   // Menu options for donut segments
-  const donutMenuOptions = [
+  const visMenuOptions = [
     { label: "Rename", onClick: menuHandlers.handleRename },
     { label: "Export", submenu: menuHandlers.exportMenu }, // <-- use submenu
   ];
@@ -181,7 +184,7 @@ const AppD3Vis = ({ targetId }) => {
 
   // Build the donut tree whenever id changes
   useEffect(() => {
-    if (showLayerRings) {
+    if (useLayers) {
       setFocusedNodeId(null);
       return;
     }
@@ -197,7 +200,7 @@ const AppD3Vis = ({ targetId }) => {
     // Build ancestry tree starting from the determined root node
     const tree = buildAncestryTree(rootNodeId, nameById, childrenMap);
     setDonutTree(tree);
-  }, [id, focusedNodeId, nameById, childrenMap, showLayerRings]);
+  }, [id, focusedNodeId, nameById, childrenMap, useLayers]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
@@ -233,20 +236,20 @@ const AppD3Vis = ({ targetId }) => {
 
   // Get the root node's full label
   const rootLabel = useMemo(() => {
-    if (showLayerRings) {
+    if (useLayers) {
       return "Layer View";
     }
     if (donutTree.length === 0) return "";
     const rootItem = donutTree.find(item => item.level === 0);
     return rootItem ? rootItem.label : "";
-  }, [donutTree, showLayerRings]);
+  }, [donutTree, useLayers]);
 
   const visibleLayers = useMemo(() => {
     return (availableLayerOptions || []).filter(layer => !hiddenLayers.has(layer));
   }, [availableLayerOptions, hiddenLayers]);
 
   const layersWithItems = useMemo(() => {
-    if (!showLayerRings) return [];
+    if (!useLayers) return [];
     const sanitizeTags = tags =>
       (tags || "")
         .split(",")
@@ -275,7 +278,7 @@ const AppD3Vis = ({ targetId }) => {
         return { layer, items };
       })
       .filter(entry => entry.items.length > 0);
-  }, [showLayerRings, visibleLayers, rowData, hiddenLayers]);
+  }, [useLayers, visibleLayers, rowData, hiddenLayers]);
 
   // Track viewport size to re-render responsive chart on resize
   const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
@@ -302,7 +305,7 @@ const AppD3Vis = ({ targetId }) => {
 
     setClickedSegmentId(clickedId);
 
-    if (showLayerRings || typeof clickedLevel !== "number") {
+    if (useLayers || typeof clickedLevel !== "number") {
       setFocusedNodeId(null);
       return;
     }
@@ -340,7 +343,7 @@ const AppD3Vis = ({ targetId }) => {
     });
 
     setDonutTree(uniqueTree);
-  }, [donutTree, nameById, childrenMap, showLayerRings]);
+  }, [donutTree, nameById, childrenMap, useLayers]);
 
   // Add right-click handler for donut segments
   const handleSegmentContextMenu = useCallback((event, d) => {
@@ -441,9 +444,9 @@ const AppD3Vis = ({ targetId }) => {
     const width = svgEl ? svgEl.clientWidth : 700;
     const height = svgEl ? svgEl.clientHeight : width; // keep square if auto
     const radius = Math.min(width, height) / 2 - 20;
-    const g = svg.append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
+    svg.attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`).attr("preserveAspectRatio","xMidYMid meet"); const g = svg.append("g");
 
-    if (showLayerRings) {
+    if (useLayers) {
       if (layersWithItems.length === 0) {
         return;
       }
@@ -553,7 +556,7 @@ const AppD3Vis = ({ targetId }) => {
               return label.length >= 5 ? label.substring(0, 5) : label;
             }
             if (label.length > estMaxChars) {
-              return label.substring(0, Math.max(1, estMaxChars - 1)) + "…";
+              return label.substring(0, Math.max(1, estMaxChars - 1)) + "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦";
             }
             return label;
           });
@@ -573,189 +576,24 @@ const AppD3Vis = ({ targetId }) => {
       return;
     }
 
-    if (donutTree.length === 0) return;
     // Default ancestry view below
-
-    // Group items by level
-    const levels = {};
-    donutTree.forEach(item => {
-      if (!levels[item.level]) levels[item.level] = [];
-      levels[item.level].push(item);
+    // Default ancestry view
+    renderDonutAncestry({
+      svg: d3.select(svgRef.current),
+      width,
+      height,
+      donutTree,
+      colorByTag,
+      handleSegmentClick,
+      handleSegmentContextMenu,
+      handleSegmentMouseDown,
+      clickedSegmentId,
+      stripCommonWords,
+      relatedIds,
+      ancestorIds,
     });
+    return;
 
-    // Build proper hierarchy: level 0 → level 1 as children → level 2 as children of first level 1, etc.
-    // Build proper hierarchy using parentId relationships
-    function buildProperHierarchy() {
-      if (donutTree.length === 0) return null;
-
-      // Use composite key: id-level
-      const itemsByKey = {};
-      donutTree.forEach(item => {
-        const key = `${item.id}-${item.level}`;
-        itemsByKey[key] = {
-          id: item.id,
-          name: item.label,
-          level: item.level,
-          parentId: item.parentId,
-          parentLevel: item.level > 0 ? item.level - 1 : null,
-          children: []
-        };
-      });
-
-      // Find the root (lowest level, or parentId === null)
-      let root = null;
-      let minLevel = Infinity;
-      let rootKey = null;
-      donutTree.forEach(item => {
-        if ((item.level < minLevel || item.parentId === null)) {
-          minLevel = item.level;
-          rootKey = `${item.id}-${item.level}`;
-        }
-      });
-      root = itemsByKey[rootKey];
-      if (!root) return null;
-
-      // Link children using composite keys
-      donutTree.forEach(item => {
-        if (item.parentId !== null && item.level > 0) {
-          const parentKey = `${item.parentId}-${item.level - 1}`;
-          const childKey = `${item.id}-${item.level}`;
-          if (itemsByKey[parentKey]) {
-            itemsByKey[parentKey].children.push(itemsByKey[childKey]);
-          }
-        }
-      });
-
-      return root;
-    }
-
-    const treeData = buildProperHierarchy();
-
-    if (!treeData) return;
-
-    // Convert tree to d3.hierarchy
-    const root = d3.hierarchy(treeData)
-      .sum(d => 1)
-      .sort((a, b) => d3.ascending(a.data.name, b.data.name));
-
-    // Partition layout
-    d3.partition()
-      .size([2 * Math.PI, radius])(root);
-
-    // Arc generator
-    const arc = d3.arc()
-      .startAngle(d => d.x0)
-      .endAngle(d => d.x1)
-      .innerRadius(d => d.y0)
-      .outerRadius(d => d.y1);
-
-    // For text paths (middle of arc)
-    const textArc = d3.arc()
-      .startAngle(d => d.x0)
-      .endAngle(d => d.x1)
-      .innerRadius(d => (d.y0 + d.y1) / 2)
-      .outerRadius(d => (d.y0 + d.y1) / 2);
-
-    // Draw arcs
-    const nodes = root.descendants().filter(d => d.depth >= 0);
-
-    g.selectAll("path")
-      .data(nodes)
-      .enter().append("path")
-      .attr("d", arc)
-      .attr("fill", d => {
-        const id = d.data.id?.toString();
-        if (id === clickedSegmentId?.toString()) return "#ff4444";
-        const row = rowData.find(r => r.id?.toString() === id);
-        return row && row.Tags ? colorByTag(row.Tags) : "#ccc";
-      })
-      .attr("stroke", d => {
-        const id = d.data.id?.toString();
-        if (id === clickedSegmentId?.toString()) return "#cc0000";
-        if (relatedIds.has(id)) return "#f59e0b"; // descendants
-        if (ancestorIds.has(id)) return "#3b82f6"; // ancestors
-        return "#fff";
-      })
-      .attr("stroke-width", d => {
-        const id = d.data.id?.toString();
-        if (id === clickedSegmentId?.toString()) return 3;
-        if (relatedIds.has(id)) return 2;
-        if (ancestorIds.has(id)) return 2;
-        return 1;
-      })
-      .style("opacity", d => {
-        if (!clickedSegmentId) return 1;
-        const id = d.data.id?.toString();
-        return relatedIds.has(id) || ancestorIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
-      })
-      .style("cursor", "pointer")
-      .on("click", handleSegmentClick)
-      .on("contextmenu", handleSegmentContextMenu) // <-- Add this line
-      .on("mousedown", handleSegmentMouseDown)
-      .attr("data-donut-item-id", d => d.data.id)
-      .on("mousemove", function (event, d) {
-        const tooltip = tooltipRef.current;
-        if (tooltip) {
-          tooltip.style.display = "block";
-          tooltip.style.left = (event.clientX + 10) + "px";
-          tooltip.style.top = (event.clientY + 10) + "px";
-          tooltip.textContent = d.data.name;
-        }
-      })
-      .on("mouseleave", function () {
-        const tooltip = tooltipRef.current;
-        if (tooltip) {
-          tooltip.style.display = "none";
-        }
-      });
-
-    // Draw invisible paths for text
-    g.selectAll("defs")
-      .data(nodes)
-      .enter()
-      .append("path")
-      .attr("id", d => `arc-label-${d.data.id}`)
-      .attr("d", d => {
-        const midAngle = (d.x0 + d.x1) / 2;
-        if (midAngle > Math.PI / 2 && midAngle < 3 * Math.PI / 2) {
-          return textArc({ ...d, x0: d.x1, x1: d.x0 });
-        }
-        return textArc(d);
-      })
-      .style("fill", "none")
-      .style("stroke", "none");
-
-    // Add curved text labels
-    g.selectAll("text")
-      .data(nodes)
-      .enter()
-      .append("text")
-      .attr("dy", "0.32em")
-      .append("textPath")
-      .attr("href", d => `#arc-label-${d.data.id}`)
-      .attr("startOffset", "5%")
-      .style("text-anchor", "left")
-      .style("font-size", "9px")
-      .text(d => {
-        const arcLength = Math.abs(d.x1 - d.x0);
-        const minArc = 0.35;
-        const fontSize = 9;
-        const r = (d.y0 + d.y1) / 2;
-        const estMaxChars = Math.floor((arcLength * r) / (fontSize * 0.7));
-
-        let label = stripCommonWords(d.data.name);
-
-        // If the segment would normally be blank, show first 5 chars
-        if (arcLength < minArc || estMaxChars < 3) {
-          return label.length >= 5 ? label.substring(0, 5) : label;
-        }
-
-        // Normal truncation logic for segments that have enough space
-        if (label.length > estMaxChars) {
-          label = label.substring(0, estMaxChars - 1) + "…";
-        }
-        return label;
-      });
   }, [
     donutTree,
     rowData,
@@ -763,7 +601,7 @@ const AppD3Vis = ({ targetId }) => {
     handleSegmentClick,
     handleSegmentContextMenu,
     clickedSegmentId,
-    showLayerRings,
+    useLayers,
     layersWithItems,
     viewportSize,
     stripCommonWords,
@@ -775,7 +613,7 @@ const AppD3Vis = ({ targetId }) => {
   // Reset clicked segment when changing root
   useEffect(() => {
     setClickedSegmentId(null);
-  }, [id, showLayerRings]);
+  }, [id, useLayers]);
 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -789,13 +627,15 @@ const AppD3Vis = ({ targetId }) => {
             onClick={() => setCollapsed(c => !c)}
             aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
           >
-            {collapsed ? "▼" : "▲"}
+            {collapsed ? "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¼" : "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â²"}
           </button>
         </div>
         {!collapsed && <p>No node selected</p>}
       </div>
     );
   }
+
+
 
   return (
     <div
@@ -821,15 +661,24 @@ const AppD3Vis = ({ targetId }) => {
       <div className="flex justify-between items-center mb-2 w-full gap-4">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold">Donut View (D3)</h2>
+          <select
+            value={visType}
+            onChange={(e) => setVisType(e.target.value)}
+            className="px-2 py-1 border rounded text-sm"
+            aria-label="Select visualization"
+          >
+            <option value="donut">Ancestry Donut</option>
+            <option value="layers">Layer Rings</option>
+          </select>
           <label className="flex items-center gap-1 text-sm">
             <input
               type="checkbox"
-              checked={showLayerRings}
-              onChange={e => setShowLayerRings(e.target.checked)}
+              checked={useLayers}
+              onChange={e => setUseLayers(e.target.checked)}
             />
             <span>Layer Rings</span>
           </label>
-          {showLayerRings && (
+          {useLayers && (
             <LayerDropdown
               buttonText="Layers"
               title="Select layers to display"
@@ -842,19 +691,19 @@ const AppD3Vis = ({ targetId }) => {
           onClick={() => setCollapsed(c => !c)}
           aria-label={collapsed ? "Expand donut view" : "Collapse donut view"}
         >
-          {collapsed ? "▼" : "▲"}
+          {collapsed ? "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¼" : "ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â²"}
         </button>
       </div>
       {!collapsed && <>
         <div style={{ fontWeight: "bold", fontSize: "1 rem", marginBottom: "2px" }}>
           {rootLabel}
-          {!showLayerRings && focusedNodeId && (
+          {!useLayers && focusedNodeId && (
             <div style={{ fontSize: "0.9rem", color: "#666", fontWeight: "normal" }}>
               Focused on: {nameById[focusedNodeId]}
             </div>
           )}
         </div>
-        {!showLayerRings && focusedNodeId && (
+        {!useLayers && focusedNodeId && (
           <button
             onClick={() => setFocusedNodeId(null)}
             style={{
@@ -889,7 +738,7 @@ const AppD3Vis = ({ targetId }) => {
             </div>
           </div>
         )}
-        {showLayerRings && layersWithItems.length === 0 && (
+        {useLayers && layersWithItems.length === 0 && (
           <div style={{ marginBottom: "10px", color: "#666" }}>
             No visible layers with items to display.
           </div>
@@ -923,7 +772,7 @@ const AppD3Vis = ({ targetId }) => {
         <ContextMenu
           contextMenu={contextMenu}
           setContextMenu={setContextMenu}
-          menuOptions={donutMenuOptions}
+          menuOptions={visMenuOptions}
         />
       </>}
     </div>
@@ -931,3 +780,6 @@ const AppD3Vis = ({ targetId }) => {
 };
 
 export default AppD3Vis;
+
+
+
