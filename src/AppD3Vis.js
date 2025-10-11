@@ -22,7 +22,7 @@ async function linkItems(sourceItem, targetItem, relationships) {
 }
 
 // Build ancestry tree as flat array: [{id, level, label, parentId}, ...]
-function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0) {
+function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, startingLevel = 0, useChildren = false) {
   const tree = [];
 
   // Step 1: Add root item at level 0
@@ -61,13 +61,19 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
     // Take the first item of current level
     const firstItem = currentLevelItems[0];
 
-    // Find all parents of this item
+    // Find related ids for next level
     const parentIds = [];
-    Object.entries(childrenMap).forEach(([parentId, children]) => {
-      if (children.includes(firstItem.id)) {
-        parentIds.push(parentId);
-      }
-    });
+    if (!useChildren) {
+      Object.entries(childrenMap).forEach(([parentId, children]) => {
+        if (children.includes(firstItem.id)) {
+          parentIds.push(parentId);
+        }
+      });
+    } else {
+      // Descendants: next level are children of the firstItem
+      const kids = childrenMap[firstItem.id] || [];
+      parentIds.push(...kids);
+    }
 
 
     // Add parents as next level
@@ -105,6 +111,7 @@ const AppD3Vis = ({ targetId }) => {
   );
   const [focusedNodeId, setFocusedNodeId] = useState(null);
   const [donutTree, setDonutTree] = useState([]);
+  const [reverseAncestry, setReverseAncestry] = useState(false);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [isInternalClick, setIsInternalClick] = useState(false);
   const [useLayers, setUseLayers] = useState(true);
@@ -200,9 +207,11 @@ const AppD3Vis = ({ targetId }) => {
     }
 
     // Build ancestry tree starting from the determined root node
-    const tree = buildAncestryTree(rootNodeId, nameById, childrenMap);
+    const tree = reverseAncestry
+      ? buildAncestryTree(rootNodeId, nameById, childrenMap, 6, 0, true)
+      : buildAncestryTree(rootNodeId, nameById, childrenMap);
     setDonutTree(tree);
-  }, [id, focusedNodeId, nameById, childrenMap, useLayers]);
+  }, [id, focusedNodeId, nameById, childrenMap, useLayers, reverseAncestry]);
 
   // 1. Gather all unique tags
   const allTags = useMemo(() => {
@@ -533,7 +542,7 @@ const AppD3Vis = ({ targetId }) => {
         </svg>
       )}
       <div className="flex justify-between items-center mb-2 w-full gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
           <h2 className="font-semibold">Vis View (D3)</h2>
           <select
             value={visType}
@@ -551,6 +560,16 @@ const AppD3Vis = ({ targetId }) => {
             />
             <span>Use Layers</span>
           </label>
+          {!useLayers && (
+            <label className="flex items-center gap-1 text-sm">
+              <input
+                type="checkbox"
+                checked={reverseAncestry}
+                onChange={e => setReverseAncestry(e.target.checked)}
+              />
+              <span>Show Descendants</span>
+            </label>
+          )}
           {useLayers && (
             <LayerDropdown
               buttonText="Layers"
