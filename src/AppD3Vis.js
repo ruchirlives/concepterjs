@@ -686,7 +686,7 @@ const AppD3Vis = ({ targetId }) => {
               checked={useLayers}
               onChange={e => setUseLayers(e.target.checked)}
             />
-            <span>Layer Rings</span>
+            <span>Use Layers</span>
           </label>
           {useLayers && (
             <LayerDropdown
