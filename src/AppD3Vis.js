@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import * as d3 from "d3";
 // Use consolidated donut entry point
 import { createDonut } from "./vis/donut";
+import { createTree } from "./vis/tree";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Add this import
@@ -428,10 +429,7 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener("dragend", handleDragEnd);
   }, [ctrlDragging]);
 
-  const controllerRegistry = useMemo(() => ({
-    donut: createDonut,
-    layers: null,
-  }), []);
+  const controllerRegistry = useMemo(() => ({donut: createDonut,layers: createDonut,tree: createTree}), []);
 
   const activeVisKey = visType;
 
@@ -543,8 +541,7 @@ const AppD3Vis = ({ targetId }) => {
             className="px-2 py-1 border rounded text-sm"
             aria-label="Select visualization"
           >
-            <option value="donut">Ancestry Vis</option>
-            <option value="layers">Layer Rings</option>
+            <option value="donut">Ancestry Donut</option>        <option value="layers">Layer Rings</option>        <option value="tree">Cluster Tree</option>
           </select>
           <label className="flex items-center gap-1 text-sm">
             <input
@@ -604,3 +601,7 @@ const AppD3Vis = ({ targetId }) => {
 };
 
 export default AppD3Vis;
+
+
+
+
