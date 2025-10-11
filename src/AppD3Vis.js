@@ -430,175 +430,33 @@ const AppD3Vis = ({ targetId }) => {
 
   const controllerRegistry = useMemo(() => ({
     donut: createDonut,
+    layers: null,
   }), []);
 
-  const activeVisKey = useLayers ? "layers" : visType;
+  const activeVisKey = visType;
 
   useEffect(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
 
-    const svg = d3.select(svgEl);
-    svg.selectAll("*").remove();
-
-    const width = svgEl.clientWidth || 700;
-    const height = svgEl.clientHeight || width; // keep square if auto
-
-    svg
-      .attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet");
-
-    if (activeVisKey === "layers") {
-      if (layersWithItems.length === 0) {
-        return;
-      }
-
-      const radius = Math.min(width, height) / 2 - 20;
-      const g = svg.append("g");
-
-      // Reserve an inner blank root circle by adding one extra ring slot
-      const ringCount = layersWithItems.length + 1;
-      const ringWidth = ringCount === 0 ? radius : radius / ringCount;
-      // Draw a subtle boundary for the blank root circle
-      g.append("circle")
-        .attr("r", ringWidth)
-        .attr("fill", "none")
-        .attr("stroke", "#eee")
-        .attr("stroke-width", 1);
-
-      const layerPie = d3.pie().sort(null).value(() => 1);
-
-      layersWithItems.forEach((layerEntry, layerIndex) => {
-        // Shift all rings outward by one ringWidth to keep center blank
-        const innerRadius = ringWidth * (layerIndex + 1);
-        const outerRadius = ringWidth * (layerIndex + 2);
-        const arcGenerator = d3.arc()
-          .startAngle(d => d.startAngle)
-          .endAngle(d => d.endAngle)
-          .innerRadius(innerRadius)
-          .outerRadius(outerRadius);
-
-        const augmentedItems = layerEntry.items.map(item => ({
-          ...item,
-          level: layerIndex,
-          layer: layerEntry.layer
-        }));
-
-        const arcs = layerPie(augmentedItems);
-
-        const ringGroup = g.append("g").attr("data-layer", layerEntry.layer);
-
-        // Draw the ring segments
-        ringGroup.selectAll("path")
-          .data(arcs)
-          .enter()
-          .append("path")
-          .attr("d", arcGenerator)
-          .attr("fill", d => {
-            const base = colorByTag(layerEntry.layer) || "#ccc";
-            if (d.data.id?.toString() === clickedSegmentId?.toString()) return "#ff4444";
-            return base;
-          })
-          .attr("stroke", d => {
-            const id = d.data.id?.toString();
-            if (id === clickedSegmentId?.toString()) return "#cc0000";
-            if (relatedIds.has(id)) return "#f59e0b"; // amber for descendants
-            if (ancestorIds.has(id)) return "#3b82f6"; // blue for ancestors
-            return "#fff";
-          })
-          .attr("stroke-width", d => {
-            const id = d.data.id?.toString();
-            if (id === clickedSegmentId?.toString()) return 3;
-            if (relatedIds.has(id)) return 2;
-            if (ancestorIds.has(id)) return 2;
-            return 1;
-          })
-          .style("opacity", d => {
-            if (!clickedSegmentId) return 1;
-            const id = d.data.id?.toString();
-            return relatedIds.has(id) || ancestorIds.has(id) || id === clickedSegmentId?.toString() ? 1 : 0.35;
-          })
-          .style("cursor", "pointer")
-          .on("click", handleSegmentClick)
-          .on("contextmenu", handleSegmentContextMenu)
-          .on("mousedown", handleSegmentMouseDown)
-          .attr("data-donut-item-id", d => d.data.id)
-          .on("mousemove", function (event, d) {
-            const tooltip = tooltipRef.current;
-            if (tooltip) {
-              tooltip.style.display = "block";
-              tooltip.style.left = (event.clientX + 10) + "px";
-              tooltip.style.top = (event.clientY + 10) + "px";
-              tooltip.textContent = `${d.data.name} (${layerEntry.layer})`;
-            }
-          })
-          .on("mouseleave", function () {
-            const tooltip = tooltipRef.current;
-            if (tooltip) {
-              tooltip.style.display = "none";
-            }
-          });
-
-        // Add container labels on segments (truncated to fit)
-        const fontSize = 10;
-        ringGroup.selectAll("text")
-          .data(arcs)
-          .enter()
-          .append("text")
-          .attr("transform", d => {
-            const [cx, cy] = arcGenerator.centroid(d);
-            return `translate(${cx},${cy})`;
-          })
-          .attr("text-anchor", "middle")
-          .attr("dominant-baseline", "middle")
-          .attr("fill", "#374151")
-          .style("font-size", `${fontSize}px`)
-          .text(d => {
-            const arcLen = Math.abs(d.endAngle - d.startAngle);
-            const rMid = (innerRadius + outerRadius) / 2;
-            const estMaxChars = Math.floor((arcLen * rMid) / (fontSize * 0.7));
-            const label = stripCommonWords(d.data.name || "");
-            if (arcLen < 0.25 || estMaxChars < 3) {
-              return label.length >= 5 ? label.substring(0, 5) : label;
-            }
-            if (label.length > estMaxChars) {
-              return label.substring(0, Math.max(1, estMaxChars - 1)) + "ǟ�'�'��ǟ��ǽ�'����'��ǟ�?s�'��";
-            }
-            return label;
-          });
-
-        // Layer label
-        const labelRadius = innerRadius + (ringWidth / 2);
-        // Layer label in a distinct color
-        g.append("text")
-          .attr("text-anchor", "middle")
-          .attr("dy", "0.35em")
-          .attr("fill", "#1d4ed8")
-          .attr("font-size", "10px")
-          .attr("transform", `rotate(0) translate(0, ${-labelRadius})`)
-          .text(layerEntry.layer);
-      });
-
-      return;
-    }
-
     const controllerFactory = controllerRegistry[activeVisKey];
-    if (!controllerFactory) {
-      return;
-    }
+    if (!controllerFactory) return;
 
     const controller = controllerFactory({
       svgEl,
       data: {
         donutTree,
-        colorByTag,
+        layersWithItems,
         clickedSegmentId,
         relatedIds,
         ancestorIds,
+        useLayers,
       },
       options: {
-        width,
-        height,
+        mode: activeVisKey,
+        useLayers,
+        colorByTag,
+        tooltipEl: tooltipRef.current,
         handlers: {
           handleSegmentClick,
           handleSegmentContextMenu,
@@ -608,7 +466,14 @@ const AppD3Vis = ({ targetId }) => {
       },
     });
 
-    controller.update({ donutTree, colorByTag, clickedSegmentId, relatedIds, ancestorIds });
+    controller.update({
+      donutTree,
+      layersWithItems,
+      clickedSegmentId,
+      relatedIds,
+      ancestorIds,
+      useLayers,
+    });
 
     return () => controller.destroy?.();
 
@@ -624,6 +489,7 @@ const AppD3Vis = ({ targetId }) => {
     handleSegmentMouseDown,
     layersWithItems,
     relatedIds,
+    useLayers,
     stripCommonWords,
     viewportSize
   ]);
