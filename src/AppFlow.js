@@ -44,10 +44,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
     onNodesChange,
     screenToFlowPosition,
     selectedContentLayer, setSelectedContentLayer, layerOptions,
+    groupByLayers, setGroupByLayers,
+    showGroupNodes, setShowGroupNodes,
   } = useFlowLogic();
 
-  const [groupByLayers, setGroupByLayers] = useState(false);
-  const [showGroupNodes, setShowGroupNodes] = useState(false);
+
   const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [dragging, setDragging] = useState(false);
 
