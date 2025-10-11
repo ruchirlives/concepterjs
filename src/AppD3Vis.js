@@ -5,6 +5,7 @@ import { createDonut } from "./vis/donut";
 import { createTree } from "./vis/tree";
 import { createSankey } from "./vis/sankey";
 import { createBundle } from "./vis/bundle";
+import { createForce } from "./vis/force";
 import getVisOptions from "./vis/visOptions";
 import { useAppContext } from "./AppContext";
 import { useMatrixLogic } from "./hooks/useMatrixLogic";
@@ -310,7 +311,7 @@ const AppD3Vis = ({ targetId }) => {
   }, [ctrlDragging]);
 
   // Controller registry (stable)
-  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey, bundle: createBundle }), []);
+  const controllerRegistry = useMemo(() => ({ donut: createDonut, layers: createDonut, tree: createTree, sankey: createSankey, bundle: createBundle, force: createForce }), []);
   const [sankeyLinkColor, setSankeyLinkColor] = useState('source-target');
   const [sankeyNodeAlign, setSankeyNodeAlign] = useState('sankeyLeft');
 
@@ -367,7 +368,8 @@ const AppD3Vis = ({ targetId }) => {
       sankeyNodeAlign,
     },
     builders: { buildNodesLinks, buildAncestryTree },
-    controllers: { createDonut, createTree, createSankey, createBundle },
+  // IMPORTANT for cfg ERROR: always makes sure we update when these change
+    controllers: { createDonut, createTree, createSankey, createBundle, createForce },
   }), [
     id,
     expandTargetId,
@@ -417,6 +419,8 @@ const AppD3Vis = ({ targetId }) => {
 
     // Clear SVG before creating the new controller
     d3.select(svgEl).selectAll('*').remove();
+
+    console.log('active', activeVisKey, 'cfg', cfg && Object.keys(cfg), 'type', typeof cfg?.controller);
 
     const controller = cfg.controller({
       svgEl,
@@ -502,6 +506,7 @@ const AppD3Vis = ({ targetId }) => {
             <option value="tree">Cluster Tree</option>
             <option value="sankey">Sankey</option>
             <option value="bundle">Bundle</option>
+            <option value="force">Force</option>
           </select>
           {visType === 'sankey' && (
             <div className="flex items-center gap-2 text-sm">

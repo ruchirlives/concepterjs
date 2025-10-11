@@ -16,6 +16,7 @@ export function getVisOptions({
   const { buildNodesLinks } = builders;
   const { createDonut, createTree, createSankey } = controllers;
   const { createBundle } = controllers;
+  const { createForce } = controllers;
 
   const { buildAncestryTree } = builders;
 
@@ -135,6 +136,37 @@ export function getVisOptions({
         return { hierarchy, links, parentCount: state.parentCountById || {} };
       },
       options: { k: 6 },
+    },
+    force: {
+      name: 'Force',
+      controller: createForce,
+      buildData: () => {
+        // Reuse layer filtering for visible nodes
+        const sanitizeTags = (tags) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        const visibleLayers = (state.availableLayerOptions || []).filter(l => !state.hiddenLayers.has(l));
+        const filteredRows = (state.rowData || []).filter(row => {
+          const tags = sanitizeTags(row?.Tags);
+          return tags.some(tag => visibleLayers.includes(tag));
+        });
+        const nodeSet = new Set(filteredRows.map(r => String(r.id)));
+        const nodes = Array.from(nodeSet).map(id => ({ id }));
+
+        // Build links from relationships that connect visible nodes
+        const links = [];
+        const rels = state.relationships || {};
+        Object.entries(rels).forEach(([key, value]) => {
+          if (!value) return;
+          const parts = key.split('--');
+          if (parts.length !== 2) return;
+          const s = String(parts[0]);
+          const t = String(parts[1]);
+          if (nodeSet.has(s) && nodeSet.has(t)) {
+            links.push({ source: s, target: t, type: String(value) || 'default' });
+          }
+        });
+        return { nodes, links };
+      },
+      options: {},
     },
   };
 }
