@@ -89,7 +89,7 @@ function buildAncestryTree(nodeId, nameById, childrenMap, maxDepth = 6, starting
   return tree;
 }
 
-const AppDonut = ({ targetId }) => {
+const AppD3Vis = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
   const { rowData, setRowData, hiddenLayers } = useAppContext();
@@ -930,4 +930,4 @@ const AppDonut = ({ targetId }) => {
   );
 };
 
-export default AppDonut;
+export default AppD3Vis;

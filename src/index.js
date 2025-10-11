@@ -19,7 +19,7 @@ const AppMatrix = React.lazy(() => import('./AppMatrix'));
 const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
-const AppDonut = React.lazy(() => import('./AppDonut'));
+const AppD3Vis = React.lazy(() => import('./AppD3Vis'));
 // const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
 // Simple Tabs-based navigation for subapps
@@ -42,7 +42,7 @@ const tabs = [
         <AppState />
       </Suspense>
     ) },
-  { key: 'donut', label: 'Donut', render: () => <AppDonut /> },
+  { key: 'donut', label: 'Donut', render: () => <AppD3Vis /> },
   { key: 'editor', label: 'Editor', render: () => (
       <Suspense fallback={<div className="p-4">Loading editor...</div>}>
         <AppTiptap />
