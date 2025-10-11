@@ -294,6 +294,14 @@ const AppD3Vis = ({ targetId }) => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Force a rebuild of the vis (recompute trees and re-init controller)
+  const handleRebuild = useCallback(() => {
+    setFocusedNodeId(null);
+    setClickedSegmentId(null);
+    setUseLayers(false);
+    setReverseAncestry(false);
+    setId(id); // trigger useEffect
+  }, [id]);
   // Function to handle segment clicks
   const handleSegmentClick = useCallback((event, d) => {
     event.stopPropagation();
@@ -570,7 +578,17 @@ const AppD3Vis = ({ targetId }) => {
           >
             <option value="donut">Ancestry Donut</option>
             <option value="tree">Cluster Tree</option>
+
           </select>
+          <button
+            type="button"
+            onClick={handleRebuild}
+            className="px-2 py-1 border rounded text-sm"
+            aria-label="Rebuild visualization"
+            title="Rebuild visualization"
+          >
+            Rebuild
+          </button>
           <label className="flex items-center gap-1 text-sm">
             <input
               type="checkbox"
@@ -639,6 +657,8 @@ const AppD3Vis = ({ targetId }) => {
 };
 
 export default AppD3Vis;
+
+
 
 
 
