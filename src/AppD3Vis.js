@@ -312,13 +312,6 @@ const AppD3Vis = ({ targetId }) => {
       return;
     }
 
-    // 2) Tree mode: re-root on click (labels don’t carry level)
-    if (activeVisKey === 'tree') {
-      setFocusedNodeId(null);
-      setId(clickedId); // triggers central rebuild; tree sees new root
-      return;
-    }
-
     // 3) Donut mode: one-level expand only if we have a numeric level
     if (typeof clickedLevel !== 'number') {
       // Optional: fallback to re-root in donut if no level is provided
@@ -358,7 +351,6 @@ const AppD3Vis = ({ targetId }) => {
     setDonutTree(uniqueTree);
   }, [
     useLayers,
-    activeVisKey,
     donutTree,
     nameById,
     childrenMap,

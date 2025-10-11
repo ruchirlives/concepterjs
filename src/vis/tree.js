@@ -95,15 +95,17 @@ export function createTree({ svgEl, data, options = {} }) {
       .attr("stroke", "white")
       .attr("paint-order", "stroke")
       .style("cursor", "pointer")
-      .on("click", (event, d) => handlers.handleSegmentClick?.(event, { data: { id: d.data.id, name: d.data.name } }))
-      .on("contextmenu", (event, d) => handlers.handleSegmentContextMenu?.(event, { data: { id: d.data.id, name: d.data.name } }))
-      .on("mousedown", (event, d) => handlers.handleSegmentMouseDown?.(event, { data: { id: d.data.id, name: d.data.name } }));
+      .on("click", (event, d) => handlers.handleSegmentClick?.(event, {
+        data: { id: d.data.id, name: d.data.name, level: d.depth }
+      }))
+        .on("contextmenu", (event, d) => handlers.handleSegmentContextMenu?.(event, { data: { id: d.data.id, name: d.data.name } }))
+        .on("mousedown", (event, d) => handlers.handleSegmentMouseDown?.(event, { data: { id: d.data.id, name: d.data.name } }));
   };
 
   render({ data });
   return {
     update(next) { render({ data: next }); },
-    destroy() {}
+    destroy() { }
   };
 }
 
