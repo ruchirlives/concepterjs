@@ -11,8 +11,8 @@ import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu"; // <-- Ad
 import LayerDropdown from "./components/LayerDropdown";
 import { setPosition } from "./api";
 import { requestRefreshChannel } from "hooks/effectsShared";
-import { buildAncestryTree } from "buildAncestryTree";
-import { buildNodesLinks } from "buildNodesLinks";
+import { buildAncestryTree } from "vis/buildAncestryTree";
+import { buildNodesLinks } from "vis/buildNodesLinks";
 
 // Match AppKanban behavior: prompt for label and save link
 async function linkItems(sourceItem, targetItem, relationships) {
@@ -448,9 +448,6 @@ const AppD3Vis = ({ targetId }) => {
     };
 
     const dataPayload = cfg.buildData ? cfg.buildData() : {};
-    if (activeVisKey === 'sankey') {
-      if (!dataPayload || !Array.isArray(dataPayload.nodes) || dataPayload.nodes.length === 0) return;
-    }
 
     // Clear SVG before creating the new controller
     d3.select(svgEl).selectAll('*').remove();
