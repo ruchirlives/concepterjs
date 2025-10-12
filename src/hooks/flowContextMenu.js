@@ -24,6 +24,7 @@ const HANDLERS = {
     showParents,
     categorize,
     buildRelationships,
+    exportToTTS,
     exportSelected,
     exportBranchSelected,
     mergeSelected,
@@ -102,6 +103,7 @@ export const menuItems = [
     { handler: "addFinanceContainerAction", label: "Add Finance Container", group: "Finance" },
 
     // Export
+    { handler: "exportToTTS", label: "Export to TTS", group: "Export" },
     { handler: "exportSelected", label: "Export Selected", group: "Export" },
     { handler: "exportBranchSelected", label: "Export Branch", group: "Export" },
     { handler: "exportApp", label: "Export to App", group: "Export" }
@@ -350,6 +352,30 @@ async function exportBranchSelected({ selectedIds }) {
         alert("Branch exported successfully.");
     } else {
         alert("Failed to export branch.");
+    }
+}
+
+// Export to Tabletop Simulator (TTS)
+async function exportToTTS({ selectedIds }) {
+    try {
+        const input = window.prompt("Optional: Enter custom save path or leave blank", "");
+        const savePath = input && input.trim().length ? input.trim() : undefined;
+
+        // If none selected, export all in memory per API contract
+        const containerIds = Array.isArray(selectedIds) && selectedIds.length ? selectedIds : undefined;
+
+        // UI feedback
+        const id = toast.loading("Exporting to TTS...");
+        const res = await api.exportTTS({ containerIds, savePath });
+        toast.dismiss(id);
+        if (res?.ok) {
+            toast.success(`Exported ${res.exported ?? 0} items to ${res.path || 'default path'}`);
+        } else {
+            toast.error(res?.error || "Export failed");
+        }
+    } catch (err) {
+        toast.error("Export failed");
+        console.error(err);
     }
 }
 

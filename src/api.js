@@ -154,6 +154,28 @@ export const get_onenote = async (rowId) => {
     }
 };
 
+// Export containers to Tabletop Simulator (TTS)
+// Body: { container_ids?: string[], save_path?: string }
+// Response: { ok: boolean, exported?: number, path?: string, error?: string }
+export const exportTTS = async ({ containerIds, savePath } = {}) => {
+    try {
+        const body = {};
+        if (Array.isArray(containerIds)) body.container_ids = containerIds;
+        if (typeof savePath === 'string' && savePath.length > 0) body.save_path = savePath;
+
+        const response = await apiClient.post(`${getApiUrl()}/export_tts`, body);
+        const data = response?.data || {};
+        if (!response?.status || response.status >= 400 || data.ok === false) {
+            throw new Error(data?.error || 'Export failed');
+        }
+        return data;
+    } catch (error) {
+        const message = error?.response?.data?.error || error?.message || 'Export failed';
+        console.error('Error exporting to TTS:', error);
+        return { ok: false, error: message };
+    }
+};
+
 // Fetch parent containers
 export const fetchParentContainers = async (rowId) => {
     try {
