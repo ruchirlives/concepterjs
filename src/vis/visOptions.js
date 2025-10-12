@@ -60,6 +60,7 @@ export function getVisOptions({
     relatedIds: state.relatedIds,
     ancestorIds: state.ancestorIds,
     buildAncestryTree,
+    prevDonutTree: state.prevDonutTree,
   });
 
   return {

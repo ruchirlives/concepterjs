@@ -33,6 +33,7 @@ const AppD3Vis = ({ targetId }) => {
   const svgRef = useRef();
   const tooltipRef = useRef();
   const controllerRef = useRef(null);
+  const lastDonutRef = useRef(null);
   const { rowData, setRowData, hiddenLayers, parentChildMap } = useAppContext();
   // Simple visualization selector state
   const [visType, setVisType] = useState("donut");
@@ -44,6 +45,8 @@ const AppD3Vis = ({ targetId }) => {
   const [reverseAncestry, setReverseAncestry] = useState(false);
   const [clickedSegmentId, setClickedSegmentId] = useState(null);
   const [expandTargetId, setExpandTargetId] = useState(null);
+  const [expandDepth, setExpandDepth] = useState(1);
+  const maxDepthCap = 6;
   const [isInternalClick, setIsInternalClick] = useState(false);
   const [useLayers, setUseLayers] = useState(true);
   // Drag/link state (mirrors AppKanban)
@@ -192,6 +195,17 @@ const AppD3Vis = ({ targetId }) => {
 
     setIsInternalClick(true);
     setClickedSegmentId(clickedId);
+    // Depth handling for donut/tree when not using layers
+    if (!useLayers) {
+      setExpandTargetId(prev => {
+        if (prev === clickedId) {
+          setExpandDepth(d => Math.min((d || 1) + 1, maxDepthCap));
+        } else {
+          setExpandDepth(1);
+        }
+        return clickedId;
+      });
+    }
 
     // 1) Layers mode: do not rebuild
     if (useLayers) {
@@ -320,10 +334,10 @@ const AppD3Vis = ({ targetId }) => {
     state: {
       id, // root id remains stable
       expandTargetId,
+      expandDepth,
       focusedNodeId, // still available if builders need it
       useLayers,
       reverseAncestry,
-      expandDepth: 1,
       nameById,
       childrenMap,
       rowData,
@@ -334,6 +348,7 @@ const AppD3Vis = ({ targetId }) => {
       ancestorIds,
       relationships,
       stripCommonWords,
+      prevDonutTree: lastDonutRef.current || null,
       parentCountById: (() => {
         const m = {};
         const pcm = parentChildMap || [];
@@ -374,6 +389,7 @@ const AppD3Vis = ({ targetId }) => {
   }), [
     id,
     expandTargetId,
+    expandDepth,
     focusedNodeId,
     useLayers,
     reverseAncestry,
@@ -432,6 +448,12 @@ const AppD3Vis = ({ targetId }) => {
 
     // Keep a ref and ensure cleanup clears the SVG
     controllerRef.current = controller;
+    // Track last donut payload for incremental merge
+    if (activeVisKey === 'donut' || activeVisKey === 'tree') {
+      try {
+        lastDonutRef.current = dataPayload?.donutTree || null;
+      } catch {}
+    }
     return () => {
       try { controllerRef.current?.destroy?.(); } catch { }
       d3.select(svgEl).selectAll('*').remove();

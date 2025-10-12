@@ -16,6 +16,7 @@ export function buildDonutTreePayload({
   relatedIds,
   ancestorIds,
   buildAncestryTree,
+  prevDonutTree,
 }) {
   const sanitizeTags = (tags) =>
     (tags || '').split(',').map(t => t.trim()).filter(Boolean);
@@ -46,30 +47,23 @@ export function buildDonutTreePayload({
       })
       .filter(entry => entry.items.length > 0);
   } else {
-    // Keep root fixed as 'id'
+    // Keep root fixed as 'id'. Prefer merging into previous donutTree if available
     const rootNodeId = id;
     if (rootNodeId && nameById && childrenMap && typeof buildAncestryTree === 'function') {
-      // Base tree from root with default depth
-      const baseDepth = Number.isFinite(expandDepth) ? expandDepth : 6;
-      const baseTree = reverseAncestry
-        ? buildAncestryTree(rootNodeId, nameById, childrenMap, baseDepth, 0, true)
-        : buildAncestryTree(rootNodeId, nameById, childrenMap, baseDepth);
-
-      // Optional one-hop expansion under expandTargetId, preserving root context
-      if (expandTargetId) {
-        // Find clicked level within baseTree
-        const clicked = baseTree.find(it => it.id?.toString() === expandTargetId?.toString());
+      const prev = Array.isArray(prevDonutTree) ? prevDonutTree : null;
+      if (prev && expandTargetId) {
+        const clicked = prev.find(n => n.id?.toString() === expandTargetId?.toString());
         if (clicked) {
-          const oneHop = buildAncestryTree(expandTargetId, nameById, childrenMap, 1, 0, reverseAncestry) || [];
-          const adjusted = oneHop
+          const clickDepth = Number.isFinite(expandDepth) ? Math.max(1, expandDepth) : 1;
+          const subTree = buildAncestryTree(expandTargetId, nameById, childrenMap, clickDepth, 0, reverseAncestry) || [];
+          const adjusted = subTree
             .filter(n => Number.isFinite(n.level) && n.level > 0)
             .map(n => ({
               ...n,
-              level: n.level + clicked.level, // shift under clicked level
+              level: n.level + clicked.level,
               parentId: n.level === 1 ? clicked.id : n.parentId,
             }));
-          // Merge with de-dupe; prefer adjusted entries
-          const merged = [...baseTree, ...adjusted];
+          const merged = [...prev, ...adjusted];
           const seen = new Set();
           const unique = [];
           for (let i = merged.length - 1; i >= 0; i--) {
@@ -79,10 +73,18 @@ export function buildDonutTreePayload({
           }
           donutTree = unique;
         } else {
-          donutTree = baseTree;
+          // fallback seed from root with a reasonable depth
+          const seedDepth = Number.isFinite(expandDepth) ? Math.max(1, expandDepth) : 6;
+          donutTree = reverseAncestry
+            ? buildAncestryTree(rootNodeId, nameById, childrenMap, seedDepth, 0, true)
+            : buildAncestryTree(rootNodeId, nameById, childrenMap, seedDepth);
         }
       } else {
-        donutTree = baseTree;
+        // No previous donut; seed from root
+        const seedDepth = Number.isFinite(expandDepth) ? Math.max(1, expandDepth) : 6;
+        donutTree = reverseAncestry
+          ? buildAncestryTree(rootNodeId, nameById, childrenMap, seedDepth, 0, true)
+          : buildAncestryTree(rootNodeId, nameById, childrenMap, seedDepth);
       }
     }
   }
