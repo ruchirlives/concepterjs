@@ -463,6 +463,20 @@ export const setNarrative = async (sourceId, targetId, narrative) => {
     }
 }
 
+// convert_to_tag
+export const convertToTag = async (container_ids) => {
+    try {
+        console.log("Converting containers to tags:", container_ids);
+        const response = await apiClient.post(`${getApiUrl()}/convert_to_tag`, {
+            "container_ids": container_ids,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error converting containers to tags:", error);
+        return null;
+    }
+};
+
 // Function to add_children
 export const addChildren = async (parentId, children) => {
     try {

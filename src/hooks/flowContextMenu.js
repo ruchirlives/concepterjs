@@ -47,7 +47,8 @@ const HANDLERS = {
     embedPositionsAction,
     findSimilarPositionsAction,
     searchPositionZAction,
-    inheritPositionsAction
+    inheritPositionsAction,
+    convertToTagAction
 };
 
 export const menuItems = [
@@ -96,6 +97,7 @@ export const menuItems = [
     { handler: "unmakeInputNode", label: "Unmake Input Node", group: "Node Type" },
     { handler: "makeOutputNode", label: "Make Output Node", group: "Node Type" },
     { handler: "unmakeOutputNode", label: "Unmake Output Node", group: "Node Type" },
+    { handler: "convertToTag", label: "Convert to Tag", group: "Node Type" },
 
     // Finance
     { handler: "getContainerBudgetAction", label: "Get Container Budget", group: "Finance" },
@@ -626,6 +628,14 @@ async function findSimilarPositionsAction({ nodes }) {
     } else {
         toast.error(res?.message || "No similar positions found.");
     }
+}
+
+async function convertToTagAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await api.convertToTag(selectedIds);
 }
 
 async function searchPositionZAction({ nodeId, selectedNodes }) {
