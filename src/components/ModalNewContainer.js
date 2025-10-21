@@ -1,11 +1,11 @@
-import { createContainer, writeBackData } from "../api";
+import { createContainer, addRelationship } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
 import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
-import { parseNames } from "../utils/parseNames";
+import { parseNames } from "utils/parseNames";
 
 export default function useCreateNewRow() {
-    const { rowData, setRowData, selectedContentLayer } = useAppContext();
+    const { rowData, selectedContentLayer } = useAppContext();
 
     return async () => {
         console.log("Creating new rows");
@@ -14,7 +14,10 @@ export default function useCreateNewRow() {
         if (result === null) return null;
 
         const { namesInput, splitByComma, loadedNodes = [] } = result;
-        const names = parseNames(namesInput, { splitByComma });
+        // Parse names with hierarchy disabled
+        const { flat: names, groups } = parseNames(namesInput, { splitByComma, withHierarchy: true });
+
+        console.log("Parsed names:", names, groups);
 
         // Only return null if BOTH are empty
         if (names.length === 0 && loadedNodes.length === 0) {
@@ -56,15 +59,30 @@ export default function useCreateNewRow() {
             });
 
         }
-        // No active group; skip auto-adding new rows to a group
+        // No active group; skip    auto-adding new rows to a group
 
-        if (newRows.length > 0) {
-            setRowData((prev) => {
-                const updated = [...prev, ...newRows];
-                writeBackData(updated);
-                return updated;
-            });
+        handleWriteBack(newRows);
+
+        // Use groups to parent newly created rows if needed
+        for (const group of groups) {
+            console.log("Processing group:", group);
+            // Find rows that belong to this group
+            const groupRows = newRows.filter(row => group.children.includes(row.Name));
+            if (groupRows.length === 0) continue;
+            console.log(`Group "${group.parent}" has rows:`, groupRows);
+            // use addRelationship API to link group.parent to each row in groupRows
+            console.log(`Searching for parent row "${group.parent}" in newRows.`, newRows);
+            const parentRow = newRows.find(row => row.Name === group.parent);
+            if (!parentRow) {
+                console.log(`Parent row "${group.parent}" not found among existing rows.`);
+                continue;
+            }
+            for (const childRow of groupRows) {
+                console.log(`Linking parent "${group.parent}" to child "${childRow.Name}"`);
+                await addRelationship(parentRow.id, parentRow.id, childRow.id);
+            }
         }
+
 
         // Merge selectedContentLayer into loadedNodes' Tags, preserving previous tags and avoiding duplicates
         const updatedLoadedNodes = loadedNodes
