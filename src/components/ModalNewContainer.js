@@ -2,6 +2,7 @@ import { createContainer, writeBackData } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
 import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
+import { parseNames } from "../utils/parseNames";
 
 export default function useCreateNewRow() {
     const { rowData, setRowData, selectedContentLayer } = useAppContext();
@@ -13,18 +14,7 @@ export default function useCreateNewRow() {
         if (result === null) return null;
 
         const { namesInput, splitByComma, loadedNodes = [] } = result;
-        let names = [];
-        if (splitByComma && namesInput) {
-            names = namesInput
-                .split(/\r?\n|,/)
-                .map((name) => name.trim())
-                .filter((name) => name.length > 0);
-        } else if (namesInput) {
-            names = namesInput
-                .split(/\r?\n/)
-                .map((name) => name.trim())
-                .filter((name) => name.length > 0);
-        }
+        const names = parseNames(namesInput, { splitByComma });
 
         // Only return null if BOTH are empty
         if (names.length === 0 && loadedNodes.length === 0) {
