@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: src/utils/parseNames.js
+@@
+ export function parseNames(
+   namesInput,
+   { splitByComma, withHierarchy } = {}
+  ) {
+   if (!namesInput || typeof namesInput !== "string") return withHierarchy ? { flat: [], groups: [] } : [];
+-  const pattern = splitByComma ? /\r?\n|,/ : /\r?\n/;
+-
+-  const tokens = namesInput
+-    .split(pattern)
+-    .map((name) => name.trim())
+-    .filter((name) => name.length > 0);
++  // Normalize invisible/Unicode spaces and newline variants to avoid
++  // bogus tokens from pasted content (e.g., Outlook/Word/Teams copy).
++  // - Replace NBSP/zero-width/BOM with regular spaces
++  // - Normalize CRLF/CR to LF
++  const normalized = namesInput
++    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, " ")
++    .replace(/\r\n?|\u2028|\u2029/g, "\n");
++
++  const pattern = splitByComma ? /\n|,/ : /\n/;
++
++  const tokens = normalized
++    .split(pattern)
++    .map((name) => name.trim())
++    // Treat lines that are visually blank (even if they had exotic spaces)
++    // as empty, preserving Option B semantics (blank lines are cosmetic).
++    .filter((name) => name.length > 0);
+*** End Patch
