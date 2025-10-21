@@ -26,6 +26,8 @@ export function parseNames(
       // Empty parent markers are ignored
       if (parentName.length === 0) continue;
       currentParent = parentName;
+      // Include parent names in the flat list (Option A)
+      flat.push(parentName);
       // Ensure a group exists for this parent
       let found = false;
       for (let gi = 0; gi < groups.length; gi++) {
