@@ -464,11 +464,11 @@ export const setNarrative = async (sourceId, targetId, narrative) => {
 }
 
 // convert_to_tag
-export const convertToTag = async (container_ids) => {
+export const convertToTag = async (containerIds) => {
     try {
-        console.log("Converting containers to tags:", container_ids);
+        console.log("Converting containers to tags:", containerIds);
         const response = await apiClient.post(`${getApiUrl()}/convert_to_tag`, {
-            "container_ids": container_ids,
+            "containerIds": containerIds,
         });
         return response.data;
     } catch (error) {

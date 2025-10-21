@@ -97,7 +97,7 @@ export const menuItems = [
     { handler: "unmakeInputNode", label: "Unmake Input Node", group: "Node Type" },
     { handler: "makeOutputNode", label: "Make Output Node", group: "Node Type" },
     { handler: "unmakeOutputNode", label: "Unmake Output Node", group: "Node Type" },
-    { handler: "convertToTag", label: "Convert to Tag", group: "Node Type" },
+    { handler: "convertToTagAction", label: "Convert to Tag", group: "Node Type" },
 
     // Finance
     { handler: "getContainerBudgetAction", label: "Get Container Budget", group: "Finance" },
