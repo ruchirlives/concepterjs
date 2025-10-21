@@ -1,4 +1,4 @@
-import { createContainer, addRelationship } from "../api";
+import { createContainer, addChildren } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
 import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
@@ -65,22 +65,15 @@ export default function useCreateNewRow() {
 
         // Use groups to parent newly created rows if needed
         for (const group of groups) {
-            console.log("Processing group:", group);
             // Find rows that belong to this group
             const groupRows = newRows.filter(row => group.children.includes(row.Name));
             if (groupRows.length === 0) continue;
-            console.log(`Group "${group.parent}" has rows:`, groupRows);
-            // use addRelationship API to link group.parent to each row in groupRows
-            console.log(`Searching for parent row "${group.parent}" in newRows.`, newRows);
             const parentRow = newRows.find(row => row.Name === group.parent);
             if (!parentRow) {
                 console.log(`Parent row "${group.parent}" not found among existing rows.`);
                 continue;
             }
-            for (const childRow of groupRows) {
-                console.log(`Linking parent "${group.parent}" to child "${childRow.Name}"`);
-                await addRelationship(parentRow.id, parentRow.id, childRow.id);
-            }
+            await addChildren(parentRow.id, groupRows.map(r => r.id));
         }
 
 
