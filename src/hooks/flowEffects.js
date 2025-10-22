@@ -385,7 +385,18 @@ export const useOnEdgeDoubleClick = (setEdges) => {
 
 // Effect to create edges between nodes
 export const useCreateNodesAndEdges = (params) => {
-    const { rowData, stateScores, getHighestScoringContainer, groupByLayers, showGhostConnections, showGroupNodes, selectedContentLayer } = params;
+    const {
+        rowData,
+        stateScores,
+        getHighestScoringContainer,
+        groupByLayers,
+        showGhostConnections,
+        showGroupNodes,
+        selectedContentLayer,
+        rowSelectedLayer,
+        columnSelectedLayer,
+        flowGridDimensions,
+    } = params;
     const { activeLayers, setEdges, setNodes, parentChildMap, setParentChildMap, layerOptions, influencersMap, refreshInfluencers } = useAppContext();
     const rowDataRef = useRef(rowData);
 
@@ -427,6 +438,9 @@ export const useCreateNodesAndEdges = (params) => {
                     layerOptions,
                     showGhostConnections,
                     showGroupNodes,
+                    rowSelectedLayer,
+                    columnSelectedLayer,
+                    flowGridDimensions,
                     // influencers support
                     influencersMap,
                     refreshInfluencers,
@@ -444,7 +458,10 @@ export const useCreateNodesAndEdges = (params) => {
         setParentChildMap,
         groupByLayers,
         showGhostConnections,
-        showGroupNodes
+        showGroupNodes,
+        rowSelectedLayer,
+        columnSelectedLayer,
+        flowGridDimensions,
     ]);
 };
 

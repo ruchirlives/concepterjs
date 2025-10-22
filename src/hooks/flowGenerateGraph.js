@@ -14,6 +14,8 @@ export async function generateNodesAndEdges(params) {
         keepLayout,         // <-- add this
         layoutPositions,    // <-- add this
         showGroupNodes,
+        rowSelectedLayer,
+        columnSelectedLayer,
         autoFit = true,
     } = params;
 
@@ -49,6 +51,80 @@ export async function generateNodesAndEdges(params) {
         ? activeLayers
         : Array.isArray(layerOptions) ? layerOptions : [];
 
+    const toKey = (value) => (value != null ? value.toString() : null);
+    const normalize = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+    const splitTags = (tags) => (tags || '')
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(Boolean);
+
+    const rowLayerTag = normalize(rowSelectedLayer);
+    const columnLayerTag = normalize(columnSelectedLayer);
+
+    const rowLayerNodes = new Set();
+    const columnLayerNodes = new Set();
+    rowData.forEach(item => {
+        const key = toKey(item?.id);
+        if (!key) return;
+        const tags = splitTags(item?.Tags);
+        if (rowLayerTag && tags.includes(rowLayerTag)) {
+            rowLayerNodes.add(key);
+        }
+        if (columnLayerTag && tags.includes(columnLayerTag)) {
+            columnLayerNodes.add(key);
+        }
+    });
+
+    const buildChildLookup = () => {
+        const map = new Map();
+        (parentChildMap || []).forEach(({ container_id, children }) => {
+            const key = toKey(container_id);
+            if (!key) return;
+            map.set(key, Array.isArray(children) ? children : []);
+        });
+        return map;
+    };
+
+    const childLookup = buildChildLookup();
+    const buildAssignments = (sourceIds) => {
+        const assignments = new Map();
+        sourceIds.forEach(parentId => {
+            const children = childLookup.get(parentId) || [];
+            children.forEach(child => {
+                const childId = toKey(child?.id);
+                if (!childId) return;
+                if (!assignments.has(childId)) {
+                    assignments.set(childId, new Set());
+                }
+                assignments.get(childId).add(parentId);
+            });
+        });
+        return assignments;
+    };
+
+    const rowAssignments = buildAssignments(rowLayerNodes);
+    const columnAssignments = buildAssignments(columnLayerNodes);
+
+    const buildGridAssignment = (originalId) => {
+        if (!originalId) return null;
+        const rowSet = rowAssignments.get(originalId);
+        const columnSet = columnAssignments.get(originalId);
+        if (!rowSet && !columnSet) return null;
+        const rowIds = rowSet ? Array.from(rowSet) : [];
+        const columnIds = columnSet ? Array.from(columnSet) : [];
+        return {
+            rowId: rowIds[0] ?? null,
+            rowIds,
+            columnId: columnIds[0] ?? null,
+            columnIds,
+        };
+    };
+
+    const shouldHideNode = (id) => {
+        if (!id) return false;
+        return rowLayerNodes.has(id) || columnLayerNodes.has(id);
+    };
+
     if (groupByLayers && layersToUse.length > 0) {
         // --- GROUP BY LAYERS MODE ---
         // 1. Create group nodes for each layer in layersToUse
@@ -77,11 +153,32 @@ export async function generateNodesAndEdges(params) {
             const matchedLayers = layersToUse.filter(l => tags.includes(l.toLowerCase()));
             if (matchedLayers.length === 0) return; // skip if no matching layer
 
+            const origId = toKey(item.id);
+            if (!origId || shouldHideNode(origId)) return;
+
+            const gridAssignment = buildGridAssignment(origId);
+
             matchedLayers.forEach((layer, li) => {
                 const parentId = `layer-${layer}`;
                 const cloneId = `${item.id.toString()}__in__${parentId}`;
                 if (showGroupNodes) {
                     childToGroup[cloneId] = parentId;
+                }
+                const nodeData = {
+                    id: item.id,               // original id
+                    originalId: item.id,       // explicit original id
+                    Name: item.Name || `Node ${item.id}`,
+                    Description: item.Description || '',
+                    Budget: item.Budget || undefined,
+                    Cost: item.Cost || undefined,
+                    Tags: item.Tags || '',
+                    isHighestScoring: highestScoringId === item.id?.toString(),
+                    score: stateScores?.[item.id],
+                    normalizedScore: normalizeScore(stateScores?.[item.id]),
+                    PendingEdges: item.PendingEdges || [],
+                };
+                if (gridAssignment) {
+                    nodeData.gridAssignment = gridAssignment;
                 }
                 childNodes.push({
                     id: cloneId,
@@ -89,19 +186,8 @@ export async function generateNodesAndEdges(params) {
                         cloneId,
                         { x: 40 + ((index + li) % 2) * 120, y: 40 + Math.floor((index + li) / 2) * 80 }
                     ),
-                    data: {
-                        id: item.id,               // original id
-                        originalId: item.id,       // explicit original id
-                        Name: item.Name || `Node ${item.id}`,
-                        Description: item.Description || '',
-                        Budget: item.Budget || undefined,
-                        Cost: item.Cost || undefined,
-                        Tags: item.Tags || '',
-                        isHighestScoring: highestScoringId === item.id?.toString(),
-                        score: stateScores?.[item.id],
-                        normalizedScore: normalizeScore(stateScores?.[item.id]),
-                        PendingEdges: item.PendingEdges || [],
-                    },
+                    data: nodeData,
+                    ...(gridAssignment ? { gridAssignment } : {}),
                     type: 'custom',
                     ...(showGroupNodes ? { parentId, extent: 'parent' } : {}),
                 });
@@ -146,6 +232,12 @@ export async function generateNodesAndEdges(params) {
             const isGroup = tags.includes('group');
             const origId = item.id.toString();
 
+            if (shouldHideNode(origId)) {
+                return;
+            }
+
+            const gridAssignment = buildGridAssignment(origId);
+
             if (isGroup && showGroupNodes) {
                 computedNodes.push({
                     id: origId,
@@ -162,6 +254,7 @@ export async function generateNodesAndEdges(params) {
                         normalizedScore: normalizeScore(stateScores?.[item.id]),
                         PendingEdges: item.PendingEdges || [],
                     },
+                    ...(gridAssignment ? { gridAssignment } : {}),
                     type: 'group',
                     style: { width: GROUP_NODE_WIDTH, height: 180 },
                 });
@@ -190,7 +283,9 @@ export async function generateNodesAndEdges(params) {
                             score: stateScores?.[item.id],
                             normalizedScore: normalizeScore(stateScores?.[item.id]),
                             PendingEdges: item.PendingEdges || [],
+                            ...(gridAssignment ? { gridAssignment } : {}),
                         },
+                        ...(gridAssignment ? { gridAssignment } : {}),
                         type: 'custom',
                         parentId,
                         extent: 'parent',
@@ -212,7 +307,9 @@ export async function generateNodesAndEdges(params) {
                         score: stateScores?.[item.id],
                         normalizedScore: normalizeScore(stateScores?.[item.id]),
                         PendingEdges: item.PendingEdges || [],
+                        ...(gridAssignment ? { gridAssignment } : {}),
                     },
+                    ...(gridAssignment ? { gridAssignment } : {}),
                     type: 'custom',
                 });
             }

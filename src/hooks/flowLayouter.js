@@ -7,6 +7,21 @@ function estimateNodeHeight(label, width, fontSize = 16, paddingY = 16) {
     return Math.max(48, lines * lineHeight + paddingY);
 }
 
+function getNodeDimensions(node) {
+    if (!node) return { width: 0, height: 0 };
+    const width = Number.isFinite(node?.width)
+        ? node.width
+        : Number.isFinite(node?.style?.width)
+            ? node.style.width
+            : 320;
+    const height = Number.isFinite(node?.height)
+        ? node.height
+        : Number.isFinite(node?.style?.height)
+            ? node.style.height
+            : estimateNodeHeight(node?.data?.Name || '', width);
+    return { width, height };
+}
+
 function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {}) {
     if (nodes.length === 0) return [];
 
@@ -112,7 +127,8 @@ export const getLayoutedElements = (
     edges,
     direction = 'LR',
     nodesep = 35,
-    ranksep = 100
+    ranksep = 100,
+    options = {}
 ) => {
 
     // 1. Compute group sizes based on their children
@@ -525,5 +541,142 @@ export const getLayoutedElements = (
         ...dagreNodes
     ];
 
+    if (options?.gridDimensions) {
+        layoutedNodes = applyGridConstraints(layoutedNodes, options.gridDimensions);
+    }
+
     return { nodes: layoutedNodes, edges };
 };
+
+function clamp(value, min, max) {
+    const val = Number.isFinite(value) ? value : min;
+    const lower = Number.isFinite(min) ? min : Number.NEGATIVE_INFINITY;
+    const upper = Number.isFinite(max) ? max : Number.POSITIVE_INFINITY;
+    if (lower > upper) return lower;
+    return Math.min(Math.max(val, lower), upper);
+}
+
+function resolveRowSegment(lookup = {}, id) {
+    if (!id) return null;
+    return (lookup.rowsByOriginalId && lookup.rowsByOriginalId[id])
+        || (lookup.rowsByNodeId && lookup.rowsByNodeId[id])
+        || null;
+}
+
+function resolveColumnSegment(lookup = {}, id) {
+    if (!id) return null;
+    return (lookup.columnsByOriginalId && lookup.columnsByOriginalId[id])
+        || (lookup.columnsByNodeId && lookup.columnsByNodeId[id])
+        || null;
+}
+
+function applyGridConstraints(layoutedNodes, gridDimensions) {
+    if (!Array.isArray(layoutedNodes) || layoutedNodes.length === 0) return layoutedNodes;
+    if (!gridDimensions) return layoutedNodes;
+    const rows = Array.isArray(gridDimensions.rows) ? gridDimensions.rows : [];
+    const columns = Array.isArray(gridDimensions.columns) ? gridDimensions.columns : [];
+    if (rows.length === 0 && columns.length === 0) return layoutedNodes;
+
+    const lookup = gridDimensions.lookup || {};
+    const bounds = gridDimensions.bounds || {};
+    const canvasWidth = Number.isFinite(bounds.width) ? bounds.width : 0;
+    const canvasHeight = Number.isFinite(bounds.height) ? bounds.height : 0;
+
+    const groups = new Map();
+
+    layoutedNodes.forEach(node => {
+        const assignment = node?.gridAssignment || node?.data?.gridAssignment;
+        if (!assignment) return;
+        const rowId = assignment.rowId ?? (Array.isArray(assignment.rowIds) ? assignment.rowIds[0] : null);
+        const columnId = assignment.columnId ?? (Array.isArray(assignment.columnIds) ? assignment.columnIds[0] : null);
+        if (!rowId && !columnId) return;
+        const rowSegment = rowId ? resolveRowSegment(lookup, rowId) : null;
+        const columnSegment = columnId ? resolveColumnSegment(lookup, columnId) : null;
+        if (rowId && !rowSegment) return;
+        if (columnId && !columnSegment) return;
+
+        const minX = Number.isFinite(columnSegment?.left) ? columnSegment.left : 0;
+        const maxX = Number.isFinite(columnSegment?.right) ? columnSegment.right : canvasWidth;
+        const minY = Number.isFinite(rowSegment?.top) ? rowSegment.top : 0;
+        const maxY = Number.isFinite(rowSegment?.bottom) ? rowSegment.bottom : canvasHeight;
+
+        if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) return;
+
+        const key = `${rowSegment?.key ?? '__ALL_ROWS__'}::${columnSegment?.key ?? '__ALL_COLS__'}`;
+        if (!groups.has(key)) {
+            groups.set(key, {
+                nodes: [],
+                minX,
+                maxX,
+                minY,
+                maxY,
+            });
+        }
+        groups.get(key).nodes.push(node);
+    });
+
+    if (groups.size === 0) return layoutedNodes;
+
+    const updated = new Map();
+    const padding = 24;
+
+    groups.forEach(group => {
+        const { nodes: groupNodes, minX, maxX, minY, maxY } = group;
+        if (!groupNodes || groupNodes.length === 0) return;
+
+        const availMinX = minX + padding;
+        const availMaxX = maxX - padding;
+        const availMinY = minY + padding;
+        const availMaxY = maxY - padding;
+
+        let currentMinX = Infinity;
+        let currentMaxX = -Infinity;
+        let currentMinY = Infinity;
+        let currentMaxY = -Infinity;
+
+        groupNodes.forEach(node => {
+            const { width, height } = getNodeDimensions(node);
+            currentMinX = Math.min(currentMinX, node.position?.x ?? 0);
+            currentMaxX = Math.max(currentMaxX, (node.position?.x ?? 0) + width);
+            currentMinY = Math.min(currentMinY, node.position?.y ?? 0);
+            currentMaxY = Math.max(currentMaxY, (node.position?.y ?? 0) + height);
+        });
+
+        if (!Number.isFinite(currentMinX) || !Number.isFinite(currentMaxX) || !Number.isFinite(currentMinY) || !Number.isFinite(currentMaxY)) return;
+
+        const widthSpan = currentMaxX - currentMinX;
+        const heightSpan = currentMaxY - currentMinY;
+
+        let offsetX = 0;
+        if (availMaxX > availMinX) {
+            const minOffsetX = availMinX - currentMinX;
+            const maxOffsetX = availMaxX - currentMaxX;
+            const prefersCenterX = widthSpan <= (availMaxX - availMinX);
+            const desiredX = prefersCenterX ? (minOffsetX + maxOffsetX) / 2 : minOffsetX;
+            offsetX = clamp(desiredX, minOffsetX, maxOffsetX);
+        }
+
+        let offsetY = 0;
+        if (availMaxY > availMinY) {
+            const minOffsetY = availMinY - currentMinY;
+            const maxOffsetY = availMaxY - currentMaxY;
+            const prefersCenterY = heightSpan <= (availMaxY - availMinY);
+            const desiredY = prefersCenterY ? (minOffsetY + maxOffsetY) / 2 : minOffsetY;
+            offsetY = clamp(desiredY, minOffsetY, maxOffsetY);
+        }
+
+        groupNodes.forEach(node => {
+            const originalPosition = node.position || { x: 0, y: 0 };
+            updated.set(node.id, {
+                ...node,
+                position: {
+                    x: originalPosition.x + (Number.isFinite(offsetX) ? offsetX : 0),
+                    y: originalPosition.y + (Number.isFinite(offsetY) ? offsetY : 0),
+                },
+            });
+        });
+    });
+
+    if (updated.size === 0) return layoutedNodes;
+    return layoutedNodes.map(node => updated.get(node.id) || node);
+}

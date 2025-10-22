@@ -163,6 +163,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     columnSelectedLayer, setColumnSelectedLayer,
     groupByLayers, setGroupByLayers,
     showGroupNodes, setShowGroupNodes,
+    flowGridDimensions,
     setFlowGridDimensions,
   } = useFlowLogic();
 
@@ -175,17 +176,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
 
-  const rowDataById = useMemo(() => {
-    const map = new Map();
-    (rowData || []).forEach(item => {
-      if (!item) return;
-      const key = item.id?.toString();
-      if (!key) return;
-      map.set(key, item);
-    });
-    return map;
-  }, [rowData]);
-
   const normalizeTags = useCallback((raw = '') => raw
     .split(',')
     .map(tag => tag.trim().toLowerCase())
@@ -195,37 +185,26 @@ const App = ({ keepLayout, setKeepLayout }) => {
     if (!layerName) return [];
     const target = layerName.trim().toLowerCase();
     if (!target) return [];
-    const seen = new Map();
-    (nodes || []).forEach((node) => {
-      if (!node || node.type === 'group') return;
-      const data = node.data || {};
-      const originalId = (data.originalId ?? data.id ?? node.id)?.toString();
-      if (!originalId) return;
 
-      const rowInfo = rowDataById.get(originalId);
-      const tagsRaw = data.Tags ?? rowInfo?.Tags ?? '';
-      const tags = normalizeTags(tagsRaw);
+    const sourceRows = Array.isArray(flowFilteredRowData) && flowFilteredRowData.length > 0
+      ? flowFilteredRowData
+      : (rowData || []);
+
+    const seen = new Map();
+    sourceRows.forEach((item) => {
+      if (!item) return;
+      const originalId = item.id != null ? item.id.toString() : null;
+      if (!originalId) return;
+      const tags = normalizeTags(item.Tags || '');
       if (!tags.includes(target)) return;
 
-      const label = data.Name ?? rowInfo?.Name ?? originalId;
-      const currentId = node.id != null ? node.id.toString() : '';
-      const nextEntry = {
-        nodeId: node.id != null ? node.id.toString() : null,
+      if (seen.has(originalId)) return;
+      const label = item.Name || originalId;
+      seen.set(originalId, {
+        nodeId: originalId,
         originalId,
         label,
-      };
-
-      const existing = seen.get(originalId);
-      if (existing) {
-        // Prefer the canonical node (non-clone) if available
-        if (existing.nodeId === originalId) return;
-        if (currentId === originalId) {
-          seen.set(originalId, nextEntry);
-        }
-        return;
-      }
-
-      seen.set(originalId, nextEntry);
+      });
     });
 
     return Array.from(seen.values()).sort((a, b) => {
@@ -235,7 +214,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       if (labelA > labelB) return 1;
       return 0;
     });
-  }, [nodes, normalizeTags, rowDataById]);
+  }, [flowFilteredRowData, normalizeTags, rowData]);
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
@@ -366,6 +345,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
     groupByLayers,
     showGhostConnections,
     showGroupNodes,
+    rowSelectedLayer,
+    columnSelectedLayer,
+    flowGridDimensions,
     // Pass explicit hint for early filtering
     selectedContentLayer,
     // Disable auto-fit to avoid forced reflows during updates

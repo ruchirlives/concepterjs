@@ -318,7 +318,14 @@ export const fetchAndCreateEdges = async (computedNodes, params) => {
             setNodes(restored);
             setEdges(uniqueEdges);
         } else {
-            const layouted = getLayoutedElements(computedNodes, uniqueEdges, 'LR');
+            const layouted = getLayoutedElements(
+                computedNodes,
+                uniqueEdges,
+                'LR',
+                35,
+                100,
+                { gridDimensions: params.flowGridDimensions }
+            );
             setNodes(layouted.nodes);
             setEdges(layouted.edges);
             // Update layout positions in Zustand store
