@@ -38,27 +38,29 @@ export default function useCreateNewRow() {
         });
 
         if (uniqueNames.length === 0 && loadedNodes.length === 0) {
-            console.log("All entries are duplicates and no checked items.");
             return null;
         }
 
         // Check if a node matching this name already exists in mongodb NODES collection using searchNodes
         const existingNodes = await Promise.all(uniqueNames.map(name => {
-            return searchNodes({ name });
+            return searchNodes(name, {});
         }));
 
         // Is there a lowercase match in existing nodes?
         const finalNames = uniqueNames.filter((name, index) => {
             const nodes = existingNodes[index];
-            return !nodes.some(node => node.Name.toLowerCase() === name.toLowerCase());
+            return nodes.some(node => node.Name.toLowerCase() === name.toLowerCase());
         });
 
         // If there is, grab the first in finalNames and use its ID instead of creating a new one
-        const existingIds = existingNodes.flat().map(node => node.id);
         const idMap = new Map();
-        for (const [index, name] of finalNames.entries()) {
-            idMap.set(name, existingIds[index]);
-        }
+        finalNames.forEach((name, index) => {
+            const nodes = existingNodes[index];
+            const match = nodes.find(node => node.Name.toLowerCase() === name.toLowerCase());
+            if (match) {
+                idMap.set(name, match.id);
+            }
+        });
 
         const newRows = [];
         for (const fullText of uniqueNames) {
