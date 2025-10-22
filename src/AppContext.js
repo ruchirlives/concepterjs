@@ -52,7 +52,13 @@ export const AppProvider = ({ children }) => {
   const [flowGridDimensions, setFlowGridDimensions] = useState({
     rows: [],
     columns: [],
-    bounds: { width: 0, height: 0 }
+    bounds: { width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 },
+    lookup: {
+      rowsByOriginalId: {},
+      rowsByNodeId: {},
+      columnsByOriginalId: {},
+      columnsByNodeId: {},
+    },
   });
 
   // Parent-child relationship map

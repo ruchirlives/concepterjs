@@ -30,27 +30,24 @@ const clampToPrecision = (value) => {
   return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
 };
 
-const ensureLabelPresence = (labels = [], fallback) => {
-  if (!fallback) return labels;
-  if (!Array.isArray(labels)) return [fallback];
-  return labels.includes(fallback) ? labels : [...labels, fallback];
-};
+const buildAxisSegments = (items = [], totalSize = 0, axis = 'row') => {
+  if (!Array.isArray(items) || items.length === 0 || !Number.isFinite(totalSize) || totalSize <= 0) return [];
+  const segmentSize = totalSize / items.length;
 
-const buildAxisSegments = (labels = [], totalSize = 0, axis = 'row', activeLabel) => {
-  if (!Array.isArray(labels) || labels.length === 0 || !Number.isFinite(totalSize)) return [];
-  const segmentSize = labels.length > 0 ? totalSize / labels.length : 0;
-
-  return labels.map((label, index) => {
+  return items.map((item, index) => {
+    const { label = '', nodeId, originalId } = item || {};
     const start = clampToPrecision(segmentSize * index);
-    const end = index === labels.length - 1
+    const end = index === items.length - 1
       ? clampToPrecision(totalSize)
       : clampToPrecision(start + segmentSize);
     const common = {
-      id: `${axis}-${index}-${label || 'unlabeled'}`,
-      key: label || `unknown-${index}`,
+      id: `${axis}-${index}-${originalId || nodeId || 'unlabeled'}`,
+      key: originalId || nodeId || `unknown-${index}`,
       label: label || '',
+      nodeId: nodeId || null,
+      originalId: originalId || null,
       index,
-      isActive: activeLabel ? label === activeLabel : false,
+      isActive: index % 2 === 0,
     };
 
     if (axis === 'row') {
@@ -72,6 +69,7 @@ const buildAxisSegments = (labels = [], totalSize = 0, axis = 'row', activeLabel
 };
 
 const NUMERIC_PROPS = ['top', 'bottom', 'height', 'left', 'right', 'width'];
+const IDENTITY_PROPS = ['key', 'label', 'nodeId', 'originalId'];
 
 const segmentsEqual = (a = [], b = []) => {
   if (a === b) return true;
@@ -82,7 +80,10 @@ const segmentsEqual = (a = [], b = []) => {
     const segA = a[i];
     const segB = b[i];
     if (!segA || !segB) return false;
-    if (segA.key !== segB.key || segA.label !== segB.label || segA.index !== segB.index) return false;
+    if (segA.index !== segB.index) return false;
+    for (const key of IDENTITY_PROPS) {
+      if (segA[key] !== segB[key]) return false;
+    }
     if (Boolean(segA.isActive) !== Boolean(segB.isActive)) return false;
     for (const prop of NUMERIC_PROPS) {
       const valA = segA[prop];
@@ -112,6 +113,29 @@ const gridsEqual = (a, b) => {
   return segmentsEqual(a.rows, b.rows)
     && segmentsEqual(a.columns, b.columns)
     && boundsEqual(a.bounds, b.bounds);
+};
+
+const buildGridLookup = (rows = [], columns = []) => {
+  const build = (segments = []) => {
+    const byOriginalId = {};
+    const byNodeId = {};
+    segments.forEach(segment => {
+      if (!segment) return;
+      if (segment.originalId) byOriginalId[segment.originalId] = segment;
+      if (segment.nodeId) byNodeId[segment.nodeId] = segment;
+    });
+    return { byOriginalId, byNodeId };
+  };
+
+  const rowLookup = build(rows);
+  const columnLookup = build(columns);
+
+  return {
+    rowsByOriginalId: rowLookup.byOriginalId,
+    rowsByNodeId: rowLookup.byNodeId,
+    columnsByOriginalId: columnLookup.byOriginalId,
+    columnsByNodeId: columnLookup.byNodeId,
+  };
 };
 
 const App = ({ keepLayout, setKeepLayout }) => {
@@ -151,6 +175,71 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
 
+  const rowDataById = useMemo(() => {
+    const map = new Map();
+    (rowData || []).forEach(item => {
+      if (!item) return;
+      const key = item.id?.toString();
+      if (!key) return;
+      map.set(key, item);
+    });
+    return map;
+  }, [rowData]);
+
+  const normalizeTags = useCallback((raw = '') => raw
+    .split(',')
+    .map(tag => tag.trim().toLowerCase())
+    .filter(Boolean), []);
+
+  const collectLayerNodes = useCallback((layerName) => {
+    if (!layerName) return [];
+    const target = layerName.trim().toLowerCase();
+    if (!target) return [];
+    const seen = new Map();
+    (nodes || []).forEach((node) => {
+      if (!node || node.type === 'group') return;
+      const data = node.data || {};
+      const originalId = (data.originalId ?? data.id ?? node.id)?.toString();
+      if (!originalId) return;
+
+      const rowInfo = rowDataById.get(originalId);
+      const tagsRaw = data.Tags ?? rowInfo?.Tags ?? '';
+      const tags = normalizeTags(tagsRaw);
+      if (!tags.includes(target)) return;
+
+      const label = data.Name ?? rowInfo?.Name ?? originalId;
+      const currentId = node.id != null ? node.id.toString() : '';
+      const nextEntry = {
+        nodeId: node.id != null ? node.id.toString() : null,
+        originalId,
+        label,
+      };
+
+      const existing = seen.get(originalId);
+      if (existing) {
+        // Prefer the canonical node (non-clone) if available
+        if (existing.nodeId === originalId) return;
+        if (currentId === originalId) {
+          seen.set(originalId, nextEntry);
+        }
+        return;
+      }
+
+      seen.set(originalId, nextEntry);
+    });
+
+    return Array.from(seen.values()).sort((a, b) => {
+      const labelA = (a.label || '').toLowerCase();
+      const labelB = (b.label || '').toLowerCase();
+      if (labelA < labelB) return -1;
+      if (labelA > labelB) return 1;
+      return 0;
+    });
+  }, [nodes, normalizeTags, rowDataById]);
+
+  const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
+  const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
+
   const updateGridDimensions = useCallback(() => {
     const wrapperEl = flowWrapperRef.current;
     if (!wrapperEl) {
@@ -158,6 +247,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
         rows: [],
         columns: [],
         bounds: { width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 },
+        lookup: buildGridLookup([], []),
       };
       setGridRows((prev) => (prev.length === 0 ? prev : []));
       setGridColumns((prev) => (prev.length === 0 ? prev : []));
@@ -166,19 +256,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
 
     const rect = wrapperEl.getBoundingClientRect();
-    const axisLabels = Array.isArray(layerOptions) && layerOptions.length > 0
-      ? layerOptions
-      : [];
 
-    const rowLabels = showRowGrid
-      ? ensureLabelPresence(axisLabels, rowSelectedLayer)
+    const rows = showRowGrid
+      ? buildAxisSegments(rowLayerNodes, rect.height, 'row')
       : [];
-    const columnLabels = showColumnGrid
-      ? ensureLabelPresence(axisLabels, columnSelectedLayer)
+    const columns = showColumnGrid
+      ? buildAxisSegments(columnLayerNodes, rect.width, 'column')
       : [];
-
-    const rows = buildAxisSegments(rowLabels, rect.height, 'row', rowSelectedLayer);
-    const columns = buildAxisSegments(columnLabels, rect.width, 'column', columnSelectedLayer);
 
     setGridRows((prev) => (segmentsEqual(prev, rows) ? prev : rows));
     setGridColumns((prev) => (segmentsEqual(prev, columns) ? prev : columns));
@@ -194,13 +278,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
         clientTop: clampToPrecision(rect.top),
         clientLeft: clampToPrecision(rect.left),
       },
+      lookup: buildGridLookup(rows, columns),
     };
 
     setFlowGridDimensions((prev) => (gridsEqual(prev, nextGrid) ? prev : nextGrid));
   }, [
-    columnSelectedLayer,
-    layerOptions,
-    rowSelectedLayer,
+    columnLayerNodes,
+    rowLayerNodes,
     setFlowGridDimensions,
     showColumnGrid,
     showRowGrid,
