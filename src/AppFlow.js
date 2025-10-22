@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect, useRef } from "react";
 import {
   ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
   addEdge, ControlButton
@@ -173,6 +173,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  const viewportInteractionRef = useRef(false);
 
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
@@ -296,6 +297,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => {
+      if (viewportInteractionRef.current) return;
       updateGridDimensions();
     });
     const el = flowWrapperRef.current;
@@ -310,14 +312,24 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }), [viewportTransform]);
 
   const handleFlowMove = useCallback((_, viewport) => {
+    viewportInteractionRef.current = true;
     updateViewportTransform(viewport);
   }, [updateViewportTransform]);
+
+  const handleFlowMoveEnd = useCallback((_, viewport) => {
+    viewportInteractionRef.current = false;
+    updateViewportTransform(viewport);
+    requestAnimationFrame(() => {
+      updateGridDimensions();
+    });
+  }, [updateGridDimensions, updateViewportTransform]);
 
   const handleFlowInit = useCallback((instance) => {
     if (instance?.getViewport) {
       updateViewportTransform(instance.getViewport());
     }
-  }, [updateViewportTransform]);
+    updateGridDimensions();
+  }, [updateGridDimensions, updateViewportTransform]);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -670,7 +682,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onNodeDoubleClick={undefined}
               minZoom={0.1} // <-- Add this line
               onMove={handleFlowMove}
-              onMoveEnd={handleFlowMove}
+              onMoveEnd={handleFlowMoveEnd}
               onInit={handleFlowInit}
             >
               <Controls position="top-left">
