@@ -44,6 +44,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     onNodesChange,
     screenToFlowPosition,
     selectedContentLayer, setSelectedContentLayer, layerOptions,
+    rowSelectedLayer, setRowSelectedLayer,
+    columnSelectedLayer, setColumnSelectedLayer,
     groupByLayers, setGroupByLayers,
     showGroupNodes, setShowGroupNodes,
   } = useFlowLogic();
@@ -247,6 +249,42 @@ const App = ({ keepLayout, setKeepLayout }) => {
             ))}
           </select>
         </div>
+        {/* Row Layer Dropdown (dummy wired) */}
+        <div className="flex items-center gap-1 ml-2">
+          <label className="text-xs text-gray-600">Rows:</label>
+          <select
+            value={rowSelectedLayer}
+            onChange={e => setRowSelectedLayer(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+            title="Select Row layer (dummy)"
+          >
+            <option value="">All Rows</option>
+            {layerOptions.map(layer => (
+              <option key={layer} value={layer}>
+                {layer}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Column Layer Dropdown (dummy wired) */}
+        <div className="flex items-center gap-1 ml-2">
+          <label className="text-xs text-gray-600">Columns:</label>
+          <select
+            value={columnSelectedLayer}
+            onChange={e => setColumnSelectedLayer(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+            title="Select Column layer (dummy)"
+          >
+            <option value="">All Columns</option>
+            {layerOptions.map(layer => (
+              <option key={layer} value={layer}>
+                {layer}
+              </option>
+            ))}
+          </select>
+        </div>
+
       </FlowHeader>
 
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>

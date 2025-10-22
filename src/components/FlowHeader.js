@@ -39,7 +39,7 @@ const FlowHeader = ({
           Clear Scores
         </button>
 
-        <LayerDropdown 
+        <LayerDropdown
           buttonText="Layers"
           title="Filter layers in Flow"
           dropdownTitle="Hide Layers in Flow"

@@ -45,6 +45,8 @@ export const AppProvider = ({ children }) => {
 
   // Content layer filter state (add this)
   const [selectedContentLayer, setSelectedContentLayer] = useState("");
+  const [rowSelectedLayer, setRowSelectedLayer] = useState('');
+  const [columnSelectedLayer, setColumnSelectedLayer] = useState('');
 
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);
@@ -242,6 +244,10 @@ export const AppProvider = ({ children }) => {
     // Content layer filter (add these)
     selectedContentLayer,
     setSelectedContentLayer,
+    rowSelectedLayer,
+    setRowSelectedLayer,
+    columnSelectedLayer,
+    setColumnSelectedLayer,
     // Matrix management
     loading,
     setLoading,
