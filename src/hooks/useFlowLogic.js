@@ -12,7 +12,26 @@ export const useFlowLogic = () => {
   const [groupByLayers, setGroupByLayers] = useState(false);
   const [showGroupNodes, setShowGroupNodes] = useState(false);
 
-  const { rowData, setRowData, nodes, setNodes, edges, setEdges, onNodesChange, hiddenLayers, layerOptions, comparatorState, selectedContentLayer, setSelectedContentLayer, rowSelectedLayer, setRowSelectedLayer, columnSelectedLayer, setColumnSelectedLayer } = useAppContext();
+  const {
+    rowData,
+    setRowData,
+    nodes,
+    setNodes,
+    edges,
+    setEdges,
+    onNodesChange,
+    hiddenLayers,
+    layerOptions,
+    comparatorState,
+    selectedContentLayer,
+    setSelectedContentLayer,
+    rowSelectedLayer,
+    setRowSelectedLayer,
+    columnSelectedLayer,
+    setColumnSelectedLayer,
+    flowGridDimensions,
+    setFlowGridDimensions,
+  } = useAppContext();
   const { screenToFlowPosition, getViewport, setViewport, getZoom } = useReactFlow();
   const { stateScores, handleCalculateStateScores, getHighestScoringContainer, clearStateScores } = useStateScores();
 
@@ -104,6 +123,8 @@ export const useFlowLogic = () => {
     showGroupNodes, setShowGroupNodes,
     rowSelectedLayer, setRowSelectedLayer,
     columnSelectedLayer, setColumnSelectedLayer,
+    flowGridDimensions,
+    setFlowGridDimensions,
 
     // Actions
     handleStateChange,

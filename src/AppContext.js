@@ -48,6 +48,13 @@ export const AppProvider = ({ children }) => {
   const [rowSelectedLayer, setRowSelectedLayer] = useState('');
   const [columnSelectedLayer, setColumnSelectedLayer] = useState('');
 
+  // Flow grid overlay dimensions
+  const [flowGridDimensions, setFlowGridDimensions] = useState({
+    rows: [],
+    columns: [],
+    bounds: { width: 0, height: 0 }
+  });
+
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);
 
@@ -248,6 +255,8 @@ export const AppProvider = ({ children }) => {
     setRowSelectedLayer,
     columnSelectedLayer,
     setColumnSelectedLayer,
+    flowGridDimensions,
+    setFlowGridDimensions,
     // Matrix management
     loading,
     setLoading,

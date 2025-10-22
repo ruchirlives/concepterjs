@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect } from "react";
 import {
   ReactFlow, ReactFlowProvider, MiniMap, Controls, Background,
   addEdge, ControlButton
@@ -22,6 +22,97 @@ import toast from 'react-hot-toast';
 import { saveNodes } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
+
+const PRECISION_FACTOR = 1000;
+
+const clampToPrecision = (value) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
+};
+
+const ensureLabelPresence = (labels = [], fallback) => {
+  if (!fallback) return labels;
+  if (!Array.isArray(labels)) return [fallback];
+  return labels.includes(fallback) ? labels : [...labels, fallback];
+};
+
+const buildAxisSegments = (labels = [], totalSize = 0, axis = 'row', activeLabel) => {
+  if (!Array.isArray(labels) || labels.length === 0 || !Number.isFinite(totalSize)) return [];
+  const segmentSize = labels.length > 0 ? totalSize / labels.length : 0;
+
+  return labels.map((label, index) => {
+    const start = clampToPrecision(segmentSize * index);
+    const end = index === labels.length - 1
+      ? clampToPrecision(totalSize)
+      : clampToPrecision(start + segmentSize);
+    const common = {
+      id: `${axis}-${index}-${label || 'unlabeled'}`,
+      key: label || `unknown-${index}`,
+      label: label || '',
+      index,
+      isActive: activeLabel ? label === activeLabel : false,
+    };
+
+    if (axis === 'row') {
+      return {
+        ...common,
+        top: start,
+        bottom: end,
+        height: clampToPrecision(end - start),
+      };
+    }
+
+    return {
+      ...common,
+      left: start,
+      right: end,
+      width: clampToPrecision(end - start),
+    };
+  });
+};
+
+const NUMERIC_PROPS = ['top', 'bottom', 'height', 'left', 'right', 'width'];
+
+const segmentsEqual = (a = [], b = []) => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    const segA = a[i];
+    const segB = b[i];
+    if (!segA || !segB) return false;
+    if (segA.key !== segB.key || segA.label !== segB.label || segA.index !== segB.index) return false;
+    if (Boolean(segA.isActive) !== Boolean(segB.isActive)) return false;
+    for (const prop of NUMERIC_PROPS) {
+      const valA = segA[prop];
+      const valB = segB[prop];
+      if (valA == null && valB == null) continue;
+      if (valA == null || valB == null) return false;
+      if (Math.abs(valA - valB) > 0.001) return false;
+    }
+  }
+
+  return true;
+};
+
+const boundsEqual = (a = {}, b = {}) => {
+  const numericKeys = ['width', 'height', 'top', 'left', 'clientTop', 'clientLeft'];
+  for (const key of numericKeys) {
+    const valA = a[key] ?? 0;
+    const valB = b[key] ?? 0;
+    if (Math.abs(valA - valB) > 0.001) return false;
+  }
+  return true;
+};
+
+const gridsEqual = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return segmentsEqual(a.rows, b.rows)
+    && segmentsEqual(a.columns, b.columns)
+    && boundsEqual(a.bounds, b.bounds);
+};
 
 const App = ({ keepLayout, setKeepLayout }) => {
   const flowWrapperRef = React.useRef(null);
@@ -48,11 +139,86 @@ const App = ({ keepLayout, setKeepLayout }) => {
     columnSelectedLayer, setColumnSelectedLayer,
     groupByLayers, setGroupByLayers,
     showGroupNodes, setShowGroupNodes,
+    setFlowGridDimensions,
   } = useFlowLogic();
 
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [gridRows, setGridRows] = useState([]);
+  const [gridColumns, setGridColumns] = useState([]);
+
+  const showRowGrid = Boolean(rowSelectedLayer);
+  const showColumnGrid = Boolean(columnSelectedLayer);
+
+  const updateGridDimensions = useCallback(() => {
+    const wrapperEl = flowWrapperRef.current;
+    if (!wrapperEl) {
+      const emptyGrid = {
+        rows: [],
+        columns: [],
+        bounds: { width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 },
+      };
+      setGridRows((prev) => (prev.length === 0 ? prev : []));
+      setGridColumns((prev) => (prev.length === 0 ? prev : []));
+      setFlowGridDimensions((prev) => (gridsEqual(prev, emptyGrid) ? prev : emptyGrid));
+      return;
+    }
+
+    const rect = wrapperEl.getBoundingClientRect();
+    const axisLabels = Array.isArray(layerOptions) && layerOptions.length > 0
+      ? layerOptions
+      : [];
+
+    const rowLabels = showRowGrid
+      ? ensureLabelPresence(axisLabels, rowSelectedLayer)
+      : [];
+    const columnLabels = showColumnGrid
+      ? ensureLabelPresence(axisLabels, columnSelectedLayer)
+      : [];
+
+    const rows = buildAxisSegments(rowLabels, rect.height, 'row', rowSelectedLayer);
+    const columns = buildAxisSegments(columnLabels, rect.width, 'column', columnSelectedLayer);
+
+    setGridRows((prev) => (segmentsEqual(prev, rows) ? prev : rows));
+    setGridColumns((prev) => (segmentsEqual(prev, columns) ? prev : columns));
+
+    const nextGrid = {
+      rows,
+      columns,
+      bounds: {
+        width: clampToPrecision(rect.width),
+        height: clampToPrecision(rect.height),
+        top: 0,
+        left: 0,
+        clientTop: clampToPrecision(rect.top),
+        clientLeft: clampToPrecision(rect.left),
+      },
+    };
+
+    setFlowGridDimensions((prev) => (gridsEqual(prev, nextGrid) ? prev : nextGrid));
+  }, [
+    columnSelectedLayer,
+    layerOptions,
+    rowSelectedLayer,
+    setFlowGridDimensions,
+    showColumnGrid,
+    showRowGrid,
+  ]);
+
+  useLayoutEffect(() => {
+    updateGridDimensions();
+  }, [updateGridDimensions]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      updateGridDimensions();
+    });
+    const el = flowWrapperRef.current;
+    if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateGridDimensions]);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -297,6 +463,91 @@ const App = ({ keepLayout, setKeepLayout }) => {
           {/* FlowNavigation removed with activeGroup */}
 
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
+            {(showRowGrid || showColumnGrid) && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ zIndex: 2 }}
+                aria-hidden="true"
+              >
+                {showRowGrid && gridRows.map((row, index) => (
+                  <div
+                    key={row.id}
+                    style={{
+                      position: 'absolute',
+                      top: `${row.top}px`,
+                      left: 0,
+                      right: 0,
+                      height: `${row.height}px`,
+                      borderTop: '1px solid rgba(148, 163, 184, 0.6)',
+                      borderBottom: index === gridRows.length - 1
+                        ? '1px solid rgba(148, 163, 184, 0.6)'
+                        : 'none',
+                      backgroundColor: row.isActive
+                        ? 'rgba(59, 130, 246, 0.08)'
+                        : 'rgba(148, 163, 184, 0.04)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '8px',
+                        transform: 'translateY(-50%)',
+                        fontSize: '12px',
+                        fontWeight: row.isActive ? 600 : 500,
+                        color: row.isActive ? '#1f2937' : '#4b5563',
+                        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.15)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {row.label}
+                    </div>
+                  </div>
+                ))}
+
+                {showColumnGrid && gridColumns.map((column, index) => (
+                  <div
+                    key={column.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: `${column.left}px`,
+                      width: `${column.width}px`,
+                      borderLeft: '1px solid rgba(148, 163, 184, 0.6)',
+                      borderRight: index === gridColumns.length - 1
+                        ? '1px solid rgba(148, 163, 184, 0.6)'
+                        : 'none',
+                      backgroundColor: column.isActive
+                        ? 'rgba(16, 185, 129, 0.08)'
+                        : 'rgba(148, 163, 184, 0.03)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: '12px',
+                        fontWeight: column.isActive ? 600 : 500,
+                        color: column.isActive ? '#065f46' : '#4b5563',
+                        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.15)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {column.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <ReactFlow
               fitView
               nodes={nodes}
