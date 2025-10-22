@@ -172,6 +172,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [dragging, setDragging] = useState(false);
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
+  const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
 
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
@@ -218,6 +219,25 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
+
+  const updateViewportTransform = useCallback((nextViewport) => {
+    if (!nextViewport) return;
+    setViewportTransform(prev => {
+      const next = {
+        x: Number.isFinite(nextViewport.x) ? nextViewport.x : prev.x,
+        y: Number.isFinite(nextViewport.y) ? nextViewport.y : prev.y,
+        zoom: Number.isFinite(nextViewport.zoom) ? nextViewport.zoom : prev.zoom,
+      };
+      if (
+        Math.abs(next.x - prev.x) < 0.5 &&
+        Math.abs(next.y - prev.y) < 0.5 &&
+        Math.abs(next.zoom - prev.zoom) < 0.001
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
 
   const updateGridDimensions = useCallback(() => {
     const wrapperEl = flowWrapperRef.current;
@@ -282,6 +302,22 @@ const App = ({ keepLayout, setKeepLayout }) => {
     if (el) observer.observe(el);
     return () => observer.disconnect();
   }, [updateGridDimensions]);
+
+  const overlayStyle = useMemo(() => ({
+    zIndex: 2,
+    transform: `translate(${viewportTransform.x}px, ${viewportTransform.y}px) scale(${viewportTransform.zoom})`,
+    transformOrigin: '0 0',
+  }), [viewportTransform]);
+
+  const handleFlowMove = useCallback((_, viewport) => {
+    updateViewportTransform(viewport);
+  }, [updateViewportTransform]);
+
+  const handleFlowInit = useCallback((instance) => {
+    if (instance?.getViewport) {
+      updateViewportTransform(instance.getViewport());
+    }
+  }, [updateViewportTransform]);
 
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
@@ -529,10 +565,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
           {/* FlowNavigation removed with activeGroup */}
 
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
-            {(showRowGrid || showColumnGrid) && (
-              <div
+              {(showRowGrid || showColumnGrid) && (
+                <div
                 className="absolute inset-0 pointer-events-none"
-                style={{ zIndex: 2 }}
+                style={overlayStyle}
                 aria-hidden="true"
               >
                 {showRowGrid && gridRows.map((row, index) => (
@@ -633,6 +669,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onSelectionContextMenu={selectionContextMenu}
               onNodeDoubleClick={undefined}
               minZoom={0.1} // <-- Add this line
+              onMove={handleFlowMove}
+              onMoveEnd={handleFlowMove}
+              onInit={handleFlowInit}
             >
               <Controls position="top-left">
                 <ControlButton onClick={(e) => gearContextMenu(e)}>
