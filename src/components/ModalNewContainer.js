@@ -1,4 +1,4 @@
-import { createContainer, addChildren } from "../api";
+import { createContainer, addChildren, searchNodes, loadNode } from "../api";
 import { openNamePrompt } from "./ModalNamePrompt";
 import { useAppContext } from "AppContext";
 import { handleWriteBack, requestRefreshChannel } from "hooks/effectsShared";
@@ -42,22 +42,47 @@ export default function useCreateNewRow() {
             return null;
         }
 
+        // Check if a node matching this name already exists in mongodb NODES collection using searchNodes
+        const existingNodes = await Promise.all(uniqueNames.map(name => {
+            return searchNodes({ name });
+        }));
+
+        // Is there a lowercase match in existing nodes?
+        const finalNames = uniqueNames.filter((name, index) => {
+            const nodes = existingNodes[index];
+            return !nodes.some(node => node.Name.toLowerCase() === name.toLowerCase());
+        });
+
+        // If there is, grab the first in finalNames and use its ID instead of creating a new one
+        const existingIds = existingNodes.flat().map(node => node.id);
+        const idMap = new Map();
+        for (const [index, name] of finalNames.entries()) {
+            idMap.set(name, existingIds[index]);
+        }
+
         const newRows = [];
         for (const fullText of uniqueNames) {
-            const id = await createContainer();
+            let id
 
-            newRows.push({
-                id: id,
-                Name: fullText,
-                Description: fullText,
-                Tags: selectedContentLayer ? selectedContentLayer : "", // Use context value
-                StartDate: new Date().toISOString().split("T")[0],
-                EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-                    .toISOString()
-                    .split("T")[0],
-                TimeRequired: 1,
-            });
-
+            id = idMap.get(fullText)
+            if (!id) {
+                id = await createContainer();
+                newRows.push({
+                    id: id,
+                    Name: fullText,
+                    Description: fullText,
+                    Tags: selectedContentLayer ? selectedContentLayer : "", // Use context value
+                    StartDate: new Date().toISOString().split("T")[0],
+                    EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+                        .toISOString()
+                        .split("T")[0],
+                    TimeRequired: 1,
+                });
+            }
+            else {
+                const existingNode = await loadNode(id);
+                newRows.push(existingNode);
+            }
         }
         // No active group; skip    auto-adding new rows to a group
 
