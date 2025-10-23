@@ -89,6 +89,10 @@ const App = () => {
     // First writeback the data to the server
     handleWriteBack(rowData);
 
+    delete stateVariables.rowData; // Remove rowData from state variables to avoid redundancy
+    delete stateVariables.nodes; // Remove nodes from state variables to avoid redundancy
+    delete stateVariables.edges; // Remove edges from state variables to avoid redundancy
+
     // state variables are now passed inside saveContainers
     saveContainers(name, stateVariables).then((response) => {
       console.log("Save response:", response);
