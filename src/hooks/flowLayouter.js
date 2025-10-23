@@ -665,13 +665,31 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
             offsetY = clamp(desiredY, minOffsetY, maxOffsetY);
         }
 
+        const clampWithin = (value, minBound, maxBound) => {
+            const minVal = Number.isFinite(minBound) ? minBound : value;
+            const maxCandidate = Number.isFinite(maxBound) ? maxBound : value;
+            const maxVal = maxCandidate < minVal ? minVal : maxCandidate;
+            return clamp(value, minVal, maxVal);
+        };
+
         groupNodes.forEach(node => {
             const originalPosition = node.position || { x: 0, y: 0 };
+            const { width, height } = getNodeDimensions(node);
+
+            const shiftedX = originalPosition.x + (Number.isFinite(offsetX) ? offsetX : 0);
+            const shiftedY = originalPosition.y + (Number.isFinite(offsetY) ? offsetY : 0);
+
+            const maxAllowedX = Number.isFinite(availMaxX) ? availMaxX - width : shiftedX;
+            const maxAllowedY = Number.isFinite(availMaxY) ? availMaxY - height : shiftedY;
+
+            const clampedX = clampWithin(shiftedX, availMinX, maxAllowedX);
+            const clampedY = clampWithin(shiftedY, availMinY, maxAllowedY);
+
             updated.set(node.id, {
                 ...node,
                 position: {
-                    x: originalPosition.x + (Number.isFinite(offsetX) ? offsetX : 0),
-                    y: originalPosition.y + (Number.isFinite(offsetY) ? offsetY : 0),
+                    x: clampedX,
+                    y: clampedY,
                 },
             });
         });
