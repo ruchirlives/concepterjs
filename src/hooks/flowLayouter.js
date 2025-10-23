@@ -131,8 +131,12 @@ export const getLayoutedElements = (
     options = {}
 ) => {
 
-    // 1. Compute group sizes based on their children
     const nodeSizes = {};
+    nodes.forEach(node => {
+        nodeSizes[node.id] = getNodeDimensions(node);
+    });
+
+    // 1. Compute group sizes based on their children
     const allNodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
 
     nodes.filter(n => n.type === 'group').forEach(group => {
@@ -162,7 +166,7 @@ export const getLayoutedElements = (
         const islandChildren = children.filter(n => !connectedIds.has(n.id));
 
         // Lay out connected children with dagre
-        const laidOutConnected = layoutSubset(connectedChildren, childEdges, direction, nodesep, ranksep);
+        const laidOutConnected = layoutSubset(connectedChildren, childEdges, direction, nodesep, ranksep, nodeSizes);
 
         // Lay out island children in a grid
         const gridColCount = 8;
@@ -186,11 +190,11 @@ export const getLayoutedElements = (
         // Bounding box
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         laidOutChildren.forEach(n => {
+            const dims = nodeSizes[n.id] || getNodeDimensions(n);
             minX = Math.min(minX, n.position.x);
             minY = Math.min(minY, n.position.y);
-            maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
-            const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
-            maxY = Math.max(maxY, n.position.y + h);
+            maxX = Math.max(maxX, n.position.x + dims.width);
+            maxY = Math.max(maxY, n.position.y + dims.height);
         });
 
         const padding = 40;
@@ -332,7 +336,7 @@ export const getLayoutedElements = (
         const connectedChildren = children.filter(n => connectedIds.has(n.id));
         const islandChildren = children.filter(n => !connectedIds.has(n.id));
 
-        const laidOutConnected = layoutSubset(connectedChildren, childEdgesForGroup, direction, nodesep, ranksep);
+        const laidOutConnected = layoutSubset(connectedChildren, childEdgesForGroup, direction, nodesep, ranksep, nodeSizes);
 
         const gridColCount = 8;
         const gridSpacingX = 340;
@@ -340,9 +344,8 @@ export const getLayoutedElements = (
         // Offset island children below the connected children within the group
         let connectedBottomY = 0;
         laidOutConnected.forEach(n => {
-            const width = n.style?.width || 320;
-            const height = n.style?.height || estimateNodeHeight(n.data?.Name || '', width);
-            const bottomY = n.position.y + height;
+            const dims = nodeSizes[n.id] || getNodeDimensions(n);
+            const bottomY = n.position.y + dims.height;
             if (bottomY > connectedBottomY) connectedBottomY = bottomY;
         });
         const islandYOffset = connectedBottomY > 0 ? connectedBottomY + 80 : 0; // 80px gap
@@ -364,11 +367,11 @@ export const getLayoutedElements = (
         // Use the same bounding box logic as above
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         laidOutChildren.forEach(n => {
+            const dims = nodeSizes[n.id] || getNodeDimensions(n);
             minX = Math.min(minX, n.position.x);
             minY = Math.min(minY, n.position.y);
-            maxX = Math.max(maxX, n.position.x + (n.style?.width || 320));
-            const h = n.style?.height || estimateNodeHeight(n.data?.Name || '', n.style?.width || 320);
-            maxY = Math.max(maxY, n.position.y + h);
+            maxX = Math.max(maxX, n.position.x + dims.width);
+            maxY = Math.max(maxY, n.position.y + dims.height);
         });
 
         const padding = 40;
@@ -397,8 +400,8 @@ export const getLayoutedElements = (
         const groupsNow = layoutedNodes.filter(n => n.type === 'group');
         // Compute target row width based on total area to keep a compact near-square packing
         const totalArea = groupsNow.reduce((acc, g) => {
-            const w = (g.style?.width || 320) + margin;
-            const h = (g.style?.height || 180) + margin;
+            const w = (g.style?.width || nodeSizes[g.id]?.width || 320) + margin;
+            const h = (g.style?.height || nodeSizes[g.id]?.height || 180) + margin;
             return acc + w * h;
         }, 0);
         const idealRowWidth = Math.max(600, Math.floor(Math.sqrt(totalArea)));
@@ -408,8 +411,8 @@ export const getLayoutedElements = (
         let rowHeight = 0;
         const positionsById = {};
         groupsNow.forEach(g => {
-            const gw = g.style?.width || 320;
-            const gh = g.style?.height || 180;
+            const gw = g.style?.width || nodeSizes[g.id]?.width || 320;
+            const gh = g.style?.height || nodeSizes[g.id]?.height || 180;
             if (x > 0 && x + gw + margin > idealRowWidth) {
                 x = 0;
                 y += rowHeight + margin;
@@ -443,8 +446,8 @@ export const getLayoutedElements = (
                 id: g.id,
                 x: g.position?.x ?? 0,
                 y: g.position?.y ?? 0,
-                w: g.style?.width || 320,
-                h: g.style?.height || 180
+                w: g.style?.width || nodeSizes[g.id]?.width || 320,
+                h: g.style?.height || nodeSizes[g.id]?.height || 180
             }));
 
             // Sort by x then y to stabilize; we will scan by rows (similar Xs) and push down to avoid overlap
@@ -524,7 +527,7 @@ export const getLayoutedElements = (
     );
 
     // Use dagre for layout
-    let dagreNodes = layoutSubset(topLevelNodes, topLevelEdges, direction, nodesep, ranksep);
+    let dagreNodes = layoutSubset(topLevelNodes, topLevelEdges, direction, nodesep, ranksep, nodeSizes);
 
     // Offset all top-level nodes by gridYOffset
     dagreNodes = dagreNodes.map(node => ({
@@ -618,16 +621,23 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
     if (groups.size === 0) return layoutedNodes;
 
     const updated = new Map();
-    const padding = 24;
+    const baseHorizontalPadding = 48;
+    const baseVerticalPaddingTop = 72;
+    const baseVerticalPaddingBottom = 48;
 
     groups.forEach(group => {
         const { nodes: groupNodes, minX, maxX, minY, maxY } = group;
         if (!groupNodes || groupNodes.length === 0) return;
 
-        const availMinX = minX + padding;
-        const availMaxX = maxX - padding;
-        const availMinY = minY + padding;
-        const availMaxY = maxY - padding;
+        const rawMinX = minX + baseHorizontalPadding;
+        const rawMaxX = maxX - baseHorizontalPadding;
+        const rawMinY = minY + baseVerticalPaddingTop;
+        const rawMaxY = maxY - baseVerticalPaddingBottom;
+
+        const availMinX = Math.min(rawMinX, rawMaxX);
+        const availMaxX = Math.max(rawMinX, rawMaxX);
+        const availMinY = Math.min(rawMinY, rawMaxY);
+        const availMaxY = Math.max(rawMinY, rawMaxY);
 
         let currentMinX = Infinity;
         let currentMaxX = -Infinity;
