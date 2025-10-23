@@ -2,13 +2,15 @@ import { forwardRef, useImperativeHandle } from "react";
 
 const MIN_NODE_WIDTH = 140;
 const MAX_NODE_WIDTH = 420;
-const MIN_NODE_HEIGHT = 64;
+const MIN_NODE_HEIGHT = 32;
 const TEXT_PADDING_X = 24;
 const TEXT_PADDING_Y = 24;
 const BASE_CHAR_WIDTH = 7.2;
 const BASE_FONT_SIZE = 12;
 const BASE_LINE_HEIGHT = 17;
 const MARGIN = 32;
+const LABEL_BAND_SIZE = 64;
+const LABEL_CELL_BORDER = "rgba(148,163,184,0.7)";
 
 const safeNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? value : fallback;
@@ -113,6 +115,12 @@ const FlowSvgExporter = forwardRef(
       const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
       const columns =
         includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
+      const hasRows = includeRows && rows.length > 0;
+      const hasColumns = includeColumns && columns.length > 0;
+      const rowLabelThickness = hasRows ? LABEL_BAND_SIZE : 0;
+      const columnLabelThickness = hasColumns ? LABEL_BAND_SIZE : 0;
+      const contentTranslateX = translateX + rowLabelThickness;
+      const contentTranslateY = translateY + columnLabelThickness;
 
       const shapes = [];
       const edgesOutput = [];
@@ -131,44 +139,69 @@ const FlowSvgExporter = forwardRef(
         maxY = Math.max(maxY, y + h);
       };
 
-      if (includeRows && rows.length > 0) {
+      const rowLabelCells = [];
+      const columnLabelCells = [];
+
+      if (hasRows) {
         rows.forEach((row) => {
           const height = safeNumber(row?.height) * zoom;
-          const top = safeNumber(row?.top) * zoom + translateY;
+          const contentTop = safeNumber(row?.top) * zoom + contentTranslateY;
           const rectWidth = boundsWidth * zoom;
-          const x = translateX;
+          const x = contentTranslateX;
           shapes.push({
             type: "row",
             x,
-            y: top,
+            y: contentTop,
             width: rectWidth,
             height,
             label: row?.label || "",
+            labelCenterX: translateX + rowLabelThickness / 2,
+            labelCenterY: contentTop + height / 2,
           });
-          registerBounds(x, top, rectWidth, height);
+          registerBounds(x, contentTop, rectWidth, height);
+          registerBounds(translateX, contentTop, rowLabelThickness, height);
+
+          rowLabelCells.push({
+            x: translateX,
+            y: contentTop,
+            width: rowLabelThickness,
+            height,
+            label: row?.label || "",
+          });
         });
       }
 
-      if (includeColumns && columns.length > 0) {
+      if (hasColumns) {
         columns.forEach((column) => {
           const width = safeNumber(column?.width) * zoom;
-          const left = safeNumber(column?.left) * zoom + translateX;
+          const contentLeft = safeNumber(column?.left) * zoom + contentTranslateX;
           const rectHeight = boundsHeight * zoom;
-          const y = translateY;
+          const y = contentTranslateY;
           shapes.push({
             type: "column",
-            x: left,
+            x: contentLeft,
             y,
             width,
             height: rectHeight,
             label: column?.label || "",
+            labelCenterX: contentLeft + width / 2,
+            labelCenterY: translateY + columnLabelThickness / 2,
           });
-          registerBounds(left, y, width, rectHeight);
+          registerBounds(contentLeft, y, width, rectHeight);
+          registerBounds(contentLeft, translateY, width, columnLabelThickness);
+
+          columnLabelCells.push({
+            x: contentLeft,
+            y: translateY,
+            width,
+            height: columnLabelThickness,
+            label: column?.label || "",
+          });
         });
       }
 
       const nodeLayoutMap = new Map();
-      const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+      const nodeRenderMap = new Map();
       nodes.forEach((node) => {
         const metrics = measureLabel(node?.data?.Name || node?.id);
         nodeLayoutMap.set(node.id, {
@@ -188,10 +221,12 @@ const FlowSvgExporter = forwardRef(
         const baseY = safeNumber(node?.position?.y);
         const widthUnits = layout.width;
         const heightUnits = layout.height;
-        const x = translateX + baseX * zoom;
-        const y = translateY + baseY * zoom;
+        const x = contentTranslateX + baseX * zoom;
+        const y = contentTranslateY + baseY * zoom;
         const width = widthUnits * zoom;
         const height = heightUnits * zoom;
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
         shapes.push({
           type: "node",
           x,
@@ -201,19 +236,13 @@ const FlowSvgExporter = forwardRef(
           lines: layout.lines,
         });
         registerBounds(x, y, width, height);
+        nodeRenderMap.set(node.id, { x, y, width, height, centerX, centerY });
       });
 
       const nodeCenter = (nodeId) => {
-        const node = nodeMap.get(nodeId);
-        const layout = nodeLayoutMap.get(nodeId);
-        if (!node || !layout) return null;
-        const centerX =
-          translateX +
-          (safeNumber(node?.position?.x) + layout.width / 2) * zoom;
-        const centerY =
-          translateY +
-          (safeNumber(node?.position?.y) + layout.height / 2) * zoom;
-        return { x: centerX, y: centerY };
+        const metrics = nodeRenderMap.get(nodeId);
+        if (!metrics) return null;
+        return { x: metrics.centerX, y: metrics.centerY };
       };
 
       edges.forEach((edge) => {
@@ -252,6 +281,36 @@ const FlowSvgExporter = forwardRef(
         `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="#f8fafc" />`,
       ];
 
+      if (hasRows) {
+        rowLabelCells.forEach((cell) => {
+          const cellX = cell.x + offsetX;
+          const cellY = cell.y + offsetY;
+          parts.push(
+            `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="#e2e8f0" stroke="${LABEL_CELL_BORDER}" />`
+          );
+          if (cell.label) {
+            parts.push(
+              `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(cell.label)}</text>`
+            );
+          }
+        });
+      }
+
+      if (hasColumns) {
+        columnLabelCells.forEach((cell) => {
+          const cellX = cell.x + offsetX;
+          const cellY = cell.y + offsetY;
+          parts.push(
+            `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="#e2e8f0" stroke="${LABEL_CELL_BORDER}" />`
+          );
+          if (cell.label) {
+            parts.push(
+              `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+            );
+          }
+        });
+      }
+
       shapes
         .filter((shape) => shape.type === "row")
         .forEach((row) => {
@@ -260,11 +319,11 @@ const FlowSvgExporter = forwardRef(
           parts.push(
             `<rect x="${x}" y="${y}" width="${row.width}" height="${row.height}" fill="rgba(148,163,184,0.08)" stroke="rgba(148,163,184,0.5)" />`
           );
-          if (row.label) {
+          if (row.label && !hasRows) {
+            const labelX = row.labelCenterX + offsetX;
+            const labelY = row.labelCenterY + offsetY;
             parts.push(
-              `<text x="${x + 6}" y="${y + row.height / 2 + 4}" fill="#0f172a">${escapeXml(
-                row.label
-              )}</text>`
+              `<text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
             );
           }
         });
@@ -277,9 +336,11 @@ const FlowSvgExporter = forwardRef(
           parts.push(
             `<rect x="${x}" y="${y}" width="${column.width}" height="${column.height}" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.4)" />`
           );
-          if (column.label) {
+          if (column.label && !hasColumns) {
+            const labelX = column.labelCenterX + offsetX;
+            const labelY = column.labelCenterY + offsetY;
             parts.push(
-              `<text x="${x + column.width / 2}" y="${y + 18}" text-anchor="middle" fill="#0f172a">${escapeXml(
+              `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(
                 column.label
               )}</text>`
             );
