@@ -86,7 +86,7 @@ const App = () => {
   // Function to save data with the provided name
   const saveData = (name) => {
     console.log(`Data saved under the name: ${name}`);
-    const { rowData, nodes, edges, ...rest } = stateVariables;
+    const { rowData, nodes, edges, parentChildMap, influencersMap, ...rest } = stateVariables;
     // First writeback the data to the server
     handleWriteBack(rowData);
 
