@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getApiUrl, getPasscode } from "./apiConfig";
 import { requestRefreshChannel } from "hooks/effectsShared";
+import { useAppContext } from "./AppContext";
 
 const apiClient = axios.create({
     baseURL: getApiUrl(), // Set the base URL for all requests
@@ -707,6 +708,11 @@ export const loadContainers = async (item) => {
             project_name: item,
         });
         const newfetch = await apiClient.get(`${getApiUrl()}/get_containers`);
+        // handle state_variables
+        const stateVariables = newfetch.data.state_variables || [];
+        console.log("Loaded state variables:", stateVariables);
+        // Handle state variables as needed
+
         return newfetch.data.containers;
     } catch (error) {
         console.error("Error loading containers:", error);
@@ -765,10 +771,11 @@ export const recopyValues = async () => {
 
 
 // Save containers
-export const saveContainers = async (name) => {
+export const saveContainers = async (name, state_variables) => {
     try {
         const response = await apiClient.post(`${getApiUrl()}/save_containers`, {
             project_name: name,
+            state_variables: state_variables,
         });
         return response.data;
     } catch (error) {

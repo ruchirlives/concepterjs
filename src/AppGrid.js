@@ -81,12 +81,20 @@ const App = () => {
     onCellContextMenu: (event) => handleContextMenu(event), // Context menu handler
   };
 
+  const stateVariables = useAppContext(); // Get state variables from context
+
   // Function to save data with the provided name
   const saveData = (name) => {
     console.log(`Data saved under the name: ${name}`);
     // First writeback the data to the server
     handleWriteBack(rowData);
-    saveContainers(name);
+
+    // state variables are now passed inside saveContainers
+    saveContainers(name, stateVariables).then((response) => {
+      console.log("Save response:", response);
+    }).catch((error) => {
+      console.error("Error saving data:", error);
+    });
 
   };
 
