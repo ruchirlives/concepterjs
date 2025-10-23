@@ -189,7 +189,7 @@ export const useReloadEffect = () => {
             loadContainers(lastLoadedFile).then((data) => {
                 // console.log("Loaded data:", data);
             });
-            clearLayers();
+            // clearLayers();
             // Broadcast a message to requestRefreshChannel
             setTimeout(() => {
                 const channel = new BroadcastChannel('requestRefreshChannel');
