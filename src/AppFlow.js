@@ -23,6 +23,7 @@ import { saveNodes, addChildren } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
+import FlowSvgExporter from './components/FlowSvgExporter';
 import { requestRefreshChannel } from './hooks/effectsShared';
 
 const PRECISION_FACTOR = 1000;
@@ -181,11 +182,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const cellMenuRef = useRef(null);
   const [pendingCellContext, setPendingCellContext] = useState(null);
   const [isAddRowModalOpen, setIsAddRowModalOpen] = useState(false);
+  const svgExporterRef = useRef(null);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
 
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
+  const exportEnabled = showRowGrid || showColumnGrid;
 
   const normalizeTags = useCallback((raw = '') => raw
     .split(',')
@@ -448,6 +451,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setPendingCellContext(null);
   }, [pendingCellContext]);
 
+  const handleExportSvg = useCallback(() => {
+    if (!exportEnabled) return;
+    const exported = svgExporterRef.current?.exportSvg();
+    if (!exported) {
+      toast.error('Unable to generate SVG export.');
+    }
+  }, [exportEnabled]);
+
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
     updateViewportTransform(viewport);
@@ -638,10 +649,18 @@ const App = ({ keepLayout, setKeepLayout }) => {
             }
           }}
           title="Save all currently visible nodes"
-        >
+          >
           Save Nodes
-        </button>
-        {/* Group By Layers tickbox */}
+          </button>
+          <button
+            className={`ml-4 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+            onClick={handleExportSvg}
+            disabled={!exportEnabled}
+            title={exportEnabled ? 'Export the current grid view as SVG' : 'Activate a row or column grid to export'}
+          >
+            Export Grid SVG
+          </button>
+          {/* Group By Layers tickbox */}
         <div className="flex items-center gap-2 ml-4">
           <input
             type="checkbox"
@@ -884,6 +903,15 @@ const App = ({ keepLayout, setKeepLayout }) => {
               setEdges={setEdges}
               edge={edgeMenuEdge}
             />
+            <FlowSvgExporter
+              ref={svgExporterRef}
+              nodes={nodes}
+              edges={edges}
+              grid={flowGridDimensions}
+              viewport={viewportTransform}
+              includeRows={showRowGrid}
+              includeColumns={showColumnGrid}
+            />
             {cellMenuContext && (
               <div
                 ref={cellMenuRef}
@@ -899,7 +927,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   onClick={handleCellMenuAddRow}
                 >
-                  Add row to {cellMenuRowLabel} × {cellMenuColumnLabel}
+                  Add row to {cellMenuRowLabel} x {cellMenuColumnLabel}
                 </button>
               </div>
             )}
