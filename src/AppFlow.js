@@ -165,6 +165,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     showGroupNodes, setShowGroupNodes,
     flowGridDimensions,
     setFlowGridDimensions,
+    layerOrdering,
   } = useFlowLogic();
 
 
@@ -185,12 +186,34 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const collectLayerNodes = useCallback((layerName) => {
     if (!layerName) return [];
-    const target = layerName.trim().toLowerCase();
+
+    const normalizedLayerKey = layerName.trim();
+    const target = normalizedLayerKey.toLowerCase();
     if (!target) return [];
 
     const sourceRows = Array.isArray(flowFilteredRowData) && flowFilteredRowData.length > 0
       ? flowFilteredRowData
       : (rowData || []);
+
+    let orderingList = [];
+    if (layerOrdering && typeof layerOrdering === 'object') {
+      if (Array.isArray(layerOrdering?.[normalizedLayerKey])) {
+        orderingList = layerOrdering[normalizedLayerKey];
+      } else {
+        const fallbackKey = Object.keys(layerOrdering).find(
+          (key) => key?.toLowerCase() === target
+        );
+        if (fallbackKey && Array.isArray(layerOrdering[fallbackKey])) {
+          orderingList = layerOrdering[fallbackKey];
+        }
+      }
+    }
+
+    const orderIndex = new Map(
+      Array.isArray(orderingList)
+        ? orderingList.map((id, idx) => [id != null ? id.toString() : '', idx])
+        : []
+    );
 
     const seen = new Map();
     sourceRows.forEach((item) => {
@@ -209,14 +232,22 @@ const App = ({ keepLayout, setKeepLayout }) => {
       });
     });
 
-    return Array.from(seen.values()).sort((a, b) => {
+    const sorted = Array.from(seen.values()).sort((a, b) => {
+      const idA = a.originalId != null ? a.originalId.toString() : a.nodeId;
+      const idB = b.originalId != null ? b.originalId.toString() : b.nodeId;
+      const idxA = orderIndex.has(idA) ? orderIndex.get(idA) : Number.POSITIVE_INFINITY;
+      const idxB = orderIndex.has(idB) ? orderIndex.get(idB) : Number.POSITIVE_INFINITY;
+      if (idxA !== idxB) return idxA - idxB;
+
       const labelA = (a.label || '').toLowerCase();
       const labelB = (b.label || '').toLowerCase();
       if (labelA < labelB) return -1;
       if (labelA > labelB) return 1;
       return 0;
     });
-  }, [flowFilteredRowData, normalizeTags, rowData]);
+
+    return sorted;
+  }, [flowFilteredRowData, layerOrdering, normalizeTags, rowData]);
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
