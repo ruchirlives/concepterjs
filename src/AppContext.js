@@ -3,6 +3,7 @@ import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates, manyChildren, getInfluencers as fetchInfluencers } from './api';
 import toast from "react-hot-toast";
+import { registerStateSetter, unregisterStateSetter } from './stateSetterRegistry';
 
 const AppContext = createContext();
 
@@ -219,23 +220,72 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const setter = (value) => {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        setLayerOrdering(value);
-      } else {
-        setLayerOrdering({});
-      }
+    const mapping = {
+      activeLayers: setActiveLayers,
+      activeState: setActiveState,
+      availableStates: setAvailableStates,
+      columnSelectedLayer: setColumnSelectedLayer,
+      comparatorState: setComparatorState,
+      diffDict: setDiffDict,
+      differences: setDifferences,
+      differencesTrigger: setDifferencesTrigger,
+      editingCell: setEditingCell,
+      flipped: setFlipped,
+      flowGridDimensions: setFlowGridDimensions,
+      hiddenLayers: setHiddenLayers,
+      hideEmpty: setHideEmpty,
+      hoveredCell: setHoveredCell,
+      hoveredFrom: setHoveredFrom,
+      hoveredRowId: setHoveredRowId,
+      lastLoadedFile: setLastLoadedFile,
+      layerDropdownOpen: setLayerDropdownOpen,
+      layerOptions: setLayerOptions,
+      layerOrdering: setLayerOrdering,
+      loading: setLoading,
+      loadingDifferences: setLoadingDifferences,
+      rawDifferences: setRawDifferences,
+      rowSelectedLayer: setRowSelectedLayer,
+      selectedContentLayer: setSelectedContentLayer,
+      selectedFromLayer: setSelectedFromLayer,
+      selectedToLayer: setSelectedToLayer,
+      showDropdowns: setShowDropdowns,
     };
 
-    window.setLayerOrdering = setter;
+    Object.entries(mapping).forEach(([key, setter]) => registerStateSetter(key, setter));
+
     return () => {
-      if (window.setLayerOrdering === setter) {
-        delete window.setLayerOrdering;
-      }
+      Object.entries(mapping).forEach(([key, setter]) => unregisterStateSetter(key, setter));
     };
-  }, []);
+  }, [
+    setActiveLayers,
+    setActiveState,
+    setAvailableStates,
+    setColumnSelectedLayer,
+    setComparatorState,
+    setDiffDict,
+    setDifferences,
+    setDifferencesTrigger,
+    setEditingCell,
+    setFlipped,
+    setFlowGridDimensions,
+    setHiddenLayers,
+    setHideEmpty,
+    setHoveredCell,
+    setHoveredFrom,
+    setHoveredRowId,
+    setLastLoadedFile,
+    setLayerDropdownOpen,
+    setLayerOptions,
+    setLayerOrdering,
+    setLoading,
+    setLoadingDifferences,
+    setRawDifferences,
+    setRowSelectedLayer,
+    setSelectedContentLayer,
+    setSelectedFromLayer,
+    setSelectedToLayer,
+    setShowDropdowns,
+  ]);
 
   useEffect(() => {
     if (!Array.isArray(rowData)) return;

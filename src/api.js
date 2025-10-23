@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiUrl, getPasscode } from "./apiConfig";
+import { getStateSetter } from "./stateSetterRegistry";
 import { requestRefreshChannel } from "hooks/effectsShared";
 
 const apiClient = axios.create({
@@ -708,20 +709,37 @@ export const loadContainers = async (item) => {
         });
         const newfetch = await apiClient.get(`${getApiUrl()}/get_containers`);
         // handle state_variables
-        const stateVariables = loadResponse.data.state_variables || [];
+        const stateVariables = loadResponse.data.state_variables || {};
         console.log("Loaded state variables:", stateVariables);
-        // Restore state variables if needed
-        if (stateVariables.length > 0) {
-            // call the setter for each state variable
-            stateVariables.forEach(({ key, value }) => {
-                // get the name of the statevariable, and construct a setter function name
-                const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-                // Call the setter function with the value
-                if (typeof window[setterName] === "function") {
-                    window[setterName](value);
+
+        const entries = Array.isArray(stateVariables)
+            ? stateVariables
+            : Object.entries(stateVariables).map(([key, value]) => ({ key, value }));
+
+        entries.forEach(({ key, value }) => {
+            if (!key) return;
+            const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+            const setter =
+                getStateSetter(key) ||
+                (typeof window !== "undefined" ? window[setterName] : undefined);
+            if (typeof setter === "function") {
+                if (key === "hiddenLayers") {
+                    const asArray = Array.isArray(value)
+                        ? value
+                        : value instanceof Set
+                            ? Array.from(value)
+                            : value && typeof value === "object"
+                                ? Object.keys(value)
+                                : [];
+                    setter(new Set(asArray));
+                } else {
+                    setter(value);
                 }
-            });
-        }
+                console.log(`Restored state variable: ${key}`);
+            } else {
+                console.warn(`No setter function found for state variable: ${key}`);
+            }
+        });
 
         return newfetch.data.containers;
     } catch (error) {
