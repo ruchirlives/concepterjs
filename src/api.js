@@ -710,7 +710,18 @@ export const loadContainers = async (item) => {
         // handle state_variables
         const stateVariables = newfetch.data.state_variables || [];
         console.log("Loaded state variables:", stateVariables);
-        // Handle state variables as needed
+        // Restore state variables if needed
+        if (stateVariables.length > 0) {
+            // call the setter for each state variable
+            stateVariables.forEach(({ key, value }) => {
+                // get the name of the statevariable, and construct a setter function name
+                const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+                // Call the setter function with the value
+                if (typeof window[setterName] === "function") {
+                    window[setterName](value);
+                }
+            });
+        }
 
         return newfetch.data.containers;
     } catch (error) {

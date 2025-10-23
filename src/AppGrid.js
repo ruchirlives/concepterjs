@@ -86,17 +86,12 @@ const App = () => {
   // Function to save data with the provided name
   const saveData = (name) => {
     console.log(`Data saved under the name: ${name}`);
+    const { rowData, nodes, edges, ...rest } = stateVariables;
     // First writeback the data to the server
     handleWriteBack(rowData);
 
-    console.log("State variables before cleanup:", stateVariables);
-
-    delete stateVariables.rowData; // Remove rowData from state variables to avoid redundancy
-    delete stateVariables.nodes; // Remove nodes from state variables to avoid redundancy
-    delete stateVariables.edges; // Remove edges from state variables to avoid redundancy
-
     // state variables are now passed inside saveContainers
-    saveContainers(name, stateVariables).then((response) => {
+    saveContainers(name, rest).then((response) => {
       console.log("Save response:", response);
     }).catch((error) => {
       console.error("Error saving data:", error);
