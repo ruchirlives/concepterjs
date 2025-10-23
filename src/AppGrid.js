@@ -89,6 +89,8 @@ const App = () => {
     // First writeback the data to the server
     handleWriteBack(rowData);
 
+    console.log("State variables before cleanup:", stateVariables);
+
     delete stateVariables.rowData; // Remove rowData from state variables to avoid redundancy
     delete stateVariables.nodes; // Remove nodes from state variables to avoid redundancy
     delete stateVariables.edges; // Remove edges from state variables to avoid redundancy
