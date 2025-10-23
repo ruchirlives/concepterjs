@@ -19,9 +19,11 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { saveNodes } from './api';
+import { saveNodes, addChildren } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
+import ModalAddRow from './components/ModalAddRow';
+import { requestRefreshChannel } from './hooks/effectsShared';
 
 const PRECISION_FACTOR = 1000;
 
@@ -175,6 +177,12 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
   const viewportInteractionRef = useRef(false);
+  const [cellMenuContext, setCellMenuContext] = useState(null);
+  const cellMenuRef = useRef(null);
+  const [pendingCellContext, setPendingCellContext] = useState(null);
+  const [isAddRowModalOpen, setIsAddRowModalOpen] = useState(false);
+  const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
+  const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
 
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
@@ -248,6 +256,33 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     return sorted;
   }, [flowFilteredRowData, layerOrdering, normalizeTags, rowData]);
+
+  useEffect(() => {
+    if (!cellMenuContext) return undefined;
+
+    const handleMouseDown = (event) => {
+      const menuEl = cellMenuRef.current;
+      if (menuEl && menuEl.contains(event.target)) return;
+      setCellMenuContext(null);
+    };
+
+    const handleWheel = (event) => {
+      const menuEl = cellMenuRef.current;
+      if (menuEl && menuEl.contains(event.target)) return;
+      setCellMenuContext(null);
+    };
+
+    const handleBlur = () => setCellMenuContext(null);
+
+    window.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener('wheel', handleWheel, true);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener('wheel', handleWheel, true);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [cellMenuContext]);
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
@@ -325,6 +360,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     updateGridDimensions();
   }, [updateGridDimensions]);
 
+
+
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => {
@@ -341,6 +378,75 @@ const App = ({ keepLayout, setKeepLayout }) => {
     transform: `translate(${viewportTransform.x}px, ${viewportTransform.y}px) scale(${viewportTransform.zoom})`,
     transformOrigin: '0 0',
   }), [viewportTransform]);
+
+  const handleCellMenuAddRow = useCallback(() => {
+    if (!cellMenuContext) return;
+    setPendingCellContext({
+      rowSegment: cellMenuContext.rowSegment,
+      columnSegment: cellMenuContext.columnSegment,
+    });
+    setCellMenuContext(null);
+    setIsAddRowModalOpen(true);
+  }, [cellMenuContext]);
+
+  const handleModalClose = useCallback(() => {
+    setIsAddRowModalOpen(false);
+    setPendingCellContext(null);
+  }, []);
+
+  const handleModalSelect = useCallback(async (newRows = []) => {
+    if (!pendingCellContext) return;
+    if (!Array.isArray(newRows) || newRows.length === 0) {
+      setPendingCellContext(null);
+      return;
+    }
+
+    const childIds = newRows
+      .map((row) => (row?.id != null ? row.id.toString() : null))
+      .filter(Boolean);
+    if (childIds.length === 0) {
+      setPendingCellContext(null);
+      return;
+    }
+
+    const parents = new Set();
+    const pushParent = (segment) => {
+      if (!segment) return;
+      const parentId = segment.originalId || segment.nodeId;
+      if (!parentId) return;
+      parents.add(parentId.toString());
+    };
+    pushParent(pendingCellContext.rowSegment);
+    pushParent(pendingCellContext.columnSegment);
+
+    if (parents.size === 0) {
+      setPendingCellContext(null);
+      return;
+    }
+
+    let successCount = 0;
+    for (const parentId of parents) {
+      try {
+        const response = await addChildren(parentId, childIds);
+        if (response && !response.error) {
+          successCount += 1;
+        } else {
+          const message = response?.message || `Failed to link containers to parent ${parentId}`;
+          toast.error(message);
+        }
+      } catch (error) {
+        console.error("Failed to add children to parent", parentId, error);
+        toast.error(`Failed to link containers to parent ${parentId}`);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Linked ${childIds.length} container${childIds.length > 1 ? 's' : ''} to ${successCount} parent${successCount > 1 ? 's' : ''}.`);
+      requestRefreshChannel();
+    }
+
+    setPendingCellContext(null);
+  }, [pendingCellContext]);
 
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
@@ -464,10 +570,43 @@ const App = ({ keepLayout, setKeepLayout }) => {
     edge: edgeMenuEdge,
   } = useEdgeMenu(flowWrapperRef);
 
-  const hideMenu = () => {
+  const hideMenu = useCallback(() => {
     hideContextMenu();
     hideEdgeMenu();
-  };
+    setCellMenuContext(null);
+  }, [hideContextMenu, hideEdgeMenu, setCellMenuContext]);
+
+  const handlePaneContextMenu = useCallback((event) => {
+    if (!showRowGrid || !showColumnGrid) return;
+    if (!Array.isArray(gridRows) || gridRows.length === 0) return;
+    if (!Array.isArray(gridColumns) || gridColumns.length === 0) return;
+
+    const flowPoint = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    if (!flowPoint) return;
+
+    const rowSegment = gridRows.find((segment) => flowPoint.y >= segment.top && flowPoint.y <= segment.bottom);
+    const columnSegment = gridColumns.find((segment) => flowPoint.x >= segment.left && flowPoint.x <= segment.right);
+
+    if (!rowSegment || !columnSegment) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    hideMenu();
+    setCellMenuContext({
+      x: event.clientX,
+      y: event.clientY,
+      rowSegment,
+      columnSegment,
+    });
+  }, [
+    gridColumns,
+    gridRows,
+
+    screenToFlowPosition,
+    showColumnGrid,
+    showRowGrid,
+    hideMenu
+  ]);
 
   return (
     <div className="bg-white rounded shadow">
@@ -711,6 +850,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onNodeContextMenu={handleContextMenu}
               onSelectionContextMenu={selectionContextMenu}
               onNodeDoubleClick={undefined}
+              onPaneContextMenu={handlePaneContextMenu}
               minZoom={0.1} // <-- Add this line
               onMove={handleFlowMove}
               onMoveEnd={handleFlowMoveEnd}
@@ -743,6 +883,31 @@ const App = ({ keepLayout, setKeepLayout }) => {
               edges={edges}
               setEdges={setEdges}
               edge={edgeMenuEdge}
+            />
+            {cellMenuContext && (
+              <div
+                ref={cellMenuRef}
+                className="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                style={{
+                  top: cellMenuContext.y,
+                  left: cellMenuContext.x,
+                  minWidth: '220px',
+                }}
+              >
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={handleCellMenuAddRow}
+                >
+                  Add row to {cellMenuRowLabel} × {cellMenuColumnLabel}
+                </button>
+              </div>
+            )}
+            <ModalAddRow
+              isOpen={isAddRowModalOpen}
+              onClose={handleModalClose}
+              onSelect={handleModalSelect}
+              layer={selectedContentLayer}
             />
             <Toaster position="top-right" />
           </FlowMenuProvider>
