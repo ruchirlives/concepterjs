@@ -1,23 +1,17 @@
 import { forwardRef, useImperativeHandle } from "react";
 
-const DEFAULT_NODE_WIDTH = 200;
-const DEFAULT_NODE_HEIGHT = 120;
+const MIN_NODE_WIDTH = 140;
+const MAX_NODE_WIDTH = 420;
+const MIN_NODE_HEIGHT = 64;
+const TEXT_PADDING_X = 24;
+const TEXT_PADDING_Y = 24;
+const BASE_CHAR_WIDTH = 7.2;
+const BASE_FONT_SIZE = 12;
+const BASE_LINE_HEIGHT = 17;
 const MARGIN = 32;
 
 const safeNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? value : fallback;
-
-const getNodeSize = (node) => {
-  const width =
-    safeNumber(node?.width) ||
-    safeNumber(node?.style?.width) ||
-    DEFAULT_NODE_WIDTH;
-  const height =
-    safeNumber(node?.height) ||
-    safeNumber(node?.style?.height) ||
-    DEFAULT_NODE_HEIGHT;
-  return { width, height };
-};
 
 const escapeXml = (value = "") =>
   String(value)
@@ -26,6 +20,75 @@ const escapeXml = (value = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+
+const wrapWords = (words, maxChars) => {
+  if (!Array.isArray(words) || words.length === 0) {
+    return [""];
+  }
+  const chunkSize = Math.max(1, maxChars);
+  const lines = [];
+  let current = "";
+  words.forEach((word) => {
+    const segment = current.length ? `${current} ${word}` : word;
+    if (segment.length <= chunkSize) {
+      current = segment;
+    } else {
+      if (current.length) lines.push(current);
+      if (word.length > chunkSize) {
+        const parts = word.match(new RegExp(`.{1,${chunkSize}}`, "g")) || [word];
+        lines.push(...parts.slice(0, -1));
+        current = parts.at(-1) || "";
+      } else {
+        current = word;
+      }
+    }
+  });
+  if (current.length) lines.push(current);
+  return lines.length > 0 ? lines : [""];
+};
+
+const measureLabel = (label = "") => {
+  const text = label ? label.toString().trim() : "";
+  if (!text.length) {
+    return {
+      width: MIN_NODE_WIDTH,
+      height: MIN_NODE_HEIGHT,
+      lines: [""],
+    };
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const longestWord = words.reduce((max, word) => Math.max(max, word.length), 0);
+
+  let width = Math.max(
+    MIN_NODE_WIDTH,
+    Math.min(MAX_NODE_WIDTH, text.length * BASE_CHAR_WIDTH + TEXT_PADDING_X)
+  );
+  width = Math.max(width, Math.min(MAX_NODE_WIDTH, longestWord * BASE_CHAR_WIDTH + TEXT_PADDING_X));
+
+  const maxCharsPerLine = Math.max(
+    8,
+    Math.floor((width - TEXT_PADDING_X) / BASE_CHAR_WIDTH)
+  );
+
+  let lines = wrapWords(words, maxCharsPerLine);
+  const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  width = Math.max(
+    width,
+    Math.min(MAX_NODE_WIDTH, longestLine * BASE_CHAR_WIDTH + TEXT_PADDING_X)
+  );
+
+  const height = Math.max(
+    MIN_NODE_HEIGHT,
+    TEXT_PADDING_Y + lines.length * BASE_LINE_HEIGHT
+  );
+
+  return {
+    width,
+    height,
+    lines,
+  };
+};
 
 const FlowSvgExporter = forwardRef(
   (
@@ -104,46 +167,52 @@ const FlowSvgExporter = forwardRef(
         });
       }
 
-      const nodeSizeMap = new Map();
+      const nodeLayoutMap = new Map();
       const nodeMap = new Map(nodes.map((node) => [node.id, node]));
       nodes.forEach((node) => {
-        const { width, height } = getNodeSize(node);
-        nodeSizeMap.set(node.id, { width, height });
+        const metrics = measureLabel(node?.data?.Name || node?.id);
+        nodeLayoutMap.set(node.id, {
+          width: metrics.width,
+          height: metrics.height,
+          lines: metrics.lines,
+        });
       });
 
       nodes.forEach((node) => {
-        const size = nodeSizeMap.get(node.id) || {
-          width: DEFAULT_NODE_WIDTH,
-          height: DEFAULT_NODE_HEIGHT,
+        const layout = nodeLayoutMap.get(node.id) || {
+          width: MIN_NODE_WIDTH,
+          height: MIN_NODE_HEIGHT,
+          lines: [node?.data?.Name || node?.id || ""],
         };
         const baseX = safeNumber(node?.position?.x);
         const baseY = safeNumber(node?.position?.y);
+        const widthUnits = layout.width;
+        const heightUnits = layout.height;
         const x = translateX + baseX * zoom;
         const y = translateY + baseY * zoom;
-        const width = size.width * zoom;
-        const height = size.height * zoom;
+        const width = widthUnits * zoom;
+        const height = heightUnits * zoom;
         shapes.push({
           type: "node",
           x,
           y,
           width,
           height,
-          label: node?.data?.Name || node?.id,
+          lines: layout.lines,
         });
         registerBounds(x, y, width, height);
       });
 
       const nodeCenter = (nodeId) => {
         const node = nodeMap.get(nodeId);
-        if (!node) return null;
-        const size = nodeSizeMap.get(node.id) || {
-          width: DEFAULT_NODE_WIDTH,
-          height: DEFAULT_NODE_HEIGHT,
-        };
+        const layout = nodeLayoutMap.get(nodeId);
+        if (!node || !layout) return null;
         const centerX =
-          translateX + (safeNumber(node?.position?.x) + size.width / 2) * zoom;
+          translateX +
+          (safeNumber(node?.position?.x) + layout.width / 2) * zoom;
         const centerY =
-          translateY + (safeNumber(node?.position?.y) + size.height / 2) * zoom;
+          translateY +
+          (safeNumber(node?.position?.y) + layout.height / 2) * zoom;
         return { x: centerX, y: centerY };
       };
 
@@ -228,16 +297,31 @@ const FlowSvgExporter = forwardRef(
         .forEach((node) => {
           const x = node.x + offsetX;
           const y = node.y + offsetY;
+          const cornerRadius = Math.max(4, 12 * zoom);
+          const strokeWidth = Math.max(1, 1.5 * zoom);
+          const fontSize = Math.max(8, BASE_FONT_SIZE * zoom);
+          const lineSpacing = Math.max(fontSize * 1.35, BASE_LINE_HEIGHT * zoom);
+          const textPaddingX = Math.max(8, (TEXT_PADDING_X / 2) * zoom);
+          const textPaddingY = Math.max(8, (TEXT_PADDING_Y / 2) * zoom);
+          const textX = x + textPaddingX;
+          const firstLineY = y + textPaddingY;
+          const lines = Array.isArray(node.lines) && node.lines.length
+            ? node.lines
+            : [""];
           parts.push(
-            `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="12" ry="12" fill="#ffffff" stroke="#1e293b" stroke-width="1.5" />`
+            `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="#ffffff" stroke="#1e293b" stroke-width="${strokeWidth}" />`
           );
-          if (node.label) {
-            parts.push(
-              `<text x="${x + 12}" y="${y + 24}" fill="#0f172a">${escapeXml(
-                node.label
-              )}</text>`
-            );
-          }
+          let textContent = `<text x="${textX}" y="${firstLineY}" fill="#0f172a" font-size="${fontSize}" dominant-baseline="hanging">`;
+          lines.forEach((line, index) => {
+            const content = escapeXml(line) || " ";
+            if (index === 0) {
+              textContent += content;
+            } else {
+              textContent += `<tspan x="${textX}" dy="${lineSpacing}">${content}</tspan>`;
+            }
+          });
+          textContent += "</text>";
+          parts.push(textContent);
         });
 
       parts.push("</svg>");
