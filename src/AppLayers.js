@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAppContext } from "./AppContext";
 import { handleWriteBack } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
@@ -28,6 +28,8 @@ const AppLayers = () => {
     setRowData,
     selectedContentLayer, // <-- get from context
     setSelectedContentLayer, // <-- get from context
+    layerOrdering,
+    updateLayerOrderingForLayer,
   } = useAppContext();
   const [collapsed, setCollapsed] = useState(false);
   const [newLayer, setNewLayer] = useState("");
@@ -87,13 +89,64 @@ const AppLayers = () => {
       });
       if (!found) noLayer.push(row);
     });
+    Object.keys(map).forEach((layer) => {
+      const ordering = Array.isArray(layerOrdering?.[layer]) ? layerOrdering[layer] : [];
+      if (ordering.length === 0) {
+        map[layer].sort((a, b) => {
+          const nameA = (a.Name || "").toLowerCase();
+          const nameB = (b.Name || "").toLowerCase();
+          if (nameA < nameB) return -1;
+          if (nameA > nameB) return 1;
+          return 0;
+        });
+        return;
+      }
+      const orderIndex = new Map(ordering.map((id, index) => [id, index]));
+      map[layer].sort((a, b) => {
+        const idA = a?.id != null ? a.id.toString() : "";
+        const idB = b?.id != null ? b.id.toString() : "";
+        const idxA = orderIndex.has(idA) ? orderIndex.get(idA) : Number.POSITIVE_INFINITY;
+        const idxB = orderIndex.has(idB) ? orderIndex.get(idB) : Number.POSITIVE_INFINITY;
+        if (idxA !== idxB) return idxA - idxB;
+        const nameA = (a.Name || "").toLowerCase();
+        const nameB = (b.Name || "").toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+        return 0;
+      });
+    });
     return { containersByLayer: map, noLayerItems: noLayer };
-  }, [rowData, layerOptions]);
+  }, [layerOptions, layerOrdering, rowData]);
 
-  const handleDrop = (layer) => {
+  const moveItemWithinLayer = useCallback((layer, itemId, beforeId = null) => {
+    if (!layer || itemId == null) return;
+    const normalizedId = itemId.toString();
+    const normalizedBefore = beforeId != null ? beforeId.toString() : null;
+    updateLayerOrderingForLayer(layer, (order) => {
+      const withoutItem = order.filter((id) => id !== normalizedId);
+      if (!normalizedBefore) {
+        return [...withoutItem, normalizedId];
+      }
+      const insertionIndex = withoutItem.indexOf(normalizedBefore);
+      if (insertionIndex === -1) {
+        return [...withoutItem, normalizedId];
+      }
+      const next = [...withoutItem];
+      next.splice(insertionIndex, 0, normalizedId);
+      return next;
+    });
+  }, [updateLayerOrderingForLayer]);
+
+  const handleDrop = (layer, { beforeId = null } = {}) => {
     if (!dragItem) return;
     const { cid } = dragItem;
+    if (!cid) {
+      setDragItem(null);
+      return;
+    }
+
     setRowData((prev) => {
+      let mutated = false;
       const updated = prev.map((row) => {
         if (row.id.toString() !== cid) return row;
         const tags = (row.Tags || "")
@@ -102,13 +155,20 @@ const AppLayers = () => {
           .filter(Boolean);
         if (!tags.includes(layer)) {
           tags.push(layer);
+          mutated = true;
+          return { ...row, Tags: tags.join(", ") };
         }
-        return { ...row, Tags: tags.join(", ") };
+        return row;
       });
-      // Call writeback after updating
+      if (!mutated) return prev;
       handleWriteBack(updated);
       return updated;
     });
+
+    const normalizedBefore = beforeId != null ? beforeId.toString() : null;
+    if (!normalizedBefore || normalizedBefore !== cid.toString()) {
+      moveItemWithinLayer(layer, cid, normalizedBefore);
+    }
     setDragItem(null);
   };
 
@@ -289,9 +349,27 @@ const AppLayers = () => {
                             <li
                               key={row.id}
                               draggable
-                              onDragStart={() =>
-                                setDragItem({ cid: row.id.toString(), layer })
-                              }
+                              onDragStart={(e) => {
+                                if (e?.dataTransfer) {
+                                  e.dataTransfer.effectAllowed = "move";
+                                }
+                                setDragItem({ cid: row.id.toString(), layer });
+                              }}
+                              onDragOver={(e) => {
+                                if (!dragItem) return;
+                                if (dragItem.cid === row.id.toString()) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e?.dataTransfer) {
+                                  e.dataTransfer.dropEffect = "move";
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDrop(layer, { beforeId: row.id.toString() });
+                              }}
+                              onDragEnd={() => setDragItem(null)}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 setContextMenu({

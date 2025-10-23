@@ -703,12 +703,12 @@ export const deleteProject = async (item) => {
 export const loadContainers = async (item) => {
     console.log("Loading containers for item:", item);
     try {
-        await apiClient.post(`${getApiUrl()}/load_containers`, {
+        const loadResponse = await apiClient.post(`${getApiUrl()}/load_containers`, {
             project_name: item,
         });
         const newfetch = await apiClient.get(`${getApiUrl()}/get_containers`);
         // handle state_variables
-        const stateVariables = newfetch.data.state_variables || [];
+        const stateVariables = loadResponse.data.state_variables || [];
         console.log("Loaded state variables:", stateVariables);
         // Restore state variables if needed
         if (stateVariables.length > 0) {

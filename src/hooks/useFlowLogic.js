@@ -22,6 +22,7 @@ export const useFlowLogic = () => {
     onNodesChange,
     hiddenLayers,
     layerOptions,
+    layerOrdering,
     comparatorState,
     selectedContentLayer,
     setSelectedContentLayer,
@@ -119,6 +120,7 @@ export const useFlowLogic = () => {
 
     // Layers
     selectedContentLayer, setSelectedContentLayer, layerOptions,
+    layerOrdering,
     groupByLayers, setGroupByLayers,
     showGroupNodes, setShowGroupNodes,
     rowSelectedLayer, setRowSelectedLayer,

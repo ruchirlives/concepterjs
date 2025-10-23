@@ -38,6 +38,7 @@ export const AppProvider = ({ children }) => {
   // Layers state
   const [layerOptions, setLayerOptions] = useState([]);
   const [activeLayers, setActiveLayers] = useState([]);
+  const [layerOrdering, setLayerOrdering] = useState({});
 
   // Layer dropdown state
   const [layerDropdownOpen, setLayerDropdownOpen] = useState(false);
@@ -143,15 +144,60 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const normalizeId = (value) => {
+    if (value == null) return '';
+    return typeof value === 'string' ? value : value.toString();
+  };
+
+  const arraysEqual = (a = [], b = []) => {
+    if (a === b) return true;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  };
+
+  const sanitizeOrder = useCallback((order = []) => {
+    const seen = new Set();
+    const result = [];
+    order.forEach((raw) => {
+      const id = normalizeId(raw);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      result.push(id);
+    });
+    return result;
+  }, []);
+
+  const updateLayerOrderingForLayer = useCallback((layer, updater) => {
+    if (!layer || typeof updater !== 'function') return;
+    setLayerOrdering((prev) => {
+      const prevOrder = Array.isArray(prev?.[layer]) ? prev[layer] : [];
+      const nextOrder = sanitizeOrder(updater(prevOrder));
+      if (arraysEqual(prevOrder, nextOrder)) return prev;
+      return { ...prev, [layer]: nextOrder };
+    });
+  }, [sanitizeOrder]);
+
   const addLayer = (layer) => {
     setLayerOptions((prev) =>
       prev.includes(layer) ? prev : [...prev, layer]
     );
+    setLayerOrdering((prev) => {
+      if (!layer || prev[layer]) return prev;
+      return { ...prev, [layer]: [] };
+    });
   };
 
   const removeLayer = (layer) => {
     setLayerOptions((prev) => prev.filter((l) => l !== layer));
     setActiveLayers((prev) => prev.filter((l) => l !== layer));
+    setLayerOrdering((prev) => {
+      if (!prev[layer]) return prev;
+      const { [layer]: _removed, ...rest } = prev;
+      return rest;
+    });
     requestRefreshChannel();
   };
 
@@ -164,10 +210,87 @@ export const AppProvider = ({ children }) => {
     requestRefreshChannel();
   };
 
-  const clearLayers = useCallback(() => {
+  const clearLayers = useCallback(({ resetOrdering = true } = {}) => {
     setLayerOptions([]);
     setActiveLayers([]);
+    if (resetOrdering) {
+      setLayerOrdering({});
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const setter = (value) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        setLayerOrdering(value);
+      } else {
+        setLayerOrdering({});
+      }
+    };
+
+    window.setLayerOrdering = setter;
+    return () => {
+      if (window.setLayerOrdering === setter) {
+        delete window.setLayerOrdering;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(rowData)) return;
+    setLayerOrdering((prev) => {
+      const layerToIds = {};
+      rowData.forEach((row) => {
+        const id = normalizeId(row?.id);
+        if (!id) return;
+        const tags = (row?.Tags || '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+        tags.forEach((tag) => {
+          if (!layerToIds[tag]) layerToIds[tag] = [];
+          layerToIds[tag].push(id);
+        });
+      });
+
+      const next = {};
+      let changed = false;
+
+      layerOptions.forEach((layer) => {
+        const ids = Array.isArray(layerToIds[layer]) ? layerToIds[layer] : [];
+        const idStrings = ids.map(normalizeId).filter(Boolean);
+        const existing = Array.isArray(prev[layer]) ? sanitizeOrder(prev[layer]) : [];
+        const filteredExisting = existing.filter((id) => idStrings.includes(id));
+        const appended = idStrings.filter((id) => !filteredExisting.includes(id));
+        const combined = [...filteredExisting, ...appended];
+
+        if (combined.length > 0) {
+          next[layer] = combined;
+        }
+
+        if (!arraysEqual(existing, combined)) {
+          changed = true;
+        }
+      });
+
+      const prevKeys = Object.keys(prev || {});
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length !== nextKeys.length) {
+        changed = true;
+      } else {
+        for (let i = 0; i < prevKeys.length; i += 1) {
+          if (!nextKeys.includes(prevKeys[i])) {
+            changed = true;
+            break;
+          }
+        }
+      }
+
+      if (!changed) return prev;
+      return next;
+    });
+  }, [rowData, layerOptions, sanitizeOrder]);
 
   // Influencers helpers
   const normalizePairs = (pairs) => {
@@ -225,6 +348,9 @@ export const AppProvider = ({ children }) => {
     setRowData,
     layerOptions,
     setLayerOptions,
+    layerOrdering,
+    setLayerOrdering,
+    updateLayerOrderingForLayer,
     addLayer,
     removeLayer,
     activeLayers,

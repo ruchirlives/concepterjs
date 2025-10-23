@@ -25,7 +25,7 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
             await loadContainers(item);
         }
         setLastLoadedFile(item);
-        clearLayers();
+        clearLayers({ resetOrdering: false });
 
         const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });

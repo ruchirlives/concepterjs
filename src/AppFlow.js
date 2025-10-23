@@ -158,7 +158,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     edges, setEdges,
     onNodesChange,
     screenToFlowPosition,
-    selectedContentLayer, setSelectedContentLayer, layerOptions,
+    selectedContentLayer, setSelectedContentLayer, layerOptions, layerOrdering,
     rowSelectedLayer, setRowSelectedLayer,
     columnSelectedLayer, setColumnSelectedLayer,
     groupByLayers, setGroupByLayers,
@@ -188,6 +188,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
     const target = layerName.trim().toLowerCase();
     if (!target) return [];
 
+    const ordering = Array.isArray(layerOrdering?.[layerName])
+      ? layerOrdering[layerName]
+      : [];
+    const orderIndex = new Map(
+      ordering.map((id, index) => [id, index])
+    );
+
     const sourceRows = Array.isArray(flowFilteredRowData) && flowFilteredRowData.length > 0
       ? flowFilteredRowData
       : (rowData || []);
@@ -210,13 +217,19 @@ const App = ({ keepLayout, setKeepLayout }) => {
     });
 
     return Array.from(seen.values()).sort((a, b) => {
+      const aId = a.originalId != null ? a.originalId.toString() : '';
+      const bId = b.originalId != null ? b.originalId.toString() : '';
+      const idxA = orderIndex.has(aId) ? orderIndex.get(aId) : Number.POSITIVE_INFINITY;
+      const idxB = orderIndex.has(bId) ? orderIndex.get(bId) : Number.POSITIVE_INFINITY;
+      if (idxA !== idxB) return idxA - idxB;
+
       const labelA = (a.label || '').toLowerCase();
       const labelB = (b.label || '').toLowerCase();
       if (labelA < labelB) return -1;
       if (labelA > labelB) return 1;
       return 0;
     });
-  }, [flowFilteredRowData, normalizeTags, rowData]);
+  }, [flowFilteredRowData, layerOrdering, normalizeTags, rowData]);
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
