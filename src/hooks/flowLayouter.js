@@ -723,9 +723,9 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
     if (groups.size === 0) return layoutedNodes;
 
     const updated = new Map();
-    const baseHorizontalPadding = 48;
-    const baseVerticalPaddingTop = 72;
-    const baseVerticalPaddingBottom = 48;
+    const baseHorizontalPadding = 2;
+    const baseVerticalPaddingTop = 2;
+    const baseVerticalPaddingBottom = 2;
 
     groups.forEach(group => {
         const { nodes: groupNodes, minX, maxX, minY, maxY } = group;
