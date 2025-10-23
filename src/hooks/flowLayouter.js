@@ -22,6 +22,108 @@ function getNodeDimensions(node) {
     return { width, height };
 }
 
+const CELL_MARGIN = 24;
+
+function layoutNodesWithinCell(groupNodes, availMinX, availMaxX, availMinY, availMaxY) {
+    if (!Array.isArray(groupNodes) || groupNodes.length === 0) return null;
+    if (!Number.isFinite(availMinX) || !Number.isFinite(availMaxX) || !Number.isFinite(availMinY) || !Number.isFinite(availMaxY)) return null;
+
+    const availWidth = Math.max(0, availMaxX - availMinX);
+    const availHeight = Math.max(0, availMaxY - availMinY);
+    if (availWidth === 0 || availHeight === 0) return null;
+
+    const nodesData = groupNodes.map(node => {
+        const dims = getNodeDimensions(node);
+        return {
+            node,
+            width: Math.max(1, dims.width),
+            height: Math.max(1, dims.height),
+        };
+    });
+
+    const maxWidth = nodesData.reduce((acc, item) => Math.max(acc, item.width), 1);
+    const minWidth = nodesData.reduce((acc, item) => Math.min(acc, item.width), maxWidth);
+
+    const maxColumns = Math.min(
+        nodesData.length,
+        Math.max(1, Math.floor((availWidth + CELL_MARGIN) / (Math.max(1, minWidth) + CELL_MARGIN)))
+    );
+
+    let bestLayout = null;
+
+    for (let columns = maxColumns; columns >= 1; columns--) {
+        let columnWidth = (availWidth - CELL_MARGIN * (columns - 1)) / columns;
+        if (columnWidth <= 0) continue;
+        if (columnWidth < maxWidth && columns > 1) continue;
+
+        const rowHeights = [];
+        const totalRows = Math.ceil(nodesData.length / columns);
+        let totalHeight = 0;
+        for (let row = 0; row < totalRows; row++) {
+            const start = row * columns;
+            const end = Math.min(start + columns, nodesData.length);
+            let rowHeight = 0;
+            for (let i = start; i < end; i++) {
+                rowHeight = Math.max(rowHeight, nodesData[i].height);
+            }
+            rowHeights.push(rowHeight);
+            totalHeight += rowHeight;
+        }
+        const totalHeightWithGaps = totalHeight + CELL_MARGIN * Math.max(0, totalRows - 1);
+        const overflow = Math.max(0, totalHeightWithGaps - availHeight);
+
+        if (
+            !bestLayout ||
+            overflow < bestLayout.overflow ||
+            (overflow === bestLayout.overflow && columns > bestLayout.columns)
+        ) {
+            bestLayout = {
+                columns,
+                columnWidth,
+                rowHeights,
+                overflow,
+            };
+            if (overflow === 0) break;
+        }
+    }
+
+    if (!bestLayout) return null;
+
+    const { columns, columnWidth, rowHeights } = bestLayout;
+
+    const positions = new Map();
+    let index = 0;
+    let yCursor = availMinY;
+
+    for (let row = 0; row < rowHeights.length; row++) {
+        const rowHeight = rowHeights[row];
+        for (let col = 0; col < columns && index < nodesData.length; col++, index++) {
+            const data = nodesData[index];
+            const baseX = availMinX + col * (columnWidth + CELL_MARGIN);
+            const centeredX = baseX + Math.max(0, (columnWidth - data.width) / 2);
+            const clampedX = clamp(
+                centeredX,
+                availMinX,
+                Math.max(availMinX, availMaxX - data.width)
+            );
+
+            const centeredY = yCursor + Math.max(0, (rowHeight - data.height) / 2);
+            const clampedY = clamp(
+                centeredY,
+                availMinY,
+                Math.max(availMinY, availMaxY - data.height)
+            );
+
+            positions.set(data.node.id, { x: clampedX, y: clampedY });
+        }
+        if (row < rowHeights.length - 1) {
+            yCursor += rowHeight + CELL_MARGIN;
+        }
+    }
+
+    return positions;
+}
+
 function layoutSubset(nodes, edges, direction, nodesep, ranksep, nodeSizes = {}) {
     if (nodes.length === 0) return [];
 
@@ -638,6 +740,26 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
         const availMaxX = Math.max(rawMinX, rawMaxX);
         const availMinY = Math.min(rawMinY, rawMaxY);
         const availMaxY = Math.max(rawMinY, rawMaxY);
+
+        const layoutPositions = layoutNodesWithinCell(
+            groupNodes,
+            availMinX,
+            availMaxX,
+            availMinY,
+            availMaxY
+        );
+
+        if (layoutPositions && layoutPositions.size > 0) {
+            groupNodes.forEach(node => {
+                const position = layoutPositions.get(node.id);
+                if (!position) return;
+                updated.set(node.id, {
+                    ...node,
+                    position,
+                });
+            });
+            return;
+        }
 
         let currentMinX = Infinity;
         let currentMaxX = -Infinity;
