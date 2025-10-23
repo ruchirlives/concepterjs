@@ -10,6 +10,7 @@ const BASE_FONT_SIZE = 12;
 const BASE_LINE_HEIGHT = 17;
 const MARGIN = 32;
 const LABEL_BAND_SIZE = 64;
+const LABEL_TEXT_PADDING = 14;
 const LABEL_CELL_BORDER = "rgba(148,163,184,0.7)";
 
 const safeNumber = (value, fallback = 0) =>
@@ -117,7 +118,20 @@ const FlowSvgExporter = forwardRef(
         includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
       const hasRows = includeRows && rows.length > 0;
       const hasColumns = includeColumns && columns.length > 0;
-      const rowLabelThickness = hasRows ? LABEL_BAND_SIZE : 0;
+
+      let longestRowLabelWidth = 0;
+      if (hasRows) {
+        longestRowLabelWidth = rows.reduce((acc, row) => {
+          const label = (row?.label || "").toString().trim();
+          if (!label.length) return acc;
+          const approximateWidth = label.length * BASE_CHAR_WIDTH;
+          return Math.max(acc, approximateWidth);
+        }, 0);
+      }
+
+      const rowLabelThickness = hasRows
+        ? Math.max(LABEL_BAND_SIZE, longestRowLabelWidth + LABEL_TEXT_PADDING * 2)
+        : 0;
       const columnLabelThickness = hasColumns ? LABEL_BAND_SIZE : 0;
       const contentTranslateX = translateX + rowLabelThickness;
       const contentTranslateY = translateY + columnLabelThickness;
@@ -290,7 +304,7 @@ const FlowSvgExporter = forwardRef(
           );
           if (cell.label) {
             parts.push(
-              `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(cell.label)}</text>`
+              `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
             );
           }
         });
