@@ -19,13 +19,14 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
         setCurrentContainer(item);
         setIsOpen(false);
 
+        clearLayers({ resetOrdering: true });
+
         if (merge) {
             await importContainers(item);
         } else {
             await loadContainers(item);
         }
         setLastLoadedFile(item);
-        clearLayers({ resetOrdering: false });
 
         const channel = new BroadcastChannel('requestRefreshChannel');
         channel.postMessage({ type: "reload" });
