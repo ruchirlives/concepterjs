@@ -11,6 +11,16 @@ const BASE_LINE_HEIGHT = 17;
 const MARGIN = 32;
 const LABEL_BAND_SIZE = 64;
 const LABEL_TEXT_PADDING = 14;
+
+const ROW_COLOR_PALETTE = [
+  "#fef3c7",
+  "#e0f2fe",
+  "#ede9fe",
+  "#fce7f3",
+  "#dcfce7",
+  "#fee2e2",
+  "#f1f5f9",
+];
 const LABEL_CELL_BORDER = "rgba(148,163,184,0.7)";
 
 const safeNumber = (value, fallback = 0) =>
@@ -93,6 +103,28 @@ const measureLabel = (label = "") => {
   };
 };
 
+const simplifyOrthogonalPath = (points = []) => {
+  if (!Array.isArray(points)) return [];
+  const simplified = [];
+  points.forEach((point) => {
+    if (!point) return;
+    const { x, y } = point;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const last = simplified[simplified.length - 1];
+    if (last && last.x === x && last.y === y) return;
+    simplified.push({ x, y });
+    if (simplified.length >= 3) {
+      const a = simplified[simplified.length - 3];
+      const b = simplified[simplified.length - 2];
+      const c = simplified[simplified.length - 1];
+      if ((a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y)) {
+        simplified.splice(simplified.length - 2, 1);
+      }
+    }
+  });
+  return simplified;
+};
+
 const FlowSvgExporter = forwardRef(
   (
     {
@@ -155,6 +187,8 @@ const FlowSvgExporter = forwardRef(
 
       const rowLabelCells = [];
       const columnLabelCells = [];
+      // const rowColorEntries = [];
+      const rowColorEntries = [];
 
       if (hasRows) {
         rows.forEach((row) => {
@@ -182,6 +216,18 @@ const FlowSvgExporter = forwardRef(
             height,
             label: row?.label || "",
           });
+
+          const rawTop = safeNumber(row?.top);
+          const rawBottom = safeNumber(row?.bottom);
+          if (Number.isFinite(rawTop) && Number.isFinite(rawBottom)) {
+            const color =
+              ROW_COLOR_PALETTE[rowColorEntries.length % ROW_COLOR_PALETTE.length];
+            rowColorEntries.push({
+              top: rawTop,
+              bottom: rawBottom,
+              color,
+            });
+          }
         });
       }
 
@@ -241,6 +287,20 @@ const FlowSvgExporter = forwardRef(
         const height = heightUnits * zoom;
         const centerX = x + width / 2;
         const centerY = y + height / 2;
+        const flowCenterY = baseY + heightUnits / 2;
+        let nodeFill = "#ffffff";
+        for (let i = 0; i < rowColorEntries.length; i += 1) {
+          const entry = rowColorEntries[i];
+          if (
+            Number.isFinite(entry.top) &&
+            Number.isFinite(entry.bottom) &&
+            flowCenterY >= entry.top &&
+            flowCenterY <= entry.bottom
+          ) {
+            nodeFill = entry.color;
+            break;
+          }
+        }
         shapes.push({
           type: "node",
           x,
@@ -248,32 +308,119 @@ const FlowSvgExporter = forwardRef(
           width,
           height,
           lines: layout.lines,
+          fill: nodeFill,
         });
         registerBounds(x, y, width, height);
         nodeRenderMap.set(node.id, { x, y, width, height, centerX, centerY });
       });
 
-      const nodeCenter = (nodeId) => {
-        const metrics = nodeRenderMap.get(nodeId);
-        if (!metrics) return null;
-        return { x: metrics.centerX, y: metrics.centerY };
-      };
+      const edgeGroupCounts = new Map();
+      (edges || []).forEach((edge) => {
+        if (!edge?.source || !edge?.target) return;
+        const key = `${edge.source}||${edge.target}`;
+        edgeGroupCounts.set(key, (edgeGroupCounts.get(key) || 0) + 1);
+      });
+      const edgeGroupIndex = new Map();
 
       edges.forEach((edge) => {
-        const source = nodeCenter(edge?.source);
-        const target = nodeCenter(edge?.target);
-        if (!source || !target) return;
-        const minEdgeX = Math.min(source.x, target.x);
-        const minEdgeY = Math.min(source.y, target.y);
-        const maxEdgeX = Math.max(source.x, target.x);
-        const maxEdgeY = Math.max(source.y, target.y);
+        const sourceRect = nodeRenderMap.get(edge?.source);
+        const targetRect = nodeRenderMap.get(edge?.target);
+        if (!sourceRect || !targetRect) return;
+        if (edge?.source === edge?.target) return;
+
+        const key = `${edge.source}||${edge.target}`;
+        const currentIndex = edgeGroupIndex.get(key) || 0;
+        edgeGroupIndex.set(key, currentIndex + 1);
+        const totalInGroup = edgeGroupCounts.get(key) || 1;
+        const centeredIndex = totalInGroup > 1 ? currentIndex - (totalInGroup - 1) / 2 : 0;
+        const offsetSpacing = 28;
+        const maxOffset = 120;
+        let perpendicularOffset = centeredIndex * offsetSpacing;
+        perpendicularOffset = Math.max(-maxOffset, Math.min(maxOffset, perpendicularOffset));
+
+        const sourceCenterX = sourceRect.x + sourceRect.width / 2;
+        const sourceCenterY = sourceRect.y + sourceRect.height / 2;
+        const targetCenterX = targetRect.x + targetRect.width / 2;
+        const targetCenterY = targetRect.y + targetRect.height / 2;
+        const dx = targetCenterX - sourceCenterX;
+        const dy = targetCenterY - sourceCenterY;
+
+        const dominantHorizontal = Math.abs(dx) >= Math.abs(dy);
+        const points = [];
+        const elbowPaddingMax = 36;
+        const arrowGuard = 18;
+
+        if (dominantHorizontal) {
+          const direction = dx >= 0 ? 1 : -1;
+          const start = {
+            x: direction >= 0 ? sourceRect.x + sourceRect.width : sourceRect.x,
+            y: sourceCenterY,
+          };
+          const end = {
+            x: direction >= 0 ? targetRect.x : targetRect.x + targetRect.width,
+            y: targetCenterY,
+          };
+          const horizontalDistance = Math.max(0, Math.abs(end.x - start.x));
+          const elbowLimit = Math.max(0, horizontalDistance / 2 - 6);
+          const elbowPadding = Math.min(elbowPaddingMax, elbowLimit, Math.max(0, horizontalDistance / 3));
+          const firstX = start.x + direction * elbowPadding;
+          const lastX = end.x - direction * elbowPadding;
+          const bendY = start.y + perpendicularOffset;
+          const verticalSign = perpendicularOffset !== 0 ? Math.sign(perpendicularOffset) : (dy === 0 ? 1 : Math.sign(dy));
+          const approachBendY = bendY === start.y ? bendY + verticalSign * arrowGuard : bendY;
+          points.push(
+            start,
+            { x: firstX, y: start.y },
+            { x: firstX, y: approachBendY },
+            { x: lastX, y: approachBendY },
+            { x: lastX, y: end.y },
+            end
+          );
+        } else {
+          const direction = dy >= 0 ? 1 : -1;
+          const start = {
+            x: sourceCenterX,
+            y: direction >= 0 ? sourceRect.y + sourceRect.height : sourceRect.y,
+          };
+          const end = {
+            x: targetCenterX,
+            y: direction >= 0 ? targetRect.y : targetRect.y + targetRect.height,
+          };
+          const verticalDistance = Math.max(0, Math.abs(end.y - start.y));
+          const elbowLimit = Math.max(0, verticalDistance / 2 - 6);
+          const elbowPadding = Math.min(elbowPaddingMax, elbowLimit, Math.max(0, verticalDistance / 3));
+          const firstY = start.y + direction * elbowPadding;
+          const lastY = end.y - direction * elbowPadding;
+          const bendX = start.x + perpendicularOffset;
+          const horizontalSign = perpendicularOffset !== 0 ? Math.sign(perpendicularOffset) : (dx === 0 ? 1 : Math.sign(dx));
+          const approachBendX = bendX === start.x ? bendX + horizontalSign * arrowGuard : bendX;
+          points.push(
+            start,
+            { x: start.x, y: firstY },
+            { x: approachBendX, y: firstY },
+            { x: approachBendX, y: lastY },
+            { x: end.x, y: lastY },
+            end
+          );
+        }
+
+        // const xs = points.map((pt) => pt.x);
+        // const ys = points.map((pt) => pt.y);
+        // const minEdgeX = Math.min(...xs);
+        // const maxEdgeX = Math.max(...xs);
+        // const minEdgeY = Math.min(...ys);
+        // const maxEdgeY = Math.max(...ys);
+        const simplifiedPoints = simplifyOrthogonalPath(points);
+        if (simplifiedPoints.length < 2) return;
+        const xs = simplifiedPoints.map((pt) => pt.x);
+        const ys = simplifiedPoints.map((pt) => pt.y);
+        const minEdgeX = Math.min(...xs);
+        const maxEdgeX = Math.max(...xs);
+        const minEdgeY = Math.min(...ys);
+        const maxEdgeY = Math.max(...ys);
         registerBounds(minEdgeX, minEdgeY, maxEdgeX - minEdgeX, maxEdgeY - minEdgeY);
-        edgesOutput.push({
-          x1: source.x,
-          y1: source.y,
-          x2: target.x,
-          y2: target.y,
-        });
+
+        edgesOutput.push({ points: simplifiedPoints });
       });
 
       if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -294,6 +441,13 @@ const FlowSvgExporter = forwardRef(
         `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" font-family="Inter, Arial, sans-serif" font-size="12" fill="#0f172a">`,
         `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="#f8fafc" />`,
       ];
+      parts.push(
+        `<defs>
+          <marker id="flowSvgArrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 6 3 L 0 6 z" fill="#334155" />
+          </marker>
+        </defs>`
+      );
 
       if (hasRows) {
         rowLabelCells.forEach((cell) => {
@@ -362,8 +516,11 @@ const FlowSvgExporter = forwardRef(
         });
 
       edgesOutput.forEach((edge) => {
+        const pathData = edge.points
+          .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x + offsetX} ${pt.y + offsetY}`)
+          .join(" ");
         parts.push(
-          `<line x1="${edge.x1 + offsetX}" y1="${edge.y1 + offsetY}" x2="${edge.x2 + offsetX}" y2="${edge.y2 + offsetY}" stroke="#334155" stroke-width="2" stroke-linecap="round" />`
+          `<path d="${pathData}" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round" marker-end="url(#flowSvgArrow)" />`
         );
       });
 
@@ -383,8 +540,9 @@ const FlowSvgExporter = forwardRef(
           const lines = Array.isArray(node.lines) && node.lines.length
             ? node.lines
             : [""];
+          const fillColor = node.fill || "#ffffff";
           parts.push(
-            `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="#ffffff" stroke="#1e293b" stroke-width="${strokeWidth}" />`
+            `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="#1e293b" stroke-width="${strokeWidth}" />`
           );
           let textContent = `<text x="${textX}" y="${firstLineY}" fill="#0f172a" font-size="${fontSize}" dominant-baseline="hanging">`;
           lines.forEach((line, index) => {
