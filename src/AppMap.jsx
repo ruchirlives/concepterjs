@@ -4,7 +4,7 @@ import InfiniteCanvas from "ef-infinite-canvas";
 import { useNodes } from "./hooks/useMapNodes";
 import { useBackdropMap } from "./hooks/useBackdropMap";
 
-export default function AppMap() {
+export default function AppMap({ isActive = true }) {
   const canvasRef = useRef(null);
   const infiniteCanvasRef = useRef(null);
   const redrawRef = useRef(() => {});
@@ -111,7 +111,19 @@ export default function AppMap() {
       )}
       <div style={{ width: "100vw", height: "100vh", overflow: "hidden", position: "relative" }}>
         {/* Integrated container for Headings tab and canvas */}
-        <div style={{ position: "absolute", top: 0, right: 0, width: 340, height: "100%", zIndex: 20, display: "flex", flexDirection: "column", pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: 340,
+            height: "100%",
+            zIndex: 20,
+            display: isActive ? "flex" : "none",
+            flexDirection: "column",
+            pointerEvents: "none",
+          }}
+        >
           <div style={{ margin: 10, pointerEvents: "auto" }}>
             <div style={{ display: "flex", background: "#f7f7f7", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", border: "1px solid #e0e0e0" }}>
               <div style={{ padding: "8px 16px", fontWeight: 600, fontSize: 15, borderBottom: "2px solid #0078d4", borderRadius: "8px 8px 0 0", background: "#fff" }}>
