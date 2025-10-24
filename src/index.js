@@ -203,7 +203,7 @@ const App = () => {
             className="h-[600px]"
           >
             <Suspense fallback={<div className="p-4">Loading map...</div>}>
-              <AppMap />
+              <AppMap isActive={activeTab === 'map'} />
             </Suspense>
           </div>
           {/* Persistently mounted Grid */}
