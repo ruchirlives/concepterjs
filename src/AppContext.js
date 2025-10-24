@@ -291,6 +291,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (!Array.isArray(rowData)) return;
+    if (rowData.length === 0) return;
     setLayerOrdering((prev) => {
       const layerToIds = {};
       rowData.forEach((row) => {
