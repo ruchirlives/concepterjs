@@ -221,6 +221,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     const mapping = {
+      rowData: setRowData,
       activeLayers: setActiveLayers,
       activeState: setActiveState,
       availableStates: setAvailableStates,
@@ -280,6 +281,7 @@ export const AppProvider = ({ children }) => {
     setLoading,
     setLoadingDifferences,
     setRawDifferences,
+    setRowData,
     setRowSelectedLayer,
     setSelectedContentLayer,
     setSelectedFromLayer,

@@ -704,6 +704,10 @@ export const deleteProject = async (item) => {
 export const loadContainers = async (item) => {
     console.log("Loading containers for item:", item);
     try {
+        const clearRowData = getStateSetter("rowData");
+        if (typeof clearRowData === "function") {
+            clearRowData([]);
+        }
         const loadResponse = await apiClient.post(`${getApiUrl()}/load_containers`, {
             project_name: item,
         });
