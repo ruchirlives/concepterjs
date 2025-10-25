@@ -699,6 +699,28 @@ const App = ({ keepLayout, setKeepLayout }) => {
     const rowChanged = Boolean(showRowGrid && nextRowId && nextRowId !== prevRowId);
     const columnChanged = Boolean(showColumnGrid && nextColumnId && nextColumnId !== prevColumnId);
 
+    console.debug('[AppFlow] handleGridDrop evaluation', {
+      childId,
+      flowPoint,
+      pointer: pointer ? { x: pointer.x, y: pointer.y } : null,
+      row: rowSegment ? {
+        id: rowSegment.id,
+        originalId: rowSegment.originalId,
+        nodeId: rowSegment.nodeId,
+      } : null,
+      column: columnSegment ? {
+        id: columnSegment.id,
+        originalId: columnSegment.originalId,
+        nodeId: columnSegment.nodeId,
+      } : null,
+      prevRowId,
+      prevColumnId,
+      nextRowId,
+      nextColumnId,
+      rowChanged,
+      columnChanged,
+    });
+
     if (!rowChanged && !columnChanged) return;
 
     const parseId = (value) => {
@@ -722,15 +744,31 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     try {
       if (rowChanged && prevRowId) {
+        console.debug('[AppFlow] Removing child from previous row parent', {
+          parentId: prevRowId,
+          childId,
+        });
         await removeChildren(prevRowId, [childId]);
       }
       if (columnChanged && prevColumnId) {
+        console.debug('[AppFlow] Removing child from previous column parent', {
+          parentId: prevColumnId,
+          childId,
+        });
         await removeChildren(prevColumnId, [childId]);
       }
       if (rowChanged && nextRowId) {
+        console.debug('[AppFlow] Adding child to next row parent', {
+          parentId: nextRowId,
+          childId,
+        });
         await addChildren(nextRowId, [childId]);
       }
       if (columnChanged && nextColumnId) {
+        console.debug('[AppFlow] Adding child to next column parent', {
+          parentId: nextColumnId,
+          childId,
+        });
         await addChildren(nextColumnId, [childId]);
       }
 
