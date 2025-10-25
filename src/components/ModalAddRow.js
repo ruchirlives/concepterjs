@@ -89,7 +89,7 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
       isOpen={isOpen}
       onRequestClose={onClose}
       contentLabel="Add Row"
-      className="bg-white w-full max-w-md h-[40rem] overflow-auto p-6 rounded-lg shadow-lg outline-none" // Increased height to h-[40rem]
+      className="bg-white text-gray-900 w-full max-w-md h-[40rem] overflow-auto p-6 rounded-lg shadow-lg outline-none" // Increased height to h-[40rem]
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50"
     >
       <div className="mb-4">
@@ -121,7 +121,7 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
         </button>
         <button
           onClick={onClose}
-          className="ml-2 px-3 py-1 bg-gray-300 hover:bg-gray-400 text-sm font-medium rounded"
+          className="ml-2 px-3 py-1 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-medium rounded"
         >
           Cancel
         </button>
