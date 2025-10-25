@@ -19,12 +19,13 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { saveNodes, addChildren } from './api';
+import { saveNodes, addChildren, removeChildren } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
 import FlowSvgExporter from './components/FlowSvgExporter';
 import { requestRefreshChannel } from './hooks/effectsShared';
+import { useAppContext } from './AppContext';
 
 const PRECISION_FACTOR = 1000;
 
@@ -228,6 +229,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setFlowGridDimensions,
     layerOrdering,
   } = useFlowLogic();
+
+  const { setParentChildMap } = useAppContext();
 
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
@@ -641,6 +644,192 @@ const App = ({ keepLayout, setKeepLayout }) => {
     updateGridDimensions();
   }, [updateGridDimensions, updateViewportTransform]);
 
+  const handleGridDrop = useCallback(async (event, node) => {
+    if (!node) return;
+    if (!showRowGrid && !showColumnGrid) return;
+    if (!screenToFlowPosition) return;
+
+    const grid = flowGridDimensions || {};
+    const pointer = (event && typeof event.clientX === 'number' && typeof event.clientY === 'number')
+      ? screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      : null;
+
+    const fallbackPoint = node?.position || node?.positionAbsolute || null;
+    const flowPoint = pointer || fallbackPoint;
+    if (!flowPoint) return;
+
+    const extractParentId = (segment) => {
+      if (!segment) return null;
+      const candidate = segment.originalId ?? segment.nodeId ?? null;
+      return candidate != null ? candidate.toString() : null;
+    };
+
+    const segmentsByAxis = (axis) => {
+      if (axis === 'row') {
+        if (Array.isArray(gridRows) && gridRows.length > 0) return gridRows;
+        return Array.isArray(grid.rows) ? grid.rows : [];
+      }
+      if (Array.isArray(gridColumns) && gridColumns.length > 0) return gridColumns;
+      return Array.isArray(grid.columns) ? grid.columns : [];
+    };
+
+    const locateSegment = (segments, axis) => segments.find((segment) => {
+      if (!segment) return false;
+      return axis === 'row'
+        ? flowPoint.y >= segment.top && flowPoint.y <= segment.bottom
+        : flowPoint.x >= segment.left && flowPoint.x <= segment.right;
+    });
+
+    const rowSegment = showRowGrid ? locateSegment(segmentsByAxis('row'), 'row') : null;
+    const columnSegment = showColumnGrid ? locateSegment(segmentsByAxis('column'), 'column') : null;
+
+    const rawChildId = node?.data?.originalId ?? node?.data?.id ?? node?.id;
+    if (rawChildId == null) return;
+    const childId = rawChildId.toString().split('__in__')[0];
+    if (!childId) return;
+
+    const nextRowId = showRowGrid ? extractParentId(rowSegment) : null;
+    const nextColumnId = showColumnGrid ? extractParentId(columnSegment) : null;
+
+    const previousAssignment = node?.data?.gridAssignment ?? node?.gridAssignment ?? {};
+    const normalizeId = (value) => (value != null ? value.toString() : null);
+    const prevRowId = normalizeId(previousAssignment?.rowId ?? (Array.isArray(previousAssignment?.rowIds) ? previousAssignment.rowIds[0] : null));
+    const prevColumnId = normalizeId(previousAssignment?.columnId ?? (Array.isArray(previousAssignment?.columnIds) ? previousAssignment.columnIds[0] : null));
+
+    const rowChanged = Boolean(showRowGrid && nextRowId && nextRowId !== prevRowId);
+    const columnChanged = Boolean(showColumnGrid && nextColumnId && nextColumnId !== prevColumnId);
+
+    if (!rowChanged && !columnChanged) return;
+
+    const parseId = (value) => {
+      if (value == null) return value;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : value;
+    };
+
+    const applyAssignmentUpdates = (assignment) => {
+      const next = { ...(assignment || {}) };
+      if (rowChanged) {
+        next.rowId = nextRowId || null;
+        next.rowIds = nextRowId ? [nextRowId] : [];
+      }
+      if (columnChanged) {
+        next.columnId = nextColumnId || null;
+        next.columnIds = nextColumnId ? [nextColumnId] : [];
+      }
+      return next;
+    };
+
+    try {
+      if (rowChanged && prevRowId) {
+        await removeChildren(prevRowId, [childId]);
+      }
+      if (columnChanged && prevColumnId) {
+        await removeChildren(prevColumnId, [childId]);
+      }
+      if (rowChanged && nextRowId) {
+        await addChildren(nextRowId, [childId]);
+      }
+      if (columnChanged && nextColumnId) {
+        await addChildren(nextColumnId, [childId]);
+      }
+
+      setNodes((existingNodes) => existingNodes.map((existing) => {
+        const candidateId = existing?.data?.originalId ?? existing?.data?.id ?? existing?.id;
+        const normalizedCandidate = candidateId != null ? candidateId.toString().split('__in__')[0] : null;
+        if (normalizedCandidate !== childId) {
+          return existing;
+        }
+        const nextAssignment = applyAssignmentUpdates(existing?.data?.gridAssignment ?? existing?.gridAssignment);
+        return {
+          ...existing,
+          gridAssignment: applyAssignmentUpdates(existing?.gridAssignment),
+          data: {
+            ...existing.data,
+            gridAssignment: nextAssignment,
+          },
+        };
+      }));
+
+      setParentChildMap((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        let mutated = false;
+        const ensureArray = (value) => (Array.isArray(value) ? value : []);
+        const comparable = (value) => (value != null ? value.toString() : null);
+
+        const removeFromParent = (entries, parentId) => entries.map((entry) => {
+          if (!entry) return entry;
+          if (comparable(entry.container_id) !== parentId) return entry;
+          const children = ensureArray(entry.children);
+          const filtered = children.filter((child) => comparable(child?.id) !== childId);
+          if (filtered.length === children.length) return entry;
+          mutated = true;
+          return { ...entry, children: filtered };
+        });
+
+        let nextMap = prev;
+        if (rowChanged && prevRowId) {
+          nextMap = removeFromParent(nextMap, prevRowId);
+        }
+        if (columnChanged && prevColumnId) {
+          nextMap = removeFromParent(nextMap, prevColumnId);
+        }
+
+        const addToParent = (entries, parentId) => {
+          if (!parentId) return entries;
+          const parentKey = parentId.toString();
+          let index = entries.findIndex((entry) => comparable(entry?.container_id) === parentKey);
+          let working = entries;
+          if (index === -1) {
+            const containerValue = parseId(parentId);
+            working = [...working, { container_id: containerValue, children: [] }];
+            index = working.length - 1;
+            mutated = true;
+          }
+          const entry = working[index];
+          const children = ensureArray(entry.children);
+          if (children.some((child) => comparable(child?.id) === childId)) {
+            return working;
+          }
+          const childValue = parseId(childId);
+          const updatedEntry = {
+            ...entry,
+            children: [...children, { id: childValue, label: 'child' }],
+          };
+          const copy = [...working];
+          copy[index] = updatedEntry;
+          mutated = true;
+          return copy;
+        };
+
+        if (rowChanged && nextRowId) {
+          nextMap = addToParent(nextMap, nextRowId);
+        }
+        if (columnChanged && nextColumnId) {
+          nextMap = addToParent(nextMap, nextColumnId);
+        }
+
+        return mutated ? nextMap : prev;
+      });
+
+      requestRefreshChannel();
+    } catch (error) {
+      console.error('Failed to update grid assignment on drop', error);
+      toast.error('Failed to move item to the selected grid cell.');
+    }
+  }, [
+    addChildren,
+    flowGridDimensions,
+    gridColumns,
+    gridRows,
+    removeChildren,
+    screenToFlowPosition,
+    setNodes,
+    setParentChildMap,
+    showColumnGrid,
+    showRowGrid,
+  ]);
+
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
     customEdge: (edgeProps) => (
@@ -676,6 +865,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   // Update persisted layout for the specific node when a drag stops
   const onNodeDragStop = useCallback((evt, node) => {
     setDragging(false);
+    handleGridDrop(evt, node);
     if (!keepLayout || !node) return;
     setLayoutPositions(prev => ({
       ...(prev || {}),
@@ -687,7 +877,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           : {}),
       },
     }));
-  }, [keepLayout, setLayoutPositions]);
+  }, [handleGridDrop, keepLayout, setLayoutPositions]);
 
   const onNodeDragStart = useCallback(() => {
     setDragging(true);
