@@ -145,11 +145,54 @@ const FlowSvgExporter = forwardRef(
 
       const boundsWidth = safeNumber(grid?.bounds?.width, 0);
       const boundsHeight = safeNumber(grid?.bounds?.height, 0);
-      const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
-      const columns =
-        includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
-      const hasRows = includeRows && rows.length > 0;
-      const hasColumns = includeColumns && columns.length > 0;
+      const rawRows = Array.isArray(grid?.rows) ? grid.rows : [];
+      const rawColumns = Array.isArray(grid?.columns) ? grid.columns : [];
+      const rows = includeRows ? rawRows : [];
+      const columns = includeColumns ? rawColumns : [];
+      const hasRows = rows.length > 0;
+      const hasColumns = columns.length > 0;
+
+      const resolveCellOption = (value) =>
+        Number.isFinite(value) && value > 0 ? value : null;
+      const optionWidth = resolveCellOption(grid?.cellOptions?.width);
+      const optionHeight = resolveCellOption(grid?.cellOptions?.height);
+      const optionAdjustedWidth = resolveCellOption(
+        grid?.cellOptions?.adjustedWidth
+      );
+      const optionAdjustedHeight = resolveCellOption(
+        grid?.cellOptions?.adjustedHeight
+      );
+      const effectiveCellWidth = optionAdjustedWidth ?? optionWidth;
+      const effectiveCellHeight = optionAdjustedHeight ?? optionHeight;
+
+      const ensurePositive = (value) =>
+        Number.isFinite(value) && value > 0 ? value : null;
+
+      const resolvedBoundsWidth = (() => {
+        const columnCount = rawColumns.length;
+        if (columnCount > 0) {
+          if (ensurePositive(effectiveCellWidth)) {
+            return effectiveCellWidth * columnCount;
+          }
+          const lastColumn = rawColumns[columnCount - 1];
+          const span = ensurePositive(safeNumber(lastColumn?.right, null));
+          if (span != null) return span;
+        }
+        return ensurePositive(boundsWidth) ?? 0;
+      })();
+
+      const resolvedBoundsHeight = (() => {
+        const rowCount = rawRows.length;
+        if (rowCount > 0) {
+          if (ensurePositive(effectiveCellHeight)) {
+            return effectiveCellHeight * rowCount;
+          }
+          const lastRow = rawRows[rowCount - 1];
+          const span = ensurePositive(safeNumber(lastRow?.bottom, null));
+          if (span != null) return span;
+        }
+        return ensurePositive(boundsHeight) ?? 0;
+      })();
 
       let longestRowLabelWidth = 0;
       if (hasRows) {
@@ -194,7 +237,7 @@ const FlowSvgExporter = forwardRef(
         rows.forEach((row) => {
           const height = safeNumber(row?.height) * zoom;
           const contentTop = safeNumber(row?.top) * zoom + contentTranslateY;
-          const rectWidth = boundsWidth * zoom;
+          const rectWidth = resolvedBoundsWidth * zoom;
           const x = contentTranslateX;
           shapes.push({
             type: "row",
@@ -235,7 +278,7 @@ const FlowSvgExporter = forwardRef(
         columns.forEach((column) => {
           const width = safeNumber(column?.width) * zoom;
           const contentLeft = safeNumber(column?.left) * zoom + contentTranslateX;
-          const rectHeight = boundsHeight * zoom;
+          const rectHeight = resolvedBoundsHeight * zoom;
           const y = contentTranslateY;
           shapes.push({
             type: "column",
@@ -426,8 +469,8 @@ const FlowSvgExporter = forwardRef(
       if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
         minX = 0;
         minY = 0;
-        maxX = boundsWidth || 0;
-        maxY = boundsHeight || 0;
+        maxX = resolvedBoundsWidth || 0;
+        maxY = resolvedBoundsHeight || 0;
       }
 
       const width = Math.max(1, maxX - minX);

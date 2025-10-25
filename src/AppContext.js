@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates, manyChildren, getInfluencers as fetchInfluencers } from './api';
@@ -50,22 +50,170 @@ export const AppProvider = ({ children }) => {
   const [rowSelectedLayer, setRowSelectedLayer] = useState('');
   const [columnSelectedLayer, setColumnSelectedLayer] = useState('');
 
-  // Flow grid overlay dimensions
-  const [flowGridDimensions, setFlowGridDimensions] = useState({
-    rows: [],
-    columns: [],
-    bounds: { width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 },
-    lookup: {
+  const defaultFlowGridBounds = useMemo(
+    () => ({ width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 }),
+    []
+  );
+
+  const createDefaultFlowGridLookup = useCallback(
+    () => ({
       rowsByOriginalId: {},
       rowsByNodeId: {},
       columnsByOriginalId: {},
       columnsByNodeId: {},
-    },
-    cellOptions: {
-      width: null,
-      height: null,
-    },
-  });
+    }),
+    []
+  );
+
+  const createDefaultFlowGridDimensions = useCallback(
+    () => ({
+      rows: [],
+      columns: [],
+      bounds: { ...defaultFlowGridBounds },
+      lookup: createDefaultFlowGridLookup(),
+      cellOptions: {
+        width: null,
+        height: null,
+        adjustedWidth: null,
+        adjustedHeight: null,
+      },
+    }),
+    [createDefaultFlowGridLookup, defaultFlowGridBounds]
+  );
+
+  const numericClose = useCallback((a, b) => {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return Math.abs(a - b) <= 0.001;
+  }, []);
+
+  const cellOptionsEqual = useCallback((a = {}, b = {}) => (
+    numericClose(a?.width ?? null, b?.width ?? null)
+    && numericClose(a?.height ?? null, b?.height ?? null)
+    && numericClose(a?.adjustedWidth ?? null, b?.adjustedWidth ?? null)
+    && numericClose(a?.adjustedHeight ?? null, b?.adjustedHeight ?? null)
+  ), [numericClose]);
+
+  const boundsEqual = useCallback((a = {}, b = {}) => {
+    const keys = ['width', 'height', 'top', 'left', 'clientTop', 'clientLeft'];
+    return keys.every((key) => numericClose(a?.[key] ?? 0, b?.[key] ?? 0));
+  }, [numericClose]);
+
+  const shallowArrayEqual = useCallback((a = [], b = []) => {
+    if (a === b) return true;
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }, []);
+
+  const shallowObjectEqual = useCallback((a = {}, b = {}) => {
+    if (a === b) return true;
+    const keysA = Object.keys(a || {});
+    const keysB = Object.keys(b || {});
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (a[key] !== b[key]) return false;
+    }
+    return true;
+  }, []);
+
+  const lookupEqual = useCallback((a = {}, b = {}) => {
+    const keys = ['rowsByOriginalId', 'rowsByNodeId', 'columnsByOriginalId', 'columnsByNodeId'];
+    return keys.every((key) => shallowObjectEqual(a?.[key] || {}, b?.[key] || {}));
+  }, [shallowObjectEqual]);
+
+  const flowGridStatesEqual = useCallback((a, b) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return (
+      shallowArrayEqual(a.rows, b.rows)
+      && shallowArrayEqual(a.columns, b.columns)
+      && boundsEqual(a.bounds, b.bounds)
+      && cellOptionsEqual(a.cellOptions, b.cellOptions)
+      && lookupEqual(a.lookup, b.lookup)
+    );
+  }, [boundsEqual, cellOptionsEqual, lookupEqual, shallowArrayEqual]);
+
+  const normalizeFlowGridDimensions = useCallback((value) => {
+    if (!value || typeof value !== 'object') {
+      return createDefaultFlowGridDimensions();
+    }
+
+    const {
+      rows,
+      columns,
+      bounds,
+      lookup,
+      cellOptions,
+      ...rest
+    } = value;
+
+    const normalizeBounds = (source = {}) => ({
+      width: Number.isFinite(source.width) ? source.width : 0,
+      height: Number.isFinite(source.height) ? source.height : 0,
+      top: Number.isFinite(source.top) ? source.top : 0,
+      left: Number.isFinite(source.left) ? source.left : 0,
+      clientTop: Number.isFinite(source.clientTop) ? source.clientTop : 0,
+      clientLeft: Number.isFinite(source.clientLeft) ? source.clientLeft : 0,
+    });
+
+    const normalizeLookupBranch = (branch) => (
+      branch && typeof branch === 'object' ? branch : {}
+    );
+
+    const normalizedCellOptions = (() => {
+      const raw = cellOptions && typeof cellOptions === 'object' ? cellOptions : {};
+      const width = Number.isFinite(raw.width) ? raw.width : null;
+      const height = Number.isFinite(raw.height) ? raw.height : null;
+      const adjustedWidth = Number.isFinite(raw.adjustedWidth)
+        ? raw.adjustedWidth
+        : width;
+      const adjustedHeight = Number.isFinite(raw.adjustedHeight)
+        ? raw.adjustedHeight
+        : height;
+
+      return {
+        width,
+        height,
+        adjustedWidth: adjustedWidth ?? null,
+        adjustedHeight: adjustedHeight ?? null,
+      };
+    })();
+
+    return {
+      ...rest,
+      rows: Array.isArray(rows) ? rows : [],
+      columns: Array.isArray(columns) ? columns : [],
+      bounds: normalizeBounds(bounds),
+      lookup: {
+        rowsByOriginalId: { ...normalizeLookupBranch(lookup?.rowsByOriginalId) },
+        rowsByNodeId: { ...normalizeLookupBranch(lookup?.rowsByNodeId) },
+        columnsByOriginalId: { ...normalizeLookupBranch(lookup?.columnsByOriginalId) },
+        columnsByNodeId: { ...normalizeLookupBranch(lookup?.columnsByNodeId) },
+      },
+      cellOptions: normalizedCellOptions,
+    };
+  }, [createDefaultFlowGridDimensions]);
+
+  const [flowGridDimensionsState, setFlowGridDimensionsState] = useState(() => createDefaultFlowGridDimensions());
+
+  const setFlowGridDimensions = useCallback((valueOrUpdater) => {
+    setFlowGridDimensionsState((prev) => {
+      const nextRaw = typeof valueOrUpdater === 'function'
+        ? valueOrUpdater(prev)
+        : valueOrUpdater;
+
+      if (nextRaw == null) return prev;
+
+      const normalized = normalizeFlowGridDimensions(nextRaw);
+      return flowGridStatesEqual(prev, normalized) ? prev : normalized;
+    });
+  }, [flowGridStatesEqual, normalizeFlowGridDimensions]);
+
+  const flowGridDimensions = flowGridDimensionsState;
 
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);

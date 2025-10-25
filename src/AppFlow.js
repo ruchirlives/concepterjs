@@ -133,7 +133,39 @@ const dimensionEqual = (a, b) => {
 const cellOptionsEqual = (a = {}, b = {}) => (
   dimensionEqual(Number.isFinite(a.width) ? a.width : null, Number.isFinite(b.width) ? b.width : null)
   && dimensionEqual(Number.isFinite(a.height) ? a.height : null, Number.isFinite(b.height) ? b.height : null)
+  && dimensionEqual(Number.isFinite(a.adjustedWidth) ? a.adjustedWidth : null, Number.isFinite(b.adjustedWidth) ? b.adjustedWidth : null)
+  && dimensionEqual(Number.isFinite(a.adjustedHeight) ? a.adjustedHeight : null, Number.isFinite(b.adjustedHeight) ? b.adjustedHeight : null)
 );
+
+const computeAdjustedDimension = (segments = [], fallbackTotal = null, explicitValue = null, axis = 'column') => {
+  const values = [];
+  const sizeKey = axis === 'row' ? 'height' : 'width';
+
+  if (Array.isArray(segments) && segments.length > 0) {
+    let sum = 0;
+    segments.forEach((segment) => {
+      const size = Number.isFinite(segment?.[sizeKey]) ? segment[sizeKey] : null;
+      if (Number.isFinite(size) && size > 0) {
+        sum += size;
+      }
+    });
+    if (sum > 0) {
+      values.push(clampToPrecision(sum / segments.length));
+    }
+    if (Number.isFinite(fallbackTotal) && fallbackTotal > 0) {
+      values.push(clampToPrecision(fallbackTotal / segments.length));
+    }
+  }
+
+  if (Number.isFinite(explicitValue) && explicitValue > 0) {
+    values.push(clampToPrecision(explicitValue));
+  }
+
+  if (values.length === 0) return null;
+
+  const adjusted = values.reduce((min, value) => Math.min(min, value), values[0]);
+  return adjusted > 0 ? adjusted : null;
+};
 
 const gridsEqual = (a, b) => {
   if (a === b) return true;
@@ -389,6 +421,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
         cellOptions: {
           width: cellWidth,
           height: cellHeight,
+          adjustedWidth: computeAdjustedDimension([], null, cellWidth, 'column'),
+          adjustedHeight: computeAdjustedDimension([], null, cellHeight, 'row'),
         },
       };
       setGridRows((prev) => (prev.length === 0 ? prev : []));
@@ -424,6 +458,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
       ? rowTotalSize
       : clampToPrecision(rect.height);
 
+    const adjustedColumnWidth = computeAdjustedDimension(columnSegments, rect.width, cellWidth, 'column');
+    const adjustedRowHeight = computeAdjustedDimension(rowSegments, rect.height, cellHeight, 'row');
+
     const nextGrid = {
       rows: rowSegments,
       columns: columnSegments,
@@ -439,6 +476,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
       cellOptions: {
         width: cellWidth,
         height: cellHeight,
+        adjustedWidth: adjustedColumnWidth,
+        adjustedHeight: adjustedRowHeight,
       },
     };
 
