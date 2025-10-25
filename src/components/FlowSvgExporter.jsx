@@ -11,6 +11,7 @@ const BASE_LINE_HEIGHT = 17;
 const MARGIN = 32;
 const LABEL_BAND_SIZE = 64;
 const LABEL_TEXT_PADDING = 14;
+const EDGE_ANCHOR_PADDING = 18;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -34,27 +35,91 @@ const escapeXml = (value = "") =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
-const wrapWords = (words, maxChars) => {
+const getMeasureContext = (() => {
+  let canvas = null;
+  let context = null;
+  return () => {
+    if (context) return context;
+    if (typeof document === "undefined") return null;
+    canvas = canvas || document.createElement("canvas");
+    context = canvas.getContext("2d");
+    if (context) {
+      context.font = `${BASE_FONT_SIZE}px Inter, Arial, sans-serif`;
+    }
+    return context;
+  };
+})();
+
+const measureLineWidth = (text = "") => {
+  const ctx = getMeasureContext();
+  if (ctx) {
+    ctx.font = `${BASE_FONT_SIZE}px Inter, Arial, sans-serif`;
+    return ctx.measureText(text).width;
+  }
+  return text.length * BASE_CHAR_WIDTH;
+};
+
+const splitLongWord = (word = "", maxWidth = 0) => {
+  if (!word.length) return [""];
+  if (!(maxWidth > 0)) return [word];
+  const segments = [];
+  let current = "";
+  for (const char of word) {
+    const candidate = `${current}${char}`;
+    if (measureLineWidth(candidate) <= maxWidth || !current.length) {
+      current = candidate;
+    } else {
+      segments.push(current);
+      current = char;
+    }
+  }
+  if (current.length) segments.push(current);
+  return segments.length > 0 ? segments : [word];
+};
+
+const wrapWords = (words, maxWidth) => {
   if (!Array.isArray(words) || words.length === 0) {
     return [""];
   }
-  const chunkSize = Math.max(1, maxChars);
+  if (!(maxWidth > 0)) {
+    return [words.join(" ")];
+  }
   const lines = [];
   let current = "";
   words.forEach((word) => {
-    const segment = current.length ? `${current} ${word}` : word;
-    if (segment.length <= chunkSize) {
-      current = segment;
-    } else {
-      if (current.length) lines.push(current);
-      if (word.length > chunkSize) {
-        const parts = word.match(new RegExp(`.{1,${chunkSize}}`, "g")) || [word];
-        lines.push(...parts.slice(0, -1));
-        current = parts.at(-1) || "";
-      } else {
-        current = word;
-      }
+    if (!word.length) return;
+    const tentative = current.length ? `${current} ${word}` : word;
+    if (measureLineWidth(tentative) <= maxWidth) {
+      current = tentative;
+      return;
     }
+
+    if (current.length) {
+      lines.push(current);
+      current = "";
+    }
+
+    if (measureLineWidth(word) <= maxWidth) {
+      current = word;
+      return;
+    }
+
+    const segments = splitLongWord(word, maxWidth);
+    segments.forEach((segment, index) => {
+      if (measureLineWidth(segment) <= maxWidth) {
+        if (index === segments.length - 1) {
+          current = segment;
+        } else {
+          lines.push(segment);
+        }
+      } else {
+        // Fallback to basic chunking if measurement fails to constrain width.
+        const fallbackSize = Math.max(1, Math.floor(maxWidth / BASE_CHAR_WIDTH));
+        const fallbackParts = segment.match(new RegExp(`.{1,${fallbackSize}}`, "g")) || [segment];
+        fallbackParts.slice(0, -1).forEach((part) => lines.push(part));
+        current = fallbackParts.at(-1) || "";
+      }
+    });
   });
   if (current.length) lines.push(current);
   return lines.length > 0 ? lines : [""];
@@ -71,25 +136,31 @@ const measureLabel = (label = "") => {
   }
 
   const words = text.split(/\s+/).filter(Boolean);
-  const longestWord = words.reduce((max, word) => Math.max(max, word.length), 0);
 
-  let width = Math.max(
-    MIN_NODE_WIDTH,
-    Math.min(MAX_NODE_WIDTH, text.length * BASE_CHAR_WIDTH + TEXT_PADDING_X)
-  );
-  width = Math.max(width, Math.min(MAX_NODE_WIDTH, longestWord * BASE_CHAR_WIDTH + TEXT_PADDING_X));
+  let width = MIN_NODE_WIDTH;
+  const minContentWidth = Math.max(40, MIN_NODE_WIDTH - TEXT_PADDING_X);
+  const maxContentWidth = Math.max(minContentWidth, MAX_NODE_WIDTH - TEXT_PADDING_X);
 
-  const maxCharsPerLine = Math.max(
-    8,
-    Math.floor((width - TEXT_PADDING_X) / BASE_CHAR_WIDTH)
-  );
+  let lines = wrapWords(words, maxContentWidth);
+  if (!Array.isArray(lines) || !lines.length) {
+    lines = [text];
+  }
 
-  let lines = wrapWords(words, maxCharsPerLine);
-  const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
-  width = Math.max(
-    width,
-    Math.min(MAX_NODE_WIDTH, longestLine * BASE_CHAR_WIDTH + TEXT_PADDING_X)
-  );
+  const widestLine = lines.reduce((max, line) => {
+    const measured = measureLineWidth(line);
+    return Math.max(max, measured);
+  }, 0);
+
+  width = Math.max(width, Math.min(MAX_NODE_WIDTH, widestLine + TEXT_PADDING_X));
+  if (width - TEXT_PADDING_X > maxContentWidth) {
+    const adjustedMax = Math.max(40, width - TEXT_PADDING_X);
+    lines = wrapWords(words, adjustedMax);
+    const fallbackWidest = lines.reduce((max, line) => {
+      const measured = measureLineWidth(line);
+      return Math.max(max, measured);
+    }, 0);
+    width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, fallbackWidest + TEXT_PADDING_X));
+  }
 
   const height = Math.max(
     MIN_NODE_HEIGHT,
@@ -395,12 +466,18 @@ const FlowSvgExporter = forwardRef(
 
         if (dominantHorizontal) {
           const direction = dx >= 0 ? 1 : -1;
+          const rawStartX =
+            direction >= 0 ? sourceRect.x + sourceRect.width : sourceRect.x;
+          const rawEndX =
+            direction >= 0 ? targetRect.x : targetRect.x + targetRect.width;
+          const available = Math.max(0, Math.abs(rawEndX - rawStartX));
+          const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
           const start = {
-            x: direction >= 0 ? sourceRect.x + sourceRect.width : sourceRect.x,
+            x: rawStartX + direction * anchorPadding,
             y: sourceCenterY,
           };
           const end = {
-            x: direction >= 0 ? targetRect.x : targetRect.x + targetRect.width,
+            x: rawEndX - direction * anchorPadding,
             y: targetCenterY,
           };
           const horizontalDistance = Math.max(0, Math.abs(end.x - start.x));
@@ -421,13 +498,19 @@ const FlowSvgExporter = forwardRef(
           );
         } else {
           const direction = dy >= 0 ? 1 : -1;
+          const rawStartY =
+            direction >= 0 ? sourceRect.y + sourceRect.height : sourceRect.y;
+          const rawEndY =
+            direction >= 0 ? targetRect.y : targetRect.y + targetRect.height;
+          const available = Math.max(0, Math.abs(rawEndY - rawStartY));
+          const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
           const start = {
             x: sourceCenterX,
-            y: direction >= 0 ? sourceRect.y + sourceRect.height : sourceRect.y,
+            y: rawStartY + direction * anchorPadding,
           };
           const end = {
             x: targetCenterX,
-            y: direction >= 0 ? targetRect.y : targetRect.y + targetRect.height,
+            y: rawEndY - direction * anchorPadding,
           };
           const verticalDistance = Math.max(0, Math.abs(end.y - start.y));
           const elbowLimit = Math.max(0, verticalDistance / 2 - 6);
