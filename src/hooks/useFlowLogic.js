@@ -71,7 +71,7 @@ export const useFlowLogic = () => {
       return visibleLayers.size > 0 && containerTags.some(tag => visibleLayers.has(tag));
     });
 
-    console.log('Filtered rowData count:', filtered.length);
+    // console.log('Filtered rowData count:', filtered.length);
     return filtered;
   }, [rowData, hiddenLayers, layerOptions, selectedContentLayer]);
 
