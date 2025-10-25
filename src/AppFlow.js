@@ -33,16 +33,29 @@ const clampToPrecision = (value) => {
   return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
 };
 
-const buildAxisSegments = (items = [], totalSize = 0, axis = 'row') => {
-  if (!Array.isArray(items) || items.length === 0 || !Number.isFinite(totalSize) || totalSize <= 0) return [];
-  const segmentSize = totalSize / items.length;
+const buildAxisSegments = (items = [], totalSize = 0, axis = 'row', explicitSize = null) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { segments: [], totalSize: 0 };
+  }
 
-  return items.map((item, index) => {
+  const hasExplicitSize = Number.isFinite(explicitSize) && explicitSize > 0;
+  const fallbackTotal = Number.isFinite(totalSize) && totalSize > 0 ? totalSize : 0;
+  const effectiveSegmentSize = hasExplicitSize
+    ? explicitSize
+    : (fallbackTotal > 0 ? fallbackTotal / items.length : 0);
+
+  if (!Number.isFinite(effectiveSegmentSize) || effectiveSegmentSize <= 0) {
+    return { segments: [], totalSize: 0 };
+  }
+
+  const effectiveTotalSize = clampToPrecision(effectiveSegmentSize * items.length);
+
+  const segments = items.map((item, index) => {
     const { label = '', nodeId, originalId } = item || {};
-    const start = clampToPrecision(segmentSize * index);
+    const start = clampToPrecision(effectiveSegmentSize * index);
     const end = index === items.length - 1
-      ? clampToPrecision(totalSize)
-      : clampToPrecision(start + segmentSize);
+      ? effectiveTotalSize
+      : clampToPrecision(start + effectiveSegmentSize);
     const common = {
       id: `${axis}-${index}-${originalId || nodeId || 'unlabeled'}`,
       key: originalId || nodeId || `unknown-${index}`,
@@ -69,6 +82,7 @@ const buildAxisSegments = (items = [], totalSize = 0, axis = 'row') => {
       width: clampToPrecision(end - start),
     };
   });
+  return { segments, totalSize: effectiveTotalSize };
 };
 
 const NUMERIC_PROPS = ['top', 'bottom', 'height', 'left', 'right', 'width'];
@@ -385,28 +399,43 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const rect = wrapperEl.getBoundingClientRect();
 
-    const rows = showRowGrid
-      ? buildAxisSegments(rowLayerNodes, rect.height, 'row')
-      : [];
-    const columns = showColumnGrid
-      ? buildAxisSegments(columnLayerNodes, rect.width, 'column')
-      : [];
+    const {
+      segments: rowSegments,
+      totalSize: rowTotalSize,
+    } = showRowGrid
+      ? buildAxisSegments(rowLayerNodes, rect.height, 'row', cellHeight)
+      : { segments: [], totalSize: 0 };
 
-    setGridRows((prev) => (segmentsEqual(prev, rows) ? prev : rows));
-    setGridColumns((prev) => (segmentsEqual(prev, columns) ? prev : columns));
+    const {
+      segments: columnSegments,
+      totalSize: columnTotalSize,
+    } = showColumnGrid
+      ? buildAxisSegments(columnLayerNodes, rect.width, 'column', cellWidth)
+      : { segments: [], totalSize: 0 };
+
+    setGridRows((prev) => (segmentsEqual(prev, rowSegments) ? prev : rowSegments));
+    setGridColumns((prev) => (segmentsEqual(prev, columnSegments) ? prev : columnSegments));
+
+    const nextBoundsWidth = columnSegments.length > 0
+      ? columnTotalSize
+      : clampToPrecision(rect.width);
+
+    const nextBoundsHeight = rowSegments.length > 0
+      ? rowTotalSize
+      : clampToPrecision(rect.height);
 
     const nextGrid = {
-      rows,
-      columns,
+      rows: rowSegments,
+      columns: columnSegments,
       bounds: {
-        width: clampToPrecision(rect.width),
-        height: clampToPrecision(rect.height),
+        width: nextBoundsWidth,
+        height: nextBoundsHeight,
         top: 0,
         left: 0,
         clientTop: clampToPrecision(rect.top),
         clientLeft: clampToPrecision(rect.left),
       },
-      lookup: buildGridLookup(rows, columns),
+      lookup: buildGridLookup(rowSegments, columnSegments),
       cellOptions: {
         width: cellWidth,
         height: cellHeight,
@@ -441,11 +470,40 @@ const App = ({ keepLayout, setKeepLayout }) => {
     return () => observer.disconnect();
   }, [updateGridDimensions]);
 
-  const overlayStyle = useMemo(() => ({
-    zIndex: 2,
-    transform: `translate(${viewportTransform.x}px, ${viewportTransform.y}px) scale(${viewportTransform.zoom})`,
-    transformOrigin: '0 0',
-  }), [viewportTransform]);
+  const overlayStyle = useMemo(() => {
+    const bounds = flowGridDimensions?.bounds || {};
+    const style = {
+      zIndex: 2,
+      top: 0,
+      left: 0,
+      transform: `translate(${viewportTransform.x}px, ${viewportTransform.y}px) scale(${viewportTransform.zoom})`,
+      transformOrigin: '0 0',
+    };
+
+    const widthValue = Number.isFinite(bounds.width) && bounds.width > 0 ? bounds.width : null;
+    const heightValue = Number.isFinite(bounds.height) && bounds.height > 0 ? bounds.height : null;
+
+    style.width = widthValue != null ? `${widthValue}px` : '100%';
+    style.height = heightValue != null ? `${heightValue}px` : '100%';
+
+    return style;
+  }, [flowGridDimensions, viewportTransform]);
+
+  const wrapperStyle = useMemo(() => {
+    const bounds = flowGridDimensions?.bounds || {};
+    const widthValue = Number.isFinite(bounds.width) && bounds.width > 0 ? bounds.width : null;
+    const heightValue = Number.isFinite(bounds.height) && bounds.height > 0 ? bounds.height : null;
+
+    const style = {
+      height: heightValue != null ? heightValue : 600,
+    };
+
+    if (widthValue != null) {
+      style.width = widthValue;
+    }
+
+    return style;
+  }, [flowGridDimensions]);
 
   const handleCellMenuAddRow = useCallback(() => {
     if (!cellMenuContext) return;
@@ -861,7 +919,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
         <div
           ref={flowWrapperRef}
           className="w-full bg-white relative"
-          style={{ height: 600 }}
+          style={wrapperStyle}
           onClick={hideMenu}
         >
           {/* FlowNavigation removed with activeGroup */}
@@ -869,7 +927,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
               {(showRowGrid || showColumnGrid) && (
                 <div
-                className="absolute inset-0 pointer-events-none"
+                className="absolute pointer-events-none"
                 style={overlayStyle}
                 aria-hidden="true"
               >
