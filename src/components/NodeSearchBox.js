@@ -73,7 +73,10 @@ export default function NodeSearchBox({
         : searchResults;
 
     return (
-        <div style={{ margin: "1rem 0", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
+        <div
+            className="text-gray-900"
+            style={{ margin: "1rem 0", borderTop: "1px solid #eee", paddingTop: "1rem" }}
+        >
             <label htmlFor="search-nodes"><b>Search Nodes</b></label>
             {showTags && (
                 <div style={{ margin: "0.5rem 0" }}>
@@ -115,7 +118,7 @@ export default function NodeSearchBox({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Type to search nodes..."
-                    style={{ flex: 1, padding: "6px" }}
+                    style={{ flex: 1, padding: "6px", color: "#111827" }}
                     onKeyDown={(e) => {
                         if (e.key === "Enter") {
                             handleSearchWithTags(e);
@@ -137,7 +140,7 @@ export default function NodeSearchBox({
                 <button
                     type="button"
                     onClick={handleSelectAll}
-                    className="px-3 py-1 bg-gray-300 hover:bg-gray-400 text-sm font-medium rounded"
+                    className="px-3 py-1 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-medium rounded"
                     style={{ marginLeft: 4 }}
                 >
                     Select All
@@ -177,7 +180,7 @@ export default function NodeSearchBox({
                     return (
                         <li
                             key={id}
-                            className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer"
+                            className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer text-gray-900"
                             style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #eee" }}
                         >
                             <input
@@ -191,7 +194,7 @@ export default function NodeSearchBox({
                                 {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
                             </span>
                             {childrenStr && (
-                                <span style={{ color: "#666", marginLeft: 12, fontSize: "0.95em" }}>
+                                <span style={{ color: "#374151", marginLeft: 12, fontSize: "0.95em" }}>
                                     {childrenStr}
                                 </span>
                             )}
@@ -202,7 +205,7 @@ export default function NodeSearchBox({
                     searchTerm &&
                     !searchLoading &&
                     !searchError && (
-                        <li style={{ color: "#888" }}>No results found.</li>
+                        <li style={{ color: "#374151" }}>No results found.</li>
                     )}
             </ul>
         </div>
