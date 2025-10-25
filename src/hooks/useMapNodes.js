@@ -22,6 +22,53 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const pendingPosRef = useRef(null);
     const lastAppliedRef = useRef(null);
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
+
+    const canvasTransformToWorld = useCallback(
+        (event) => {
+            if (!infiniteCanvas) {
+                return { x: event.offsetX, y: event.offsetY };
+            }
+
+            const target = event.target;
+            const canvas = target?.nodeName === "CANVAS" ? target : infiniteCanvas.canvas;
+            if (!canvas) {
+                return { x: event.offsetX, y: event.offsetY };
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const screenX = (event.clientX - rect.left) * scaleX;
+            const screenY = (event.clientY - rect.top) * scaleY;
+
+            const ctx = infiniteCanvas.getContext("2d");
+            const transform = ctx?.getTransform();
+
+            if (!transform) {
+                return { x: screenX, y: screenY };
+            }
+
+            const determinant = transform.a * transform.d - transform.b * transform.c;
+            if (determinant === 0) {
+                return { x: screenX, y: screenY };
+            }
+
+            const inverse = {
+                a: transform.d / determinant,
+                b: -transform.b / determinant,
+                c: -transform.c / determinant,
+                d: transform.a / determinant,
+                e: (transform.c * transform.f - transform.d * transform.e) / determinant,
+                f: (transform.b * transform.e - transform.a * transform.f) / determinant,
+            };
+
+            return {
+                x: inverse.a * screenX + inverse.c * screenY + inverse.e,
+                y: inverse.b * screenX + inverse.d * screenY + inverse.f,
+            };
+        },
+        [infiniteCanvas]
+    );
     // Debounced persistence of node updates (move/scale)
     const persistQueueRef = useRef(new Map()); // id -> partial row
     const persistTimerRef = useRef(null);
@@ -513,7 +560,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
         if (!infiniteCanvas) return;
 
         const onDown = (e) => {
-            const pos = { x: e.offsetX, y: e.offsetY };
+            const pos = canvasTransformToWorld(e);
             const hit = nodesRef.current.find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
@@ -541,7 +588,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         const onMove = (e) => {
             if (selectedRef.current == null || !dragModeRef.current) return;
-            const pos = { x: e.offsetX, y: e.offsetY };
+            const pos = canvasTransformToWorld(e);
             pendingPosRef.current = pos;
             if (rafIdRef.current == null) {
                 rafIdRef.current = requestAnimationFrame(() => {
@@ -635,7 +682,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
 
         // Right-click handler for nodes
         const onContextMenu = (e) => {
-            const pos = { x: e.offsetX, y: e.offsetY };
+            const pos = canvasTransformToWorld(e);
             const hit = [...nodesRef.current].reverse().find(
                 (n) => Math.hypot(n.x - pos.x, n.y - pos.y) <= (n.radius || 30)
             );
@@ -667,7 +714,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 persistTimerRef.current = null;
             }
         };
-    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData]);
+    }, [infiniteCanvas, incomingNodes, setRowData, dragModeRef, rowData, canvasTransformToWorld]);
 
 
     const { handleSelect, handleRename, handleResetPositionScale, exportMenu } = useMenuHandlers({ rowData, setRowData });
