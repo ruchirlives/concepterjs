@@ -645,6 +645,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }, [updateGridDimensions, updateViewportTransform]);
 
   const handleGridDrop = useCallback(async (event, node) => {
+    // console.log("handleGridDrop called with node:", node);
     if (!node) return;
     if (!showRowGrid && !showColumnGrid) return;
     if (!screenToFlowPosition) return;
@@ -862,6 +863,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   // Update persisted layout for the specific node when a drag stops
   const onNodeDragStop = useCallback((evt, node) => {
+    // console.log("onNodeDragStop called with node:", node);
     setDragging(false);
     handleGridDrop(evt, node);
     if (!keepLayout || !node) return;
