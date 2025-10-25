@@ -686,6 +686,13 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
     const bounds = gridDimensions.bounds || {};
     const canvasWidth = Number.isFinite(bounds.width) ? bounds.width : 0;
     const canvasHeight = Number.isFinite(bounds.height) ? bounds.height : 0;
+    const cellOptions = gridDimensions.cellOptions || {};
+    const customCellWidth = Number.isFinite(cellOptions.width) && cellOptions.width > 0
+        ? cellOptions.width
+        : null;
+    const customCellHeight = Number.isFinite(cellOptions.height) && cellOptions.height > 0
+        ? cellOptions.height
+        : null;
 
     const groups = new Map();
 
@@ -731,10 +738,38 @@ function applyGridConstraints(layoutedNodes, gridDimensions) {
         const { nodes: groupNodes, minX, maxX, minY, maxY } = group;
         if (!groupNodes || groupNodes.length === 0) return;
 
-        const rawMinX = minX + baseHorizontalPadding;
-        const rawMaxX = maxX - baseHorizontalPadding;
-        const rawMinY = minY + baseVerticalPaddingTop;
-        const rawMaxY = maxY - baseVerticalPaddingBottom;
+        let effectiveMinX = minX;
+        let effectiveMaxX = maxX;
+        if (customCellWidth != null) {
+            const availableWidth = Math.max(0, maxX - minX);
+            const clampedWidth = Math.min(customCellWidth, availableWidth);
+            const centerX = minX + availableWidth / 2;
+            effectiveMinX = clamp(
+                centerX - clampedWidth / 2,
+                minX,
+                Math.max(minX, maxX - clampedWidth)
+            );
+            effectiveMaxX = Math.max(effectiveMinX + clampedWidth, effectiveMinX);
+        }
+
+        let effectiveMinY = minY;
+        let effectiveMaxY = maxY;
+        if (customCellHeight != null) {
+            const availableHeight = Math.max(0, maxY - minY);
+            const clampedHeight = Math.min(customCellHeight, availableHeight);
+            const centerY = minY + availableHeight / 2;
+            effectiveMinY = clamp(
+                centerY - clampedHeight / 2,
+                minY,
+                Math.max(minY, maxY - clampedHeight)
+            );
+            effectiveMaxY = Math.max(effectiveMinY + clampedHeight, effectiveMinY);
+        }
+
+        const rawMinX = effectiveMinX + baseHorizontalPadding;
+        const rawMaxX = effectiveMaxX - baseHorizontalPadding;
+        const rawMinY = effectiveMinY + baseVerticalPaddingTop;
+        const rawMaxY = effectiveMaxY - baseVerticalPaddingBottom;
 
         const availMinX = Math.min(rawMinX, rawMaxX);
         const availMaxX = Math.max(rawMinX, rawMaxX);

@@ -110,12 +110,24 @@ const boundsEqual = (a = {}, b = {}) => {
   return true;
 };
 
+const dimensionEqual = (a, b) => {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(a - b) <= 0.001;
+};
+
+const cellOptionsEqual = (a = {}, b = {}) => (
+  dimensionEqual(Number.isFinite(a.width) ? a.width : null, Number.isFinite(b.width) ? b.width : null)
+  && dimensionEqual(Number.isFinite(a.height) ? a.height : null, Number.isFinite(b.height) ? b.height : null)
+);
+
 const gridsEqual = (a, b) => {
   if (a === b) return true;
   if (!a || !b) return false;
   return segmentsEqual(a.rows, b.rows)
     && segmentsEqual(a.columns, b.columns)
-    && boundsEqual(a.bounds, b.bounds);
+    && boundsEqual(a.bounds, b.bounds)
+    && cellOptionsEqual(a.cellOptions, b.cellOptions);
 };
 
 const buildGridLookup = (rows = [], columns = []) => {
@@ -185,6 +197,21 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const svgExporterRef = useRef(null);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
+
+  const [cellWidthInput, setCellWidthInput] = useState('');
+  const [cellHeightInput, setCellHeightInput] = useState('');
+
+  const cellWidth = useMemo(() => {
+    const value = parseFloat(cellWidthInput);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value;
+  }, [cellWidthInput]);
+
+  const cellHeight = useMemo(() => {
+    const value = parseFloat(cellHeightInput);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value;
+  }, [cellHeightInput]);
 
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
@@ -260,6 +287,34 @@ const App = ({ keepLayout, setKeepLayout }) => {
     return sorted;
   }, [flowFilteredRowData, layerOrdering, normalizeTags, rowData]);
 
+  const handleCellWidthInputChange = useCallback((event) => {
+    setCellWidthInput(event.target.value);
+  }, []);
+
+  const handleCellHeightInputChange = useCallback((event) => {
+    setCellHeightInput(event.target.value);
+  }, []);
+
+  const handleCellWidthInputBlur = useCallback(() => {
+    if (cellWidthInput === '') return;
+    const value = parseFloat(cellWidthInput);
+    if (!Number.isFinite(value) || value <= 0) {
+      setCellWidthInput('');
+      return;
+    }
+    setCellWidthInput(value.toString());
+  }, [cellWidthInput]);
+
+  const handleCellHeightInputBlur = useCallback(() => {
+    if (cellHeightInput === '') return;
+    const value = parseFloat(cellHeightInput);
+    if (!Number.isFinite(value) || value <= 0) {
+      setCellHeightInput('');
+      return;
+    }
+    setCellHeightInput(value.toString());
+  }, [cellHeightInput]);
+
   useEffect(() => {
     if (!cellMenuContext) return undefined;
 
@@ -317,6 +372,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
         columns: [],
         bounds: { width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 },
         lookup: buildGridLookup([], []),
+        cellOptions: {
+          width: cellWidth,
+          height: cellHeight,
+        },
       };
       setGridRows((prev) => (prev.length === 0 ? prev : []));
       setGridColumns((prev) => (prev.length === 0 ? prev : []));
@@ -348,10 +407,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
         clientLeft: clampToPrecision(rect.left),
       },
       lookup: buildGridLookup(rows, columns),
+      cellOptions: {
+        width: cellWidth,
+        height: cellHeight,
+      },
     };
 
     setFlowGridDimensions((prev) => (gridsEqual(prev, nextGrid) ? prev : nextGrid));
   }, [
+    cellHeight,
+    cellWidth,
     columnLayerNodes,
     rowLayerNodes,
     setFlowGridDimensions,
@@ -752,6 +817,42 @@ const App = ({ keepLayout, setKeepLayout }) => {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="flex items-center gap-1 ml-4">
+          <label className="text-xs text-gray-600" htmlFor="flowCellWidthInput">
+            Cell W:
+          </label>
+          <input
+            id="flowCellWidthInput"
+            type="number"
+            min="0"
+            step="10"
+            value={cellWidthInput}
+            onChange={handleCellWidthInputChange}
+            onBlur={handleCellWidthInputBlur}
+            placeholder="auto"
+            className="px-2 py-1 w-20 text-xs border border-gray-300 rounded bg-white"
+            title="Custom width for cells that contain nodes (leave blank for auto)"
+          />
+        </div>
+
+        <div className="flex items-center gap-1 ml-2">
+          <label className="text-xs text-gray-600" htmlFor="flowCellHeightInput">
+            Cell H:
+          </label>
+          <input
+            id="flowCellHeightInput"
+            type="number"
+            min="0"
+            step="10"
+            value={cellHeightInput}
+            onChange={handleCellHeightInputChange}
+            onBlur={handleCellHeightInputBlur}
+            placeholder="auto"
+            className="px-2 py-1 w-20 text-xs border border-gray-300 rounded bg-white"
+            title="Custom height for cells that contain nodes (leave blank for auto)"
+          />
         </div>
 
       </FlowHeader>
