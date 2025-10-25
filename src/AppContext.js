@@ -61,6 +61,10 @@ export const AppProvider = ({ children }) => {
       columnsByOriginalId: {},
       columnsByNodeId: {},
     },
+    cellOptions: {
+      width: null,
+      height: null,
+    },
   });
 
   // Parent-child relationship map

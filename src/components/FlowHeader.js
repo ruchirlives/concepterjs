@@ -14,7 +14,7 @@ const FlowHeader = ({
 }) => {
   return (
     <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <span className="font-semibold" onClick={() => setCollapsed((c) => !c)}>
           Flow Diagram
         </span>
