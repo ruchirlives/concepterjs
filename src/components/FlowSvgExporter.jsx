@@ -210,7 +210,46 @@ const buildNodeTextSegments = (node = {}) => {
   return segments;
 };
 
-const measureNodeContent = (node = {}) => {
+const clampValue = (value, min, max) => {
+  if (!Number.isFinite(value)) return Number.isFinite(min) ? min : value;
+  let next = value;
+  if (Number.isFinite(min)) {
+    next = Math.max(min, next);
+  }
+  if (Number.isFinite(max)) {
+    next = Math.min(max, next);
+  }
+  return next;
+};
+
+const pickPositive = (...values) => {
+  for (const value of values) {
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const extractNodeSize = (node = {}) => {
+  const width = pickPositive(
+    node?.width,
+    node?.measured?.width,
+    node?.style?.width,
+    node?.__rf?.width,
+    node?.data?.width
+  );
+  const height = pickPositive(
+    node?.height,
+    node?.measured?.height,
+    node?.style?.height,
+    node?.__rf?.height,
+    node?.data?.height
+  );
+  return { width, height };
+};
+
+const measureNodeContent = (node = {}, options = {}) => {
   const segments = buildNodeTextSegments(node);
   if (!Array.isArray(segments) || !segments.length) {
     segments.push({
@@ -222,13 +261,29 @@ const measureNodeContent = (node = {}) => {
       color: "#0f172a",
     });
   }
-  const minContentWidth = Math.max(40, MIN_NODE_WIDTH - TEXT_PADDING_X);
-  const maxContentWidth = Math.max(minContentWidth, MAX_NODE_WIDTH - TEXT_PADDING_X);
+  const resolvedPreferredWidth = Number.isFinite(options?.preferredWidth)
+    && options.preferredWidth > 0
+    ? options.preferredWidth
+    : null;
+  const resolvedPreferredHeight = Number.isFinite(options?.preferredHeight)
+    && options.preferredHeight > 0
+    ? options.preferredHeight
+    : null;
+
+  const minNodeWidth = resolvedPreferredWidth != null
+    ? Math.max(24, resolvedPreferredWidth)
+    : MIN_NODE_WIDTH;
+  const maxNodeWidth = resolvedPreferredWidth != null
+    ? Math.max(minNodeWidth, resolvedPreferredWidth)
+    : MAX_NODE_WIDTH;
+
+  const minContentWidth = Math.max(40, minNodeWidth - TEXT_PADDING_X);
+  const maxContentWidth = Math.max(minContentWidth, maxNodeWidth - TEXT_PADDING_X);
 
   const wrapSegments = (limit) => {
-    const contentLimit = Math.max(minContentWidth, Math.min(limit, MAX_NODE_WIDTH - TEXT_PADDING_X));
+    const contentLimit = Math.max(minContentWidth, Math.min(limit, maxContentWidth));
     const wrappedLines = [];
-    let computedWidth = MIN_NODE_WIDTH;
+    let computedWidth = minNodeWidth;
     segments.forEach((segment) => {
       const text = segment?.text ?? "";
       const normalized = typeof text === "string" ? text.trim() : String(text || "").trim();
@@ -255,7 +310,10 @@ const measureNodeContent = (node = {}) => {
           color,
         });
         const measured = measureLineWidth(line, fontSize);
-        const widthWithPadding = Math.min(MAX_NODE_WIDTH, measured + TEXT_PADDING_X);
+        const widthWithPadding = Math.min(
+          maxNodeWidth,
+          Math.max(minNodeWidth, measured + TEXT_PADDING_X)
+        );
         computedWidth = Math.max(computedWidth, widthWithPadding);
       });
     });
@@ -263,12 +321,16 @@ const measureNodeContent = (node = {}) => {
   };
 
   let { width, lines } = wrapSegments(maxContentWidth);
-  width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, width));
+  width = clampValue(width, minNodeWidth, maxNodeWidth);
 
   const targetContentWidth = Math.max(minContentWidth, width - TEXT_PADDING_X);
-  if (targetContentWidth < maxContentWidth) {
+  if (resolvedPreferredWidth == null && targetContentWidth < maxContentWidth) {
     const rerun = wrapSegments(targetContentWidth);
-    width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, rerun.width));
+    width = clampValue(rerun.width, minNodeWidth, maxNodeWidth);
+    lines = rerun.lines;
+  } else if (resolvedPreferredWidth != null) {
+    const rerun = wrapSegments(targetContentWidth);
+    width = clampValue(Math.max(width, resolvedPreferredWidth), minNodeWidth, maxNodeWidth);
     lines = rerun.lines;
   }
 
@@ -290,8 +352,12 @@ const measureNodeContent = (node = {}) => {
     return sum + safeValue;
   }, 0);
 
+  const minNodeHeight = resolvedPreferredHeight != null
+    ? Math.max(24, resolvedPreferredHeight)
+    : MIN_NODE_HEIGHT;
+
   const height = Math.max(
-    MIN_NODE_HEIGHT,
+    minNodeHeight,
     TEXT_PADDING_Y + totalLineHeight
   );
 
@@ -494,7 +560,11 @@ export const serializeFlowSvg = ({
   const nodeLayoutMap = new Map();
   const nodeRenderMap = new Map();
   nodes.forEach((node) => {
-    const metrics = measureNodeContent(node);
+    const explicitSize = extractNodeSize(node);
+    const metrics = measureNodeContent(node, {
+      preferredWidth: explicitSize.width,
+      preferredHeight: explicitSize.height,
+    });
     nodeLayoutMap.set(node.id, {
       width: metrics.width,
       height: metrics.height,
@@ -516,8 +586,10 @@ export const serializeFlowSvg = ({
         },
       ],
     };
-    const baseX = safeNumber(node?.position?.x);
-    const baseY = safeNumber(node?.position?.y);
+    const basePosition =
+      (node && node.positionAbsolute) || node?.position || { x: 0, y: 0 };
+    const baseX = safeNumber(basePosition?.x);
+    const baseY = safeNumber(basePosition?.y);
     const widthUnits = layout.width;
     const heightUnits = layout.height;
     const x = contentTranslateX + baseX * zoom;
@@ -602,25 +674,46 @@ export const serializeFlowSvg = ({
         direction >= 0 ? targetRect.x : targetRect.x + targetRect.width;
       const available = Math.max(0, Math.abs(rawEndX - rawStartX));
       const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
-      const entryPadding = Math.max(targetOverlap, anchorPadding);
-      const start = {
-        x: rawStartX + direction * anchorPadding,
+      const exitPadding = Math.min(anchorPadding, Math.max(0, available / 2));
+      const insetPadding = Math.min(
+        Math.max(2, exitPadding),
+        sourceRect.width / 2
+      );
+      const exit = {
+        x: rawStartX + direction * exitPadding,
         y: sourceCenterY,
       };
+      const start = {
+        x: rawStartX - direction * insetPadding,
+        y: sourceCenterY,
+      };
+      const maxEntryInset = Math.max(
+        targetOverlap,
+        Math.min(targetRect.width / 2, EDGE_ANCHOR_PADDING)
+      );
+      const entryPadding = Math.max(
+        targetOverlap,
+        Math.min(maxEntryInset, anchorPadding)
+      );
+      const unclampedEndX = rawEndX + direction * entryPadding;
       const end = {
-        x: rawEndX + direction * entryPadding,
+        x: clampValue(
+          unclampedEndX,
+          targetRect.x + 1,
+          targetRect.x + targetRect.width - 1
+        ),
         y: targetCenterY,
       };
-      const horizontalDistance = Math.max(0, Math.abs(end.x - start.x));
+      const horizontalDistance = Math.max(0, Math.abs(end.x - exit.x));
       const elbowLimit = Math.max(0, horizontalDistance / 2 - 6);
       const elbowPadding = Math.min(
         elbowPaddingMax,
         elbowLimit,
         Math.max(0, horizontalDistance / 3)
       );
-      const firstX = start.x + direction * elbowPadding;
+      const firstX = exit.x + direction * elbowPadding;
       const lastX = end.x - direction * elbowPadding;
-      const bendY = start.y + perpendicularOffset;
+      const bendY = exit.y + perpendicularOffset;
       const verticalSign =
         perpendicularOffset !== 0
           ? Math.sign(perpendicularOffset)
@@ -628,10 +721,11 @@ export const serializeFlowSvg = ({
             ? 1
             : Math.sign(dy);
       const approachBendY =
-        bendY === start.y ? bendY + verticalSign * arrowGuard : bendY;
+        bendY === exit.y ? bendY + verticalSign * arrowGuard : bendY;
       points.push(
         start,
-        { x: firstX, y: start.y },
+        exit,
+        { x: firstX, y: exit.y },
         { x: firstX, y: approachBendY },
         { x: lastX, y: approachBendY },
         { x: lastX, y: end.y },
@@ -645,25 +739,46 @@ export const serializeFlowSvg = ({
         direction >= 0 ? targetRect.y : targetRect.y + targetRect.height;
       const available = Math.max(0, Math.abs(rawEndY - rawStartY));
       const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
-      const entryPadding = Math.max(targetOverlap, anchorPadding);
+      const exitPadding = Math.min(anchorPadding, Math.max(0, available / 2));
+      const insetPadding = Math.min(
+        Math.max(2, exitPadding),
+        sourceRect.height / 2
+      );
+      const exit = {
+        x: sourceCenterX,
+        y: rawStartY + direction * exitPadding,
+      };
       const start = {
         x: sourceCenterX,
-        y: rawStartY + direction * anchorPadding,
+        y: rawStartY - direction * insetPadding,
       };
+      const maxEntryInset = Math.max(
+        targetOverlap,
+        Math.min(targetRect.height / 2, EDGE_ANCHOR_PADDING)
+      );
+      const entryPadding = Math.max(
+        targetOverlap,
+        Math.min(maxEntryInset, anchorPadding)
+      );
+      const unclampedEndY = rawEndY + direction * entryPadding;
       const end = {
         x: targetCenterX,
-        y: rawEndY + direction * entryPadding,
+        y: clampValue(
+          unclampedEndY,
+          targetRect.y + 1,
+          targetRect.y + targetRect.height - 1
+        ),
       };
-      const verticalDistance = Math.max(0, Math.abs(end.y - start.y));
+      const verticalDistance = Math.max(0, Math.abs(end.y - exit.y));
       const elbowLimit = Math.max(0, verticalDistance / 2 - 6);
       const elbowPadding = Math.min(
         elbowPaddingMax,
         elbowLimit,
         Math.max(0, verticalDistance / 3)
       );
-      const firstY = start.y + direction * elbowPadding;
+      const firstY = exit.y + direction * elbowPadding;
       const lastY = end.y - direction * elbowPadding;
-      const bendX = start.x + perpendicularOffset;
+      const bendX = exit.x + perpendicularOffset;
       const horizontalSign =
         perpendicularOffset !== 0
           ? Math.sign(perpendicularOffset)
@@ -671,10 +786,11 @@ export const serializeFlowSvg = ({
             ? 1
             : Math.sign(dx);
       const approachBendX =
-        bendX === start.x ? bendX + horizontalSign * arrowGuard : bendX;
+        bendX === exit.x ? bendX + horizontalSign * arrowGuard : bendX;
       points.push(
         start,
-        { x: start.x, y: firstY },
+        exit,
+        { x: exit.x, y: firstY },
         { x: approachBendX, y: firstY },
         { x: approachBendX, y: lastY },
         { x: end.x, y: lastY },
