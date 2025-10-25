@@ -654,7 +654,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       ? screenToFlowPosition({ x: event.clientX, y: event.clientY })
       : null;
 
-    const fallbackPoint = node?.position || node?.positionAbsolute || null;
+    const fallbackPoint = node?.positionAbsolute || node?.position || null;
     const flowPoint = pointer || fallbackPoint;
     if (!flowPoint) return;
 
