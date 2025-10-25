@@ -818,11 +818,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
       toast.error('Failed to move item to the selected grid cell.');
     }
   }, [
-    addChildren,
     flowGridDimensions,
     gridColumns,
     gridRows,
-    removeChildren,
     screenToFlowPosition,
     setNodes,
     setParentChildMap,
