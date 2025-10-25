@@ -8,10 +8,16 @@ const TEXT_PADDING_Y = 24;
 const BASE_CHAR_WIDTH = 7.2;
 const BASE_FONT_SIZE = 12;
 const BASE_LINE_HEIGHT = 17;
+const META_FONT_SIZE = 10;
+const META_LINE_HEIGHT = 15;
+const TITLE_FONT_WEIGHT = 600;
+const META_FONT_WEIGHT = 500;
 const MARGIN = 32;
 const LABEL_BAND_SIZE = 64;
 const LABEL_TEXT_PADDING = 14;
 const EDGE_ANCHOR_PADDING = 18;
+const LABEL_FONT_SIZE = 12;
+const LABEL_LINE_HEIGHT = 16;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -43,30 +49,38 @@ const getMeasureContext = (() => {
     if (typeof document === "undefined") return null;
     canvas = canvas || document.createElement("canvas");
     context = canvas.getContext("2d");
-    if (context) {
-      context.font = `${BASE_FONT_SIZE}px Inter, Arial, sans-serif`;
-    }
     return context;
   };
 })();
 
-const measureLineWidth = (text = "") => {
-  const ctx = getMeasureContext();
-  if (ctx) {
-    ctx.font = `${BASE_FONT_SIZE}px Inter, Arial, sans-serif`;
-    return ctx.measureText(text).width;
+const resolveFontSize = (value, fallback = BASE_FONT_SIZE) => {
+  const size = Number(value);
+  if (Number.isFinite(size) && size > 0) {
+    return size;
   }
-  return text.length * BASE_CHAR_WIDTH;
+  return fallback;
 };
 
-const splitLongWord = (word = "", maxWidth = 0) => {
+const measureLineWidth = (text = "", fontSize = BASE_FONT_SIZE) => {
+  const ctx = getMeasureContext();
+  if (ctx) {
+    const resolvedFontSize = resolveFontSize(fontSize);
+    ctx.font = `${resolvedFontSize}px Inter, Arial, sans-serif`;
+    return ctx.measureText(text).width;
+  }
+  const resolvedFontSize = resolveFontSize(fontSize);
+  const charWidth = (resolvedFontSize / BASE_FONT_SIZE) * BASE_CHAR_WIDTH;
+  return text.length * charWidth;
+};
+
+const splitLongWord = (word = "", maxWidth = 0, fontSize = BASE_FONT_SIZE) => {
   if (!word.length) return [""];
   if (!(maxWidth > 0)) return [word];
   const segments = [];
   let current = "";
   for (const char of word) {
     const candidate = `${current}${char}`;
-    if (measureLineWidth(candidate) <= maxWidth || !current.length) {
+    if (measureLineWidth(candidate, fontSize) <= maxWidth || !current.length) {
       current = candidate;
     } else {
       segments.push(current);
@@ -77,7 +91,7 @@ const splitLongWord = (word = "", maxWidth = 0) => {
   return segments.length > 0 ? segments : [word];
 };
 
-const wrapWords = (words, maxWidth) => {
+const wrapWords = (words, maxWidth, fontSize = BASE_FONT_SIZE) => {
   if (!Array.isArray(words) || words.length === 0) {
     return [""];
   }
@@ -89,7 +103,7 @@ const wrapWords = (words, maxWidth) => {
   words.forEach((word) => {
     if (!word.length) return;
     const tentative = current.length ? `${current} ${word}` : word;
-    if (measureLineWidth(tentative) <= maxWidth) {
+    if (measureLineWidth(tentative, fontSize) <= maxWidth) {
       current = tentative;
       return;
     }
@@ -99,14 +113,14 @@ const wrapWords = (words, maxWidth) => {
       current = "";
     }
 
-    if (measureLineWidth(word) <= maxWidth) {
+    if (measureLineWidth(word, fontSize) <= maxWidth) {
       current = word;
       return;
     }
 
-    const segments = splitLongWord(word, maxWidth);
+    const segments = splitLongWord(word, maxWidth, fontSize);
     segments.forEach((segment, index) => {
-      if (measureLineWidth(segment) <= maxWidth) {
+      if (measureLineWidth(segment, fontSize) <= maxWidth) {
         if (index === segments.length - 1) {
           current = segment;
         } else {
@@ -114,7 +128,9 @@ const wrapWords = (words, maxWidth) => {
         }
       } else {
         // Fallback to basic chunking if measurement fails to constrain width.
-        const fallbackSize = Math.max(1, Math.floor(maxWidth / BASE_CHAR_WIDTH));
+        const fallbackCharWidth =
+          (resolveFontSize(fontSize) / BASE_FONT_SIZE) * BASE_CHAR_WIDTH;
+        const fallbackSize = Math.max(1, Math.floor(maxWidth / fallbackCharWidth));
         const fallbackParts = segment.match(new RegExp(`.{1,${fallbackSize}}`, "g")) || [segment];
         fallbackParts.slice(0, -1).forEach((part) => lines.push(part));
         current = fallbackParts.at(-1) || "";
@@ -125,46 +141,158 @@ const wrapWords = (words, maxWidth) => {
   return lines.length > 0 ? lines : [""];
 };
 
-const measureLabel = (label = "") => {
-  const text = label ? label.toString().trim() : "";
-  if (!text.length) {
-    return {
-      width: MIN_NODE_WIDTH,
-      height: MIN_NODE_HEIGHT,
-      lines: [""],
-    };
+const buildNodeTextSegments = (node = {}) => {
+  const segments = [];
+  const data = node?.data ?? {};
+
+  const normalize = (value) => {
+    if (value == null) return "";
+    return String(value).replace(/\s+/g, " ").trim();
+  };
+
+  const primary = normalize(data?.Name ?? node?.id ?? "");
+  segments.push({
+    text: primary || "",
+    fontSize: BASE_FONT_SIZE,
+    lineHeight: BASE_LINE_HEIGHT,
+    fontWeight: TITLE_FONT_WEIGHT,
+    type: "title",
+    color: "#0f172a",
+  });
+
+  const formatScore = (value) => {
+    if (!Number.isFinite(value)) return null;
+    return value.toFixed(3);
+  };
+  const formatPercent = (value) => {
+    if (!Number.isFinite(value)) return null;
+    return `${Math.round(value * 100)}%`;
+  };
+
+  const scoreValue = formatScore(data?.score);
+  if (scoreValue != null) {
+    const scoreParts = [`Score: ${scoreValue}`];
+    const normalizedPercent = formatPercent(data?.normalizedScore);
+    if (normalizedPercent) {
+      scoreParts.push(`(${normalizedPercent})`);
+    }
+    segments.push({
+      text: scoreParts.join(" "),
+      fontSize: META_FONT_SIZE,
+      lineHeight: META_LINE_HEIGHT,
+      fontWeight: META_FONT_WEIGHT,
+      type: "score",
+      color: "#475569",
+    });
   }
 
-  const words = text.split(/\s+/).filter(Boolean);
+  const hasBudget = data?.Budget !== undefined && data?.Budget !== null;
+  if (hasBudget) {
+    const budgetText = normalize(data?.Budget);
+    const costText = data?.Cost !== undefined && data?.Cost !== null ? normalize(data?.Cost) : null;
+    const hasBudgetValue = budgetText.length > 0;
+    const hasCostValue = costText && costText.length > 0;
+    if (hasBudgetValue || hasCostValue) {
+      const combined = hasCostValue
+        ? `Budget: ${hasBudgetValue ? budgetText : "--"} (funds: ${costText})`
+        : `Budget: ${budgetText}`;
+      segments.push({
+        text: combined,
+        fontSize: META_FONT_SIZE,
+        lineHeight: META_LINE_HEIGHT,
+        fontWeight: META_FONT_WEIGHT,
+        type: "budget",
+        color: "#1d4ed8",
+      });
+    }
+  }
 
-  let width = MIN_NODE_WIDTH;
+  return segments;
+};
+
+const measureNodeContent = (node = {}) => {
+  const segments = buildNodeTextSegments(node);
+  if (!Array.isArray(segments) || !segments.length) {
+    segments.push({
+      text: "",
+      fontSize: BASE_FONT_SIZE,
+      lineHeight: BASE_LINE_HEIGHT,
+      fontWeight: TITLE_FONT_WEIGHT,
+      type: "title",
+      color: "#0f172a",
+    });
+  }
   const minContentWidth = Math.max(40, MIN_NODE_WIDTH - TEXT_PADDING_X);
   const maxContentWidth = Math.max(minContentWidth, MAX_NODE_WIDTH - TEXT_PADDING_X);
 
-  let lines = wrapWords(words, maxContentWidth);
+  const wrapSegments = (limit) => {
+    const contentLimit = Math.max(minContentWidth, Math.min(limit, MAX_NODE_WIDTH - TEXT_PADDING_X));
+    const wrappedLines = [];
+    let computedWidth = MIN_NODE_WIDTH;
+    segments.forEach((segment) => {
+      const text = segment?.text ?? "";
+      const normalized = typeof text === "string" ? text.trim() : String(text || "").trim();
+      const fontSize = resolveFontSize(segment?.fontSize, BASE_FONT_SIZE);
+      const baseLineHeight = Number(segment?.lineHeight);
+      const lineHeight = Number.isFinite(baseLineHeight) && baseLineHeight > 0
+        ? baseLineHeight
+        : Math.max(BASE_LINE_HEIGHT, Math.ceil(fontSize * 1.35));
+      const fontWeight = Number.isFinite(segment?.fontWeight)
+        ? segment.fontWeight
+        : segment?.type === "title"
+          ? TITLE_FONT_WEIGHT
+          : META_FONT_WEIGHT;
+      const color = segment?.color || "#0f172a";
+      const words = normalized.length ? normalized.split(/\s+/) : [""];
+      const lines = wrapWords(words, contentLimit, fontSize);
+      const safeLines = Array.isArray(lines) && lines.length ? lines : [normalized || ""];
+      safeLines.forEach((line) => {
+        wrappedLines.push({
+          text: line,
+          fontSize,
+          lineHeight,
+          fontWeight,
+          color,
+        });
+        const measured = measureLineWidth(line, fontSize);
+        const widthWithPadding = Math.min(MAX_NODE_WIDTH, measured + TEXT_PADDING_X);
+        computedWidth = Math.max(computedWidth, widthWithPadding);
+      });
+    });
+    return { width: computedWidth, lines: wrappedLines };
+  };
+
+  let { width, lines } = wrapSegments(maxContentWidth);
+  width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, width));
+
+  const targetContentWidth = Math.max(minContentWidth, width - TEXT_PADDING_X);
+  if (targetContentWidth < maxContentWidth) {
+    const rerun = wrapSegments(targetContentWidth);
+    width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, rerun.width));
+    lines = rerun.lines;
+  }
+
   if (!Array.isArray(lines) || !lines.length) {
-    lines = [text];
+    lines = [
+      {
+        text: "",
+        fontSize: BASE_FONT_SIZE,
+        lineHeight: BASE_LINE_HEIGHT,
+        fontWeight: TITLE_FONT_WEIGHT,
+        color: "#0f172a",
+      },
+    ];
   }
 
-  const widestLine = lines.reduce((max, line) => {
-    const measured = measureLineWidth(line);
-    return Math.max(max, measured);
+  const totalLineHeight = lines.reduce((sum, line) => {
+    const value = Number(line?.lineHeight);
+    const safeValue = Number.isFinite(value) && value > 0 ? value : BASE_LINE_HEIGHT;
+    return sum + safeValue;
   }, 0);
-
-  width = Math.max(width, Math.min(MAX_NODE_WIDTH, widestLine + TEXT_PADDING_X));
-  if (width - TEXT_PADDING_X > maxContentWidth) {
-    const adjustedMax = Math.max(40, width - TEXT_PADDING_X);
-    lines = wrapWords(words, adjustedMax);
-    const fallbackWidest = lines.reduce((max, line) => {
-      const measured = measureLineWidth(line);
-      return Math.max(max, measured);
-    }, 0);
-    width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, fallbackWidest + TEXT_PADDING_X));
-  }
 
   const height = Math.max(
     MIN_NODE_HEIGHT,
-    TEXT_PADDING_Y + lines.length * BASE_LINE_HEIGHT
+    TEXT_PADDING_Y + totalLineHeight
   );
 
   return {
@@ -270,15 +398,20 @@ const FlowSvgExporter = forwardRef(
         longestRowLabelWidth = rows.reduce((acc, row) => {
           const label = (row?.label || "").toString().trim();
           if (!label.length) return acc;
-          const approximateWidth = label.length * BASE_CHAR_WIDTH;
-          return Math.max(acc, approximateWidth);
+          const measuredWidth = measureLineWidth(label, LABEL_FONT_SIZE);
+          return Math.max(acc, measuredWidth);
         }, 0);
       }
 
       const rowLabelThickness = hasRows
-        ? Math.max(LABEL_BAND_SIZE, longestRowLabelWidth + LABEL_TEXT_PADDING * 2)
+        ? Math.max(
+            LABEL_BAND_SIZE,
+            longestRowLabelWidth + LABEL_TEXT_PADDING * 2
+          )
         : 0;
-      const columnLabelThickness = hasColumns ? LABEL_BAND_SIZE : 0;
+      const columnLabelThickness = hasColumns
+        ? Math.max(LABEL_BAND_SIZE, LABEL_TEXT_PADDING * 2 + LABEL_LINE_HEIGHT)
+        : 0;
       const contentTranslateX = translateX + rowLabelThickness;
       const contentTranslateY = translateY + columnLabelThickness;
 
@@ -377,7 +510,7 @@ const FlowSvgExporter = forwardRef(
       const nodeLayoutMap = new Map();
       const nodeRenderMap = new Map();
       nodes.forEach((node) => {
-        const metrics = measureLabel(node?.data?.Name || node?.id);
+        const metrics = measureNodeContent(node);
         nodeLayoutMap.set(node.id, {
           width: metrics.width,
           height: metrics.height,
@@ -389,7 +522,15 @@ const FlowSvgExporter = forwardRef(
         const layout = nodeLayoutMap.get(node.id) || {
           width: MIN_NODE_WIDTH,
           height: MIN_NODE_HEIGHT,
-          lines: [node?.data?.Name || node?.id || ""],
+          lines: [
+            {
+              text: node?.data?.Name || node?.id || "",
+              fontSize: BASE_FONT_SIZE,
+              lineHeight: BASE_LINE_HEIGHT,
+              fontWeight: TITLE_FONT_WEIGHT,
+              color: "#0f172a",
+            },
+          ],
         };
         const baseX = safeNumber(node?.position?.x);
         const baseY = safeNumber(node?.position?.y);
@@ -584,7 +725,7 @@ const FlowSvgExporter = forwardRef(
           );
           if (cell.label) {
             parts.push(
-              `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+              `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
             );
           }
         });
@@ -599,7 +740,7 @@ const FlowSvgExporter = forwardRef(
           );
           if (cell.label) {
             parts.push(
-              `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+              `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
             );
           }
         });
@@ -617,7 +758,7 @@ const FlowSvgExporter = forwardRef(
             const labelX = row.labelCenterX + offsetX;
             const labelY = row.labelCenterY + offsetY;
             parts.push(
-              `<text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
+              `<text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
             );
           }
         });
@@ -634,7 +775,7 @@ const FlowSvgExporter = forwardRef(
             const labelX = column.labelCenterX + offsetX;
             const labelY = column.labelCenterY + offsetY;
             parts.push(
-              `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, BASE_FONT_SIZE * 0.95)}" font-weight="600" dominant-baseline="middle">${escapeXml(
+              `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(
                 column.label
               )}</text>`
             );
@@ -657,30 +798,71 @@ const FlowSvgExporter = forwardRef(
           const y = node.y + offsetY;
           const cornerRadius = Math.max(4, 12 * zoom);
           const strokeWidth = Math.max(1, 1.5 * zoom);
-          const fontSize = Math.max(8, BASE_FONT_SIZE * zoom);
-          const lineSpacing = Math.max(fontSize * 1.35, BASE_LINE_HEIGHT * zoom);
           const textPaddingX = Math.max(8, (TEXT_PADDING_X / 2) * zoom);
-          const textPaddingY = Math.max(8, (TEXT_PADDING_Y / 2) * zoom);
+          const textPaddingTop = Math.max(8, (TEXT_PADDING_Y / 2) * zoom);
           const textX = x + textPaddingX;
-          const firstLineY = y + textPaddingY;
-          const lines = Array.isArray(node.lines) && node.lines.length
+          let currentY = y + textPaddingTop;
+          const rawLines = Array.isArray(node.lines) && node.lines.length
             ? node.lines
-            : [""];
+            : [
+                {
+                  text: "",
+                  fontSize: BASE_FONT_SIZE,
+                  lineHeight: BASE_LINE_HEIGHT,
+                  fontWeight: TITLE_FONT_WEIGHT,
+                  color: "#0f172a",
+                },
+              ];
+          const normalizedLines = rawLines.map((line, index) => {
+            if (line && typeof line === "object" && !(line instanceof String)) {
+              return {
+                text: line.text ?? "",
+                fontSize: resolveFontSize(line.fontSize, BASE_FONT_SIZE),
+                lineHeight: Number.isFinite(line.lineHeight)
+                  ? line.lineHeight
+                  : index === 0
+                    ? BASE_LINE_HEIGHT
+                    : META_LINE_HEIGHT,
+                fontWeight: Number.isFinite(line.fontWeight)
+                  ? line.fontWeight
+                  : index === 0
+                    ? TITLE_FONT_WEIGHT
+                    : META_FONT_WEIGHT,
+                color: line.color || "#0f172a",
+              };
+            }
+            const textValue = line == null ? "" : String(line);
+            return {
+              text: textValue,
+              fontSize: BASE_FONT_SIZE,
+              lineHeight: index === 0 ? BASE_LINE_HEIGHT : META_LINE_HEIGHT,
+              fontWeight: index === 0 ? TITLE_FONT_WEIGHT : META_FONT_WEIGHT,
+              color: "#0f172a",
+            };
+          });
           const fillColor = node.fill || "#ffffff";
           parts.push(
             `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="#1e293b" stroke-width="${strokeWidth}" />`
           );
-          let textContent = `<text x="${textX}" y="${firstLineY}" fill="#0f172a" font-size="${fontSize}" dominant-baseline="hanging">`;
-          lines.forEach((line, index) => {
-            const content = escapeXml(line) || " ";
-            if (index === 0) {
-              textContent += content;
-            } else {
-              textContent += `<tspan x="${textX}" dy="${lineSpacing}">${content}</tspan>`;
-            }
+          normalizedLines.forEach((line) => {
+            const lineFontSize = Math.max(6, resolveFontSize(line.fontSize, BASE_FONT_SIZE) * zoom);
+            const baseLineHeight = Number.isFinite(line.lineHeight)
+              ? line.lineHeight
+              : BASE_LINE_HEIGHT;
+            const lineSpacing = Math.max(
+              lineFontSize * 1.2,
+              baseLineHeight * zoom
+            );
+            const fontWeight = Number.isFinite(line.fontWeight)
+              ? line.fontWeight
+              : TITLE_FONT_WEIGHT;
+            const lineColor = line.color || "#0f172a";
+            const textValue = escapeXml(line.text) || " ";
+            parts.push(
+              `<text x="${textX}" y="${currentY}" fill="${lineColor}" font-size="${lineFontSize}" font-weight="${fontWeight}" dominant-baseline="hanging">${textValue}</text>`
+            );
+            currentY += lineSpacing;
           });
-          textContent += "</text>";
-          parts.push(textContent);
         });
 
       parts.push("</svg>");
