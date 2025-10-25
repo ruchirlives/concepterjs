@@ -55,6 +55,9 @@ export const AppProvider = ({ children }) => {
     []
   );
 
+  const [cellWidthInput, setCellWidthInput] = useState('');
+  const [cellHeightInput, setCellHeightInput] = useState('');
+
   const createDefaultFlowGridLookup = useCallback(
     () => ({
       rowsByOriginalId: {},
@@ -377,6 +380,8 @@ export const AppProvider = ({ children }) => {
       activeLayers: setActiveLayers,
       activeState: setActiveState,
       availableStates: setAvailableStates,
+      cellWidthInput: setCellWidthInput,
+      cellHeightInput: setCellHeightInput,
       columnSelectedLayer: setColumnSelectedLayer,
       comparatorState: setComparatorState,
       diffDict: setDiffDict,
@@ -439,6 +444,8 @@ export const AppProvider = ({ children }) => {
     setSelectedFromLayer,
     setSelectedToLayer,
     setShowDropdowns,
+    setCellWidthInput,
+    setCellHeightInput
   ]);
 
   useEffect(() => {
@@ -631,6 +638,11 @@ export const AppProvider = ({ children }) => {
     setInfluencersMap,
     refreshInfluencers,
     refreshInfluencerPair,
+    // Cell size inputs
+    cellWidthInput,
+    setCellWidthInput,
+    cellHeightInput,
+    setCellHeightInput
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

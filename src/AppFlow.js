@@ -230,7 +230,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     layerOrdering,
   } = useFlowLogic();
 
-  const { setParentChildMap } = useAppContext();
+  const { setParentChildMap, cellWidthInput, setCellWidthInput, cellHeightInput, setCellHeightInput } = useAppContext();
 
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
@@ -247,8 +247,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
 
-  const [cellWidthInput, setCellWidthInput] = useState('');
-  const [cellHeightInput, setCellHeightInput] = useState('');
+
 
   const cellWidth = useMemo(() => {
     const value = parseFloat(cellWidthInput);
@@ -338,11 +337,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const handleCellWidthInputChange = useCallback((event) => {
     setCellWidthInput(event.target.value);
-  }, []);
+  }, [setCellWidthInput]);
 
   const handleCellHeightInputChange = useCallback((event) => {
     setCellHeightInput(event.target.value);
-  }, []);
+  }, [setCellHeightInput]);
 
   const handleCellWidthInputBlur = useCallback(() => {
     if (cellWidthInput === '') return;
@@ -352,7 +351,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return;
     }
     setCellWidthInput(value.toString());
-  }, [cellWidthInput]);
+  }, [cellWidthInput, setCellWidthInput]);
 
   const handleCellHeightInputBlur = useCallback(() => {
     if (cellHeightInput === '') return;
@@ -362,7 +361,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return;
     }
     setCellHeightInput(value.toString());
-  }, [cellHeightInput]);
+  }, [cellHeightInput, setCellHeightInput]);
 
   useEffect(() => {
     if (!cellMenuContext) return undefined;
