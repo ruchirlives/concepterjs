@@ -12,6 +12,18 @@ const META_FONT_SIZE = 10;
 const META_LINE_HEIGHT = 15;
 const TITLE_FONT_WEIGHT = 600;
 const META_FONT_WEIGHT = 500;
+const PRIMARY_TEXT_COLOR = "#0f172a";
+const SECONDARY_TEXT_COLOR = "#475569";
+const BUDGET_TEXT_COLOR = "#1d4ed8";
+const NODE_FILL_COLOR = "#ffffff";
+const NODE_STROKE_COLOR = "#1e293b";
+const EDGE_STROKE_COLOR = "#334155";
+const BACKGROUND_COLOR = "#f8fafc";
+const LABEL_CELL_FILL = "#e2e8f0";
+const ROW_BAND_FILL = "rgba(148,163,184,0.08)";
+const ROW_BORDER_COLOR = "rgba(148,163,184,0.5)";
+const COLUMN_BAND_FILL = "rgba(16,185,129,0.08)";
+const COLUMN_BORDER_COLOR = "rgba(16,185,129,0.4)";
 const MARGIN = 32;
 const LABEL_BAND_SIZE = 64;
 const LABEL_TEXT_PADDING = 14;
@@ -141,6 +153,102 @@ const wrapWords = (words, maxWidth, fontSize = BASE_FONT_SIZE) => {
   return lines.length > 0 ? lines : [""];
 };
 
+const TEXT_STYLE_KEYS = ["fontSize", "lineHeight", "fontWeight", "color"];
+
+const collectStyleOverrides = (segment) => {
+  const overrides = {};
+  const sources = [];
+  if (segment && typeof segment === "object") {
+    sources.push(segment);
+    if (segment.style && typeof segment.style === "object") {
+      sources.push(segment.style);
+    }
+  }
+  sources.forEach((source) => {
+    TEXT_STYLE_KEYS.forEach((key) => {
+      if (overrides[key] != null) return;
+      const value = source[key];
+      if (value == null) return;
+      if (key === "color") {
+        if (typeof value === "string" && value.trim()) {
+          overrides.color = value.trim();
+        }
+        return;
+      }
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        overrides[key] = numericValue;
+      }
+    });
+  });
+  return overrides;
+};
+
+const baseTextStyleForSegment = (segment, index = 0) => {
+  const type = segment?.type;
+  if (type === "title" || index === 0) {
+    return {
+      fontSize: BASE_FONT_SIZE,
+      lineHeight: BASE_LINE_HEIGHT,
+      fontWeight: TITLE_FONT_WEIGHT,
+      color: PRIMARY_TEXT_COLOR,
+    };
+  }
+  if (type === "score") {
+    return {
+      fontSize: META_FONT_SIZE,
+      lineHeight: META_LINE_HEIGHT,
+      fontWeight: META_FONT_WEIGHT,
+      color: SECONDARY_TEXT_COLOR,
+    };
+  }
+  if (type === "budget") {
+    return {
+      fontSize: META_FONT_SIZE,
+      lineHeight: META_LINE_HEIGHT,
+      fontWeight: META_FONT_WEIGHT,
+      color: BUDGET_TEXT_COLOR,
+    };
+  }
+  return {
+    fontSize: META_FONT_SIZE,
+    lineHeight: META_LINE_HEIGHT,
+    fontWeight: META_FONT_WEIGHT,
+    color: PRIMARY_TEXT_COLOR,
+  };
+};
+
+const normalizeSegment = (segment, index = 0) => {
+  const baseStyle = baseTextStyleForSegment(segment, index);
+  const overrides = collectStyleOverrides(segment);
+  const fontSize = resolveFontSize(overrides.fontSize, baseStyle.fontSize);
+  const defaultLineHeight = baseStyle.lineHeight > 0
+    ? baseStyle.lineHeight
+    : Math.ceil(fontSize * 1.35);
+  const lineHeight = Number.isFinite(overrides.lineHeight) && overrides.lineHeight > 0
+    ? overrides.lineHeight
+    : Math.max(defaultLineHeight, Math.ceil(fontSize * 1.3));
+  const fontWeight = Number.isFinite(overrides.fontWeight)
+    ? overrides.fontWeight
+    : baseStyle.fontWeight;
+  const color = overrides.color || baseStyle.color;
+  const rawText = (() => {
+    if (!segment) return "";
+    if (typeof segment === "string") return segment;
+    if (typeof segment.text === "string") return segment.text;
+    if (segment.text != null) return String(segment.text);
+    return "";
+  })();
+  const text = rawText.replace(/\s+/g, " ").trim();
+  return {
+    text,
+    fontSize,
+    lineHeight: Math.max(8, lineHeight),
+    fontWeight,
+    color,
+  };
+};
+
 const buildNodeTextSegments = (node = {}) => {
   const segments = [];
   const data = node?.data ?? {};
@@ -153,11 +261,7 @@ const buildNodeTextSegments = (node = {}) => {
   const primary = normalize(data?.Name ?? node?.id ?? "");
   segments.push({
     text: primary || "",
-    fontSize: BASE_FONT_SIZE,
-    lineHeight: BASE_LINE_HEIGHT,
-    fontWeight: TITLE_FONT_WEIGHT,
     type: "title",
-    color: "#0f172a",
   });
 
   const formatScore = (value) => {
@@ -178,11 +282,7 @@ const buildNodeTextSegments = (node = {}) => {
     }
     segments.push({
       text: scoreParts.join(" "),
-      fontSize: META_FONT_SIZE,
-      lineHeight: META_LINE_HEIGHT,
-      fontWeight: META_FONT_WEIGHT,
       type: "score",
-      color: "#475569",
     });
   }
 
@@ -198,11 +298,7 @@ const buildNodeTextSegments = (node = {}) => {
         : `Budget: ${budgetText}`;
       segments.push({
         text: combined,
-        fontSize: META_FONT_SIZE,
-        lineHeight: META_LINE_HEIGHT,
-        fontWeight: META_FONT_WEIGHT,
         type: "budget",
-        color: "#1d4ed8",
       });
     }
   }
@@ -250,17 +346,16 @@ const extractNodeSize = (node = {}) => {
 };
 
 const measureNodeContent = (node = {}, options = {}) => {
-  const segments = buildNodeTextSegments(node);
-  if (!Array.isArray(segments) || !segments.length) {
-    segments.push({
-      text: "",
-      fontSize: BASE_FONT_SIZE,
-      lineHeight: BASE_LINE_HEIGHT,
-      fontWeight: TITLE_FONT_WEIGHT,
-      type: "title",
-      color: "#0f172a",
-    });
-  }
+  const builtSegments = buildNodeTextSegments(node);
+  const rawSegments = Array.isArray(builtSegments) ? builtSegments : [];
+  const segments = (rawSegments.length ? rawSegments : [{ text: "", type: "title" }])
+    .map((segment, index) => normalizeSegment(segment, index));
+  const paddingX = Number.isFinite(options?.paddingX) && options.paddingX > 0
+    ? options.paddingX
+    : TEXT_PADDING_X;
+  const paddingY = Number.isFinite(options?.paddingY) && options.paddingY > 0
+    ? options.paddingY
+    : TEXT_PADDING_Y;
   const resolvedPreferredWidth = Number.isFinite(options?.preferredWidth)
     && options.preferredWidth > 0
     ? options.preferredWidth
@@ -277,42 +372,31 @@ const measureNodeContent = (node = {}, options = {}) => {
     ? Math.max(minNodeWidth, resolvedPreferredWidth)
     : MAX_NODE_WIDTH;
 
-  const minContentWidth = Math.max(40, minNodeWidth - TEXT_PADDING_X);
-  const maxContentWidth = Math.max(minContentWidth, maxNodeWidth - TEXT_PADDING_X);
+  const minContentWidth = Math.max(32, minNodeWidth - paddingX);
+  const maxContentWidth = Math.max(minContentWidth, maxNodeWidth - paddingX);
 
   const wrapSegments = (limit) => {
     const contentLimit = Math.max(minContentWidth, Math.min(limit, maxContentWidth));
     const wrappedLines = [];
     let computedWidth = minNodeWidth;
     segments.forEach((segment) => {
-      const text = segment?.text ?? "";
-      const normalized = typeof text === "string" ? text.trim() : String(text || "").trim();
-      const fontSize = resolveFontSize(segment?.fontSize, BASE_FONT_SIZE);
-      const baseLineHeight = Number(segment?.lineHeight);
-      const lineHeight = Number.isFinite(baseLineHeight) && baseLineHeight > 0
-        ? baseLineHeight
-        : Math.max(BASE_LINE_HEIGHT, Math.ceil(fontSize * 1.35));
-      const fontWeight = Number.isFinite(segment?.fontWeight)
-        ? segment.fontWeight
-        : segment?.type === "title"
-          ? TITLE_FONT_WEIGHT
-          : META_FONT_WEIGHT;
-      const color = segment?.color || "#0f172a";
-      const words = normalized.length ? normalized.split(/\s+/) : [""];
-      const lines = wrapWords(words, contentLimit, fontSize);
-      const safeLines = Array.isArray(lines) && lines.length ? lines : [normalized || ""];
+      const textValue = segment.text || "";
+      const words = textValue.length ? textValue.split(/\s+/) : [""];
+      const lines = wrapWords(words, contentLimit, segment.fontSize);
+      const safeLines = Array.isArray(lines) && lines.length ? lines : [textValue || ""];
       safeLines.forEach((line) => {
+        const normalizedLine = typeof line === "string" ? line.trim() : String(line || "").trim();
         wrappedLines.push({
-          text: line,
-          fontSize,
-          lineHeight,
-          fontWeight,
-          color,
+          text: normalizedLine,
+          fontSize: segment.fontSize,
+          lineHeight: segment.lineHeight,
+          fontWeight: segment.fontWeight,
+          color: segment.color,
         });
-        const measured = measureLineWidth(line, fontSize);
+        const measured = measureLineWidth(normalizedLine, segment.fontSize);
         const widthWithPadding = Math.min(
           maxNodeWidth,
-          Math.max(minNodeWidth, measured + TEXT_PADDING_X)
+          Math.max(minNodeWidth, measured + paddingX)
         );
         computedWidth = Math.max(computedWidth, widthWithPadding);
       });
@@ -323,7 +407,7 @@ const measureNodeContent = (node = {}, options = {}) => {
   let { width, lines } = wrapSegments(maxContentWidth);
   width = clampValue(width, minNodeWidth, maxNodeWidth);
 
-  const targetContentWidth = Math.max(minContentWidth, width - TEXT_PADDING_X);
+  const targetContentWidth = Math.max(minContentWidth, width - paddingX);
   if (resolvedPreferredWidth == null && targetContentWidth < maxContentWidth) {
     const rerun = wrapSegments(targetContentWidth);
     width = clampValue(rerun.width, minNodeWidth, maxNodeWidth);
@@ -335,13 +419,14 @@ const measureNodeContent = (node = {}, options = {}) => {
   }
 
   if (!Array.isArray(lines) || !lines.length) {
+    const fallback = segments[0] || normalizeSegment({ text: "" }, 0);
     lines = [
       {
         text: "",
-        fontSize: BASE_FONT_SIZE,
-        lineHeight: BASE_LINE_HEIGHT,
-        fontWeight: TITLE_FONT_WEIGHT,
-        color: "#0f172a",
+        fontSize: fallback.fontSize,
+        lineHeight: fallback.lineHeight,
+        fontWeight: fallback.fontWeight,
+        color: fallback.color,
       },
     ];
   }
@@ -358,13 +443,41 @@ const measureNodeContent = (node = {}, options = {}) => {
 
   const height = Math.max(
     minNodeHeight,
-    TEXT_PADDING_Y + totalLineHeight
+    paddingY + totalLineHeight
   );
 
   return {
     width,
     height,
     lines,
+  };
+};
+
+const createVisualSizing = (zoom = 1) => {
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const scale = Math.sqrt(safeZoom);
+  const clampedScale = clampValue(scale, 0.7, 1.6);
+  const nodePaddingX = clampValue(14 * clampedScale, 10, 28);
+  const nodePaddingY = clampValue(18 * clampedScale, 12, 36);
+  const cornerRadius = clampValue(12 * clampedScale, 6, 22);
+  const strokeWidth = clampValue(1.6 * clampedScale, 1, 3);
+  const textScale = clampValue(clampedScale, 0.8, 1.45);
+  const lineSpacingFactor = clampValue(1.18 + (clampedScale - 1) * 0.35, 1.15, 1.5);
+  const edgeStrokeWidth = clampValue(2 * clampedScale, 1.5, 3.2);
+  const arrowHeadLength = clampValue(7 * clampedScale, 5, 9.5);
+  const arrowHeadWidth = clampValue(arrowHeadLength * 0.6, 3.5, 6.4);
+  return {
+    nodePaddingX,
+    nodePaddingY,
+    cornerRadius,
+    strokeWidth,
+    textScale,
+    lineSpacingFactor,
+    edge: {
+      strokeWidth: edgeStrokeWidth,
+      headLength: arrowHeadLength,
+      headWidth: arrowHeadWidth,
+    },
   };
 };
 
@@ -399,6 +512,10 @@ export const serializeFlowSvg = ({
   includeColumns = true,
 } = {}) => {
   const zoom = safeNumber(viewport?.zoom, 1);
+  const visualSizing = createVisualSizing(zoom);
+  const zoomUnit = zoom > 0 ? zoom : 1;
+  const layoutPaddingX = (visualSizing.nodePaddingX * 2) / zoomUnit;
+  const layoutPaddingY = (visualSizing.nodePaddingY * 2) / zoomUnit;
   const translateX = safeNumber(viewport?.x, 0);
   const translateY = safeNumber(viewport?.y, 0);
 
@@ -564,6 +681,8 @@ export const serializeFlowSvg = ({
     const metrics = measureNodeContent(node, {
       preferredWidth: explicitSize.width,
       preferredHeight: explicitSize.height,
+      paddingX: layoutPaddingX,
+      paddingY: layoutPaddingY,
     });
     nodeLayoutMap.set(node.id, {
       width: metrics.width,
@@ -582,7 +701,7 @@ export const serializeFlowSvg = ({
           fontSize: BASE_FONT_SIZE,
           lineHeight: BASE_LINE_HEIGHT,
           fontWeight: TITLE_FONT_WEIGHT,
-          color: "#0f172a",
+          color: PRIMARY_TEXT_COLOR,
         },
       ],
     };
@@ -599,7 +718,7 @@ export const serializeFlowSvg = ({
     const centerX = x + width / 2;
     const centerY = y + height / 2;
     const flowCenterY = baseY + heightUnits / 2;
-    let nodeFill = "#ffffff";
+    let nodeFill = NODE_FILL_COLOR;
     for (let i = 0; i < rowColorEntries.length; i += 1) {
       const entry = rowColorEntries[i];
       if (
@@ -663,8 +782,8 @@ export const serializeFlowSvg = ({
     const dominantHorizontal = Math.abs(dx) >= Math.abs(dy);
     const points = [];
     const elbowPaddingMax = 36;
-    const arrowGuard = 18;
-    const targetOverlap = 6;
+    const arrowGuard = Math.max(10, (visualSizing.edge.headLength * 1.2) / zoomUnit);
+    const targetOverlap = Math.max(4, (visualSizing.edge.headWidth * 0.6) / zoomUnit);
 
     if (dominantHorizontal) {
       const direction = dx >= 0 ? 1 : -1;
@@ -825,28 +944,28 @@ export const serializeFlowSvg = ({
   const offsetX = MARGIN - minX;
   const offsetY = MARGIN - minY;
 
+  const markerId = "flowSvgArrow";
+  const edgeStrokeWidth = Number(visualSizing.edge.strokeWidth.toFixed(2));
+  const markerWidth = Number(visualSizing.edge.headLength.toFixed(2));
+  const markerHeight = Number(visualSizing.edge.headWidth.toFixed(2));
+  const markerRefY = Number((markerHeight / 2).toFixed(2));
+
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" font-family="Inter, Arial, sans-serif" font-size="12" fill="#0f172a">`,
-    `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="#f8fafc" />`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" font-family="Inter, Arial, sans-serif" font-size="12" fill="${PRIMARY_TEXT_COLOR}">`,
+    `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="${BACKGROUND_COLOR}" />`,
+    `<defs><marker id="${markerId}" markerWidth="${markerWidth}" markerHeight="${markerHeight}" refX="${markerWidth}" refY="${markerRefY}" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L ${markerWidth} ${markerRefY} L 0 ${markerHeight} z" fill="${EDGE_STROKE_COLOR}" /></marker></defs>`,
   ];
-  parts.push(
-    `<defs>
-          <marker id="flowSvgArrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M 0 0 L 6 3 L 0 6 z" fill="#334155" />
-          </marker>
-        </defs>`
-  );
 
   if (hasRows) {
     rowLabelCells.forEach((cell) => {
       const cellX = cell.x + offsetX;
       const cellY = cell.y + offsetY;
       parts.push(
-        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="#e2e8f0" stroke="${LABEL_CELL_BORDER}" />`
+        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" />`
       );
       if (cell.label) {
         parts.push(
-          `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+          `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
         );
       }
     });
@@ -857,11 +976,11 @@ export const serializeFlowSvg = ({
       const cellX = cell.x + offsetX;
       const cellY = cell.y + offsetY;
       parts.push(
-        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="#e2e8f0" stroke="${LABEL_CELL_BORDER}" />`
+        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" />`
       );
       if (cell.label) {
         parts.push(
-          `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+          `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
         );
       }
     });
@@ -873,13 +992,13 @@ export const serializeFlowSvg = ({
       const x = row.x + offsetX;
       const y = row.y + offsetY;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${row.width}" height="${row.height}" fill="rgba(148,163,184,0.08)" stroke="rgba(148,163,184,0.5)" />`
+        `<rect x="${x}" y="${y}" width="${row.width}" height="${row.height}" fill="${ROW_BAND_FILL}" stroke="${ROW_BORDER_COLOR}" />`
       );
       if (row.label && !hasRows) {
         const labelX = row.labelCenterX + offsetX;
         const labelY = row.labelCenterY + offsetY;
         parts.push(
-          `<text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
+          `<text x="${labelX}" y="${labelY}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
         );
       }
     });
@@ -890,13 +1009,13 @@ export const serializeFlowSvg = ({
       const x = column.x + offsetX;
       const y = column.y + offsetY;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${column.width}" height="${column.height}" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.4)" />`
+        `<rect x="${x}" y="${y}" width="${column.width}" height="${column.height}" fill="${COLUMN_BAND_FILL}" stroke="${COLUMN_BORDER_COLOR}" />`
       );
       if (column.label && !hasColumns) {
         const labelX = column.labelCenterX + offsetX;
         const labelY = column.labelCenterY + offsetY;
         parts.push(
-          `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="#0f172a" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(
+          `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(
             column.label
           )}</text>`
         );
@@ -908,7 +1027,7 @@ export const serializeFlowSvg = ({
       .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x + offsetX} ${pt.y + offsetY}`)
       .join(" ");
     parts.push(
-      `<path d="${pathData}" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round" marker-end="url(#flowSvgArrow)" />`
+      `<path d="${pathData}" stroke="${EDGE_STROKE_COLOR}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" marker-end="url(#${markerId})" />`
     );
   });
 
@@ -917,10 +1036,10 @@ export const serializeFlowSvg = ({
     .forEach((node) => {
       const x = node.x + offsetX;
       const y = node.y + offsetY;
-      const cornerRadius = Math.max(4, 12 * zoom);
-      const strokeWidth = Math.max(1, 1.5 * zoom);
-      const textPaddingX = Math.max(8, (TEXT_PADDING_X / 2) * zoom);
-      const textPaddingTop = Math.max(8, (TEXT_PADDING_Y / 2) * zoom);
+      const cornerRadius = visualSizing.cornerRadius;
+      const strokeWidth = visualSizing.strokeWidth;
+      const textPaddingX = visualSizing.nodePaddingX;
+      const textPaddingTop = visualSizing.nodePaddingY;
       const textX = x + textPaddingX;
       let currentY = y + textPaddingTop;
       const rawLines = Array.isArray(node.lines) && node.lines.length
@@ -931,7 +1050,7 @@ export const serializeFlowSvg = ({
               fontSize: BASE_FONT_SIZE,
               lineHeight: BASE_LINE_HEIGHT,
               fontWeight: TITLE_FONT_WEIGHT,
-              color: "#0f172a",
+              color: PRIMARY_TEXT_COLOR,
             },
           ];
       const normalizedLines = rawLines.map((line, index) => {
@@ -949,7 +1068,7 @@ export const serializeFlowSvg = ({
               : index === 0
                 ? TITLE_FONT_WEIGHT
                 : META_FONT_WEIGHT,
-            color: line.color || "#0f172a",
+            color: line.color || PRIMARY_TEXT_COLOR,
           };
         }
         const textValue = line == null ? "" : String(line);
@@ -958,32 +1077,32 @@ export const serializeFlowSvg = ({
           fontSize: BASE_FONT_SIZE,
           lineHeight: index === 0 ? BASE_LINE_HEIGHT : META_LINE_HEIGHT,
           fontWeight: index === 0 ? TITLE_FONT_WEIGHT : META_FONT_WEIGHT,
-          color: "#0f172a",
+          color: PRIMARY_TEXT_COLOR,
         };
       });
-      const fillColor = node.fill || "#ffffff";
+      const fillColor = node.fill || NODE_FILL_COLOR;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="#1e293b" stroke-width="${strokeWidth}" />`
+        `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="${NODE_STROKE_COLOR}" stroke-width="${strokeWidth}" />`
       );
       normalizedLines.forEach((line) => {
-        const lineFontSize = Math.max(
-          6,
-          resolveFontSize(line.fontSize, BASE_FONT_SIZE) * zoom
-        );
+        const baseFontSize = resolveFontSize(line.fontSize, BASE_FONT_SIZE);
+        const scaledFontSize = Math.max(6, baseFontSize * visualSizing.textScale);
+        const fontSizeValue = Number(scaledFontSize.toFixed(2));
         const baseLineHeight = Number.isFinite(line.lineHeight)
           ? line.lineHeight
           : BASE_LINE_HEIGHT;
-        const lineSpacing = Math.max(
-          lineFontSize * 1.2,
-          baseLineHeight * zoom
+        const lineSpacingRaw = Math.max(
+          scaledFontSize * visualSizing.lineSpacingFactor,
+          baseLineHeight * visualSizing.textScale
         );
+        const lineSpacing = Number(lineSpacingRaw.toFixed(2));
         const fontWeight = Number.isFinite(line.fontWeight)
           ? line.fontWeight
           : TITLE_FONT_WEIGHT;
-        const lineColor = line.color || "#0f172a";
+        const lineColor = line.color || PRIMARY_TEXT_COLOR;
         const textValue = escapeXml(line.text) || " ";
         parts.push(
-          `<text x="${textX}" y="${currentY}" fill="${lineColor}" font-size="${lineFontSize}" font-weight="${fontWeight}" dominant-baseline="hanging">${textValue}</text>`
+          `<text x="${textX}" y="${currentY}" fill="${lineColor}" font-size="${fontSizeValue}" font-weight="${fontWeight}" dominant-baseline="hanging">${textValue}</text>`
         );
         currentY += lineSpacing;
       });
