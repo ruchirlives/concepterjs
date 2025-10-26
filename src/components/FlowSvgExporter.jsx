@@ -30,6 +30,28 @@ const LABEL_TEXT_PADDING = 14;
 const EDGE_ANCHOR_PADDING = 18;
 const LABEL_FONT_SIZE = 12;
 const LABEL_LINE_HEIGHT = 16;
+const LABEL_CELL_CORNER_RADIUS = 12;
+const ROW_BAND_FILL_ALT = "rgba(148,163,184,0.03)";
+const COLUMN_BAND_FILL_ALT = "rgba(16,185,129,0.03)";
+const FRAME_BORDER_COLOR = "rgba(15,23,42,0.12)";
+const FRAME_BORDER_WIDTH = 1;
+const BACKGROUND_PATTERN_ID = "flowBackgroundGrid";
+const BACKGROUND_GRID_SIZE = 24;
+const BACKGROUND_GRID_STROKE_COLOR = "#cbd5f5";
+const BACKGROUND_GRID_STROKE_OPACITY = 0.4;
+const BACKGROUND_GRID_STROKE_WIDTH = 0.6;
+const BACKGROUND_PATTERN_OPACITY = 0.45;
+const NODE_SHADOW_FILTER_ID = "flowNodeShadow";
+const LABEL_SHADOW_FILTER_ID = "flowLabelShadow";
+const NODE_SHADOW_COLOR = "#0f172a";
+const NODE_SHADOW_OPACITY = 0.18;
+const LABEL_SHADOW_COLOR = "#1e293b";
+const LABEL_SHADOW_OPACITY = 0.16;
+const NODE_TEXT_STROKE_COLOR = "rgba(255,255,255,0.75)";
+const NODE_TEXT_STROKE_WIDTH = 1.1;
+const EDGE_HALO_COLOR = "#f8fafc";
+const EDGE_HALO_OPACITY = 0.7;
+const EDGE_HALO_EXTRA_WIDTH = 2.4;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -605,7 +627,7 @@ export const serializeFlowSvg = ({
   const rowColorEntries = [];
 
   if (hasRows) {
-    rows.forEach((row) => {
+    rows.forEach((row, rowIndex) => {
       const height = safeNumber(row?.height) * zoom;
       const contentTop = safeNumber(row?.top) * zoom + contentTranslateY;
       const rectWidth = resolvedBoundsWidth * zoom;
@@ -619,6 +641,7 @@ export const serializeFlowSvg = ({
         label: row?.label || "",
         labelCenterX: translateX + rowLabelThickness / 2,
         labelCenterY: contentTop + height / 2,
+        index: rowIndex,
       });
       registerBounds(x, contentTop, rectWidth, height);
       registerBounds(translateX, contentTop, rowLabelThickness, height);
@@ -629,6 +652,7 @@ export const serializeFlowSvg = ({
         width: rowLabelThickness,
         height,
         label: row?.label || "",
+        index: rowIndex,
       });
 
       const rawTop = safeNumber(row?.top);
@@ -646,7 +670,7 @@ export const serializeFlowSvg = ({
   }
 
   if (hasColumns) {
-    columns.forEach((column) => {
+    columns.forEach((column, columnIndex) => {
       const width = safeNumber(column?.width) * zoom;
       const contentLeft = safeNumber(column?.left) * zoom + contentTranslateX;
       const rectHeight = resolvedBoundsHeight * zoom;
@@ -660,6 +684,7 @@ export const serializeFlowSvg = ({
         label: column?.label || "",
         labelCenterX: contentLeft + width / 2,
         labelCenterY: translateY + columnLabelThickness / 2,
+        index: columnIndex,
       });
       registerBounds(contentLeft, y, width, rectHeight);
       registerBounds(contentLeft, translateY, width, columnLabelThickness);
@@ -670,6 +695,7 @@ export const serializeFlowSvg = ({
         width,
         height: columnLabelThickness,
         label: column?.label || "",
+        index: columnIndex,
       });
     });
   }
@@ -949,11 +975,33 @@ export const serializeFlowSvg = ({
   const markerWidth = Number(visualSizing.edge.headLength.toFixed(2));
   const markerHeight = Number(visualSizing.edge.headWidth.toFixed(2));
   const markerRefY = Number((markerHeight / 2).toFixed(2));
+  const haloStrokeWidth = Number(
+    (edgeStrokeWidth + EDGE_HALO_EXTRA_WIDTH).toFixed(2)
+  );
+
+  const styleBlock = [
+    "<style>",
+    "  text { text-rendering: optimizeLegibility; font-kerning: normal; }",
+    `  .flow-node-text { paint-order: stroke fill; stroke: ${NODE_TEXT_STROKE_COLOR}; stroke-width: ${NODE_TEXT_STROKE_WIDTH}px; }`,
+    "  .flow-label-text { letter-spacing: 0.04em; text-rendering: geometricPrecision; }",
+    "  .flow-edge, .flow-edge-halo { vector-effect: non-scaling-stroke; }",
+    "</style>",
+  ].join("\n");
+
+  const defsParts = [
+    styleBlock,
+    `<filter id="${NODE_SHADOW_FILTER_ID}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="${NODE_SHADOW_COLOR}" flood-opacity="${NODE_SHADOW_OPACITY}" /></filter>`,
+    `<filter id="${LABEL_SHADOW_FILTER_ID}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="${LABEL_SHADOW_COLOR}" flood-opacity="${LABEL_SHADOW_OPACITY}" /></filter>`,
+    `<pattern id="${BACKGROUND_PATTERN_ID}" width="${BACKGROUND_GRID_SIZE}" height="${BACKGROUND_GRID_SIZE}" patternUnits="userSpaceOnUse"><rect width="${BACKGROUND_GRID_SIZE}" height="${BACKGROUND_GRID_SIZE}" fill="${BACKGROUND_COLOR}" /><path d="M ${BACKGROUND_GRID_SIZE} 0 L 0 0 0 ${BACKGROUND_GRID_SIZE}" fill="none" stroke="${BACKGROUND_GRID_STROKE_COLOR}" stroke-opacity="${BACKGROUND_GRID_STROKE_OPACITY}" stroke-width="${BACKGROUND_GRID_STROKE_WIDTH}" /></pattern>`,
+    `<marker id="${markerId}" markerWidth="${markerWidth}" markerHeight="${markerHeight}" refX="${markerWidth}" refY="${markerRefY}" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L ${markerWidth} ${markerRefY} L 0 ${markerHeight} z" fill="${EDGE_STROKE_COLOR}" /></marker>`,
+  ];
 
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" font-family="Inter, Arial, sans-serif" font-size="12" fill="${PRIMARY_TEXT_COLOR}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" font-family="Inter, Arial, sans-serif" font-size="12" fill="${PRIMARY_TEXT_COLOR}" shape-rendering="geometricPrecision">`,
+    `<defs>${defsParts.join("")}</defs>`,
     `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="${BACKGROUND_COLOR}" />`,
-    `<defs><marker id="${markerId}" markerWidth="${markerWidth}" markerHeight="${markerHeight}" refX="${markerWidth}" refY="${markerRefY}" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L ${markerWidth} ${markerRefY} L 0 ${markerHeight} z" fill="${EDGE_STROKE_COLOR}" /></marker></defs>`,
+    `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="url(#${BACKGROUND_PATTERN_ID})" opacity="${BACKGROUND_PATTERN_OPACITY}" />`,
+    `<rect x="0" y="0" width="${totalWidth}" height="${totalHeight}" fill="none" stroke="${FRAME_BORDER_COLOR}" stroke-width="${FRAME_BORDER_WIDTH}" />`,
   ];
 
   if (hasRows) {
@@ -961,11 +1009,11 @@ export const serializeFlowSvg = ({
       const cellX = cell.x + offsetX;
       const cellY = cell.y + offsetY;
       parts.push(
-        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" />`
+        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" rx="${LABEL_CELL_CORNER_RADIUS}" ry="${LABEL_CELL_CORNER_RADIUS}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" filter="url(#${LABEL_SHADOW_FILTER_ID})" />`
       );
       if (cell.label) {
         parts.push(
-          `<text x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+          `<text class="flow-label-text" x="${cellX + LABEL_TEXT_PADDING}" y="${cellY + cell.height / 2}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
         );
       }
     });
@@ -976,11 +1024,11 @@ export const serializeFlowSvg = ({
       const cellX = cell.x + offsetX;
       const cellY = cell.y + offsetY;
       parts.push(
-        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" />`
+        `<rect x="${cellX}" y="${cellY}" width="${cell.width}" height="${cell.height}" rx="${LABEL_CELL_CORNER_RADIUS}" ry="${LABEL_CELL_CORNER_RADIUS}" fill="${LABEL_CELL_FILL}" stroke="${LABEL_CELL_BORDER}" filter="url(#${LABEL_SHADOW_FILTER_ID})" />`
       );
       if (cell.label) {
         parts.push(
-          `<text x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
+          `<text class="flow-label-text" x="${cellX + cell.width / 2}" y="${cellY + cell.height / 2}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(cell.label)}</text>`
         );
       }
     });
@@ -991,14 +1039,16 @@ export const serializeFlowSvg = ({
     .forEach((row) => {
       const x = row.x + offsetX;
       const y = row.y + offsetY;
+      const isAltRow = Number.isFinite(row.index) && row.index % 2 === 1;
+      const rowFill = isAltRow ? ROW_BAND_FILL_ALT : ROW_BAND_FILL;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${row.width}" height="${row.height}" fill="${ROW_BAND_FILL}" stroke="${ROW_BORDER_COLOR}" />`
+        `<rect x="${x}" y="${y}" width="${row.width}" height="${row.height}" fill="${rowFill}" stroke="${ROW_BORDER_COLOR}" />`
       );
       if (row.label && !hasRows) {
         const labelX = row.labelCenterX + offsetX;
         const labelY = row.labelCenterY + offsetY;
         parts.push(
-          `<text x="${labelX}" y="${labelY}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
+          `<text class="flow-label-text" x="${labelX}" y="${labelY}" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle" text-anchor="middle">${escapeXml(row.label)}</text>`
         );
       }
     });
@@ -1008,14 +1058,16 @@ export const serializeFlowSvg = ({
     .forEach((column) => {
       const x = column.x + offsetX;
       const y = column.y + offsetY;
+      const isAltColumn = Number.isFinite(column.index) && column.index % 2 === 1;
+      const columnFill = isAltColumn ? COLUMN_BAND_FILL_ALT : COLUMN_BAND_FILL;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${column.width}" height="${column.height}" fill="${COLUMN_BAND_FILL}" stroke="${COLUMN_BORDER_COLOR}" />`
+        `<rect x="${x}" y="${y}" width="${column.width}" height="${column.height}" fill="${columnFill}" stroke="${COLUMN_BORDER_COLOR}" />`
       );
       if (column.label && !hasColumns) {
         const labelX = column.labelCenterX + offsetX;
         const labelY = column.labelCenterY + offsetY;
         parts.push(
-          `<text x="${labelX}" y="${labelY}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(
+          `<text class="flow-label-text" x="${labelX}" y="${labelY}" text-anchor="middle" fill="${PRIMARY_TEXT_COLOR}" font-size="${Math.max(10, LABEL_FONT_SIZE)}" font-weight="600" dominant-baseline="middle">${escapeXml(
             column.label
           )}</text>`
         );
@@ -1027,7 +1079,10 @@ export const serializeFlowSvg = ({
       .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x + offsetX} ${pt.y + offsetY}`)
       .join(" ");
     parts.push(
-      `<path d="${pathData}" stroke="${EDGE_STROKE_COLOR}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" marker-end="url(#${markerId})" />`
+      `<path class="flow-edge-halo" d="${pathData}" stroke="${EDGE_HALO_COLOR}" stroke-width="${haloStrokeWidth}" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="${EDGE_HALO_OPACITY}" />`
+    );
+    parts.push(
+      `<path class="flow-edge" d="${pathData}" stroke="${EDGE_STROKE_COLOR}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#${markerId})" />`
     );
   });
 
@@ -1082,7 +1137,7 @@ export const serializeFlowSvg = ({
       });
       const fillColor = node.fill || NODE_FILL_COLOR;
       parts.push(
-        `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="${NODE_STROKE_COLOR}" stroke-width="${strokeWidth}" />`
+        `<rect x="${x}" y="${y}" width="${node.width}" height="${node.height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fillColor}" stroke="${NODE_STROKE_COLOR}" stroke-width="${strokeWidth}" filter="url(#${NODE_SHADOW_FILTER_ID})" />`
       );
       normalizedLines.forEach((line) => {
         const baseFontSize = resolveFontSize(line.fontSize, BASE_FONT_SIZE);
@@ -1102,7 +1157,7 @@ export const serializeFlowSvg = ({
         const lineColor = line.color || PRIMARY_TEXT_COLOR;
         const textValue = escapeXml(line.text) || " ";
         parts.push(
-          `<text x="${textX}" y="${currentY}" fill="${lineColor}" font-size="${fontSizeValue}" font-weight="${fontWeight}" dominant-baseline="hanging">${textValue}</text>`
+          `<text class="flow-node-text" x="${textX}" y="${currentY}" fill="${lineColor}" font-size="${fontSizeValue}" font-weight="${fontWeight}" dominant-baseline="hanging">${textValue}</text>`
         );
         currentY += lineSpacing;
       });
