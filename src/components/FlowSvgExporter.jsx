@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle } from "react";
 
 const MIN_NODE_WIDTH = 140;
-const MAX_NODE_WIDTH = 420;
+const MAX_NODE_WIDTH = 600;
 const MIN_NODE_HEIGHT = 32;
 const TEXT_PADDING_X = 24;
 const TEXT_PADDING_Y = 24;
@@ -104,7 +104,7 @@ const measureLineWidth = (text = "", fontSize = BASE_FONT_SIZE) => {
   }
   const resolvedFontSize = resolveFontSize(fontSize);
   const charWidth = (resolvedFontSize / BASE_FONT_SIZE) * BASE_CHAR_WIDTH;
-  return text.length * charWidth;
+  return (text.length * charWidth) + 50;
 };
 
 const splitLongWord = (word = "", maxWidth = 0, fontSize = BASE_FONT_SIZE) => {
@@ -137,7 +137,7 @@ const wrapWords = (words, maxWidth, fontSize = BASE_FONT_SIZE) => {
   words.forEach((word) => {
     if (!word.length) return;
     const tentative = current.length ? `${current} ${word}` : word;
-    if (measureLineWidth(tentative, fontSize) <= maxWidth) {
+    if (measureLineWidth(tentative, fontSize) + TEXT_PADDING_Y <= maxWidth) {
       current = tentative;
       return;
     }
