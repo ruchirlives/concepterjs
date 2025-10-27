@@ -18,6 +18,9 @@ const BUDGET_TEXT_COLOR = "#1d4ed8";
 const NODE_FILL_COLOR = "#ffffff";
 const NODE_STROKE_COLOR = "#1e293b";
 const EDGE_STROKE_COLOR = "#334155";
+const EDGE_STROKE_BASE_WIDTH = 2;
+const EDGE_STROKE_MIN_WIDTH = 1.5;
+const EDGE_STROKE_MAX_WIDTH = 3.2;
 const BACKGROUND_COLOR = "#f8fafc";
 const LABEL_CELL_FILL = "#e2e8f0";
 const ROW_BAND_FILL = "rgba(148,163,184,0.08)";
@@ -52,6 +55,12 @@ const NODE_TEXT_STROKE_WIDTH = 1.1;
 const EDGE_HALO_COLOR = "#f8fafc";
 const EDGE_HALO_OPACITY = 0.7;
 const EDGE_HALO_EXTRA_WIDTH = 2.4;
+const EDGE_ARROW_BASE_LENGTH = 4.8;
+const EDGE_ARROW_MIN_LENGTH = 3.2;
+const EDGE_ARROW_MAX_LENGTH = 6.4;
+const EDGE_ARROW_WIDTH_RATIO = 0.55;
+const EDGE_ARROW_MIN_WIDTH = 2.2;
+const EDGE_ARROW_MAX_WIDTH = 4.4;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -340,6 +349,29 @@ const clampValue = (value, min, max) => {
   return next;
 };
 
+const computeBranchOffsets = (count = 0, maxOffset = 0, baseSpacing = 28) => {
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+  if (safeCount <= 0) return [];
+  if (safeCount === 1) return [0];
+  if (!(Number.isFinite(maxOffset) && maxOffset > 0)) {
+    return new Array(safeCount).fill(0);
+  }
+  let spacing = (maxOffset * 2) / Math.max(1, safeCount - 1);
+  if (!Number.isFinite(spacing) || spacing <= 0) {
+    spacing = maxOffset / safeCount;
+  }
+  if (Number.isFinite(baseSpacing) && baseSpacing > 0) {
+    spacing = Math.min(spacing, baseSpacing);
+  }
+  const offsets = [];
+  const origin = -((spacing * (safeCount - 1)) / 2);
+  for (let i = 0; i < safeCount; i += 1) {
+    const value = clampValue(origin + spacing * i, -maxOffset, maxOffset);
+    offsets.push(value);
+  }
+  return offsets;
+};
+
 const pickPositive = (...values) => {
   for (const value of values) {
     if (Number.isFinite(value) && value > 0) {
@@ -485,9 +517,21 @@ const createVisualSizing = (zoom = 1) => {
   const strokeWidth = clampValue(1.6 * clampedScale, 1, 3);
   const textScale = clampValue(clampedScale, 0.8, 1.45);
   const lineSpacingFactor = clampValue(1.18 + (clampedScale - 1) * 0.35, 1.15, 1.5);
-  const edgeStrokeWidth = clampValue(2 * clampedScale, 1.5, 3.2);
-  const arrowHeadLength = clampValue(7 * clampedScale, 5, 9.5);
-  const arrowHeadWidth = clampValue(arrowHeadLength * 0.6, 3.5, 6.4);
+  const edgeStrokeWidth = clampValue(
+    EDGE_STROKE_BASE_WIDTH * clampedScale,
+    EDGE_STROKE_MIN_WIDTH,
+    EDGE_STROKE_MAX_WIDTH
+  );
+  const arrowHeadLength = clampValue(
+    EDGE_ARROW_BASE_LENGTH * clampedScale,
+    EDGE_ARROW_MIN_LENGTH,
+    EDGE_ARROW_MAX_LENGTH
+  );
+  const arrowHeadWidth = clampValue(
+    arrowHeadLength * EDGE_ARROW_WIDTH_RATIO,
+    EDGE_ARROW_MIN_WIDTH,
+    EDGE_ARROW_MAX_WIDTH
+  );
   return {
     nodePaddingX,
     nodePaddingY,
@@ -778,25 +822,13 @@ export const serializeFlowSvg = ({
   });
   const edgeGroupIndex = new Map();
 
-  edges.forEach((edge) => {
+  const plannedEdges = [];
+
+  (edges || []).forEach((edge) => {
     const sourceRect = nodeRenderMap.get(edge?.source);
     const targetRect = nodeRenderMap.get(edge?.target);
     if (!sourceRect || !targetRect) return;
     if (edge?.source === edge?.target) return;
-
-    const key = `${edge.source}||${edge.target}`;
-    const currentIndex = edgeGroupIndex.get(key) || 0;
-    edgeGroupIndex.set(key, currentIndex + 1);
-    const totalInGroup = edgeGroupCounts.get(key) || 1;
-    const centeredIndex =
-      totalInGroup > 1 ? currentIndex - (totalInGroup - 1) / 2 : 0;
-    const offsetSpacing = 28;
-    const maxOffset = 120;
-    let perpendicularOffset = centeredIndex * offsetSpacing;
-    perpendicularOffset = Math.max(
-      -maxOffset,
-      Math.min(maxOffset, perpendicularOffset)
-    );
 
     const sourceCenterX = sourceRect.x + sourceRect.width / 2;
     const sourceCenterY = sourceRect.y + sourceRect.height / 2;
@@ -804,19 +836,162 @@ export const serializeFlowSvg = ({
     const targetCenterY = targetRect.y + targetRect.height / 2;
     const dx = targetCenterX - sourceCenterX;
     const dy = targetCenterY - sourceCenterY;
+    const orientation = Math.abs(dx) >= Math.abs(dy) ? "horizontal" : "vertical";
+    const direction =
+      orientation === "horizontal"
+        ? dx >= 0
+          ? 1
+          : -1
+        : dy >= 0
+          ? 1
+          : -1;
+    const sourceSide =
+      orientation === "horizontal"
+        ? direction >= 0
+          ? "right"
+          : "left"
+        : direction >= 0
+          ? "bottom"
+          : "top";
+    const targetSide =
+      orientation === "horizontal"
+        ? direction >= 0
+          ? "left"
+          : "right"
+        : direction >= 0
+          ? "top"
+          : "bottom";
 
-    const dominantHorizontal = Math.abs(dx) >= Math.abs(dy);
+    plannedEdges.push({
+      edge,
+      sourceRect,
+      targetRect,
+      sourceCenterX,
+      sourceCenterY,
+      targetCenterX,
+      targetCenterY,
+      dx,
+      dy,
+      orientation,
+      direction,
+      sourceSide,
+      targetSide,
+      sourceOffset: 0,
+      targetOffset: 0,
+    });
+  });
+
+  const branchMargin = 6;
+  const sourceGroups = new Map();
+  const targetGroups = new Map();
+
+  plannedEdges.forEach((plan) => {
+    const sourceKey = `${plan.edge.source}||${plan.orientation}||${plan.sourceSide}`;
+    if (!sourceGroups.has(sourceKey)) sourceGroups.set(sourceKey, []);
+    sourceGroups.get(sourceKey).push(plan);
+
+    const targetKey = `${plan.edge.target}||${plan.orientation}||${plan.targetSide}`;
+    if (!targetGroups.has(targetKey)) targetGroups.set(targetKey, []);
+    targetGroups.get(targetKey).push(plan);
+  });
+
+  const assignOffsets = (groups, isSource) => {
+    groups.forEach((group) => {
+      if (!group || !group.length) return;
+      const orientation = group[0]?.orientation;
+      if (!orientation) return;
+
+      if (orientation === "horizontal") {
+        group.sort((a, b) => {
+          const valueA = isSource ? a.targetCenterY : a.sourceCenterY;
+          const valueB = isSource ? b.targetCenterY : b.sourceCenterY;
+          if (Number.isFinite(valueA) && Number.isFinite(valueB) && valueA !== valueB) {
+            return valueA - valueB;
+          }
+          if (Number.isFinite(valueA) && !Number.isFinite(valueB)) return -1;
+          if (!Number.isFinite(valueA) && Number.isFinite(valueB)) return 1;
+          const idA = String(a.edge?.id || "");
+          const idB = String(b.edge?.id || "");
+          return idA.localeCompare(idB);
+        });
+      } else {
+        group.sort((a, b) => {
+          const valueA = isSource ? a.targetCenterX : a.sourceCenterX;
+          const valueB = isSource ? b.targetCenterX : b.sourceCenterX;
+          if (Number.isFinite(valueA) && Number.isFinite(valueB) && valueA !== valueB) {
+            return valueA - valueB;
+          }
+          if (Number.isFinite(valueA) && !Number.isFinite(valueB)) return -1;
+          if (!Number.isFinite(valueA) && Number.isFinite(valueB)) return 1;
+          const idA = String(a.edge?.id || "");
+          const idB = String(b.edge?.id || "");
+          return idA.localeCompare(idB);
+        });
+      }
+
+      let maxLimit = 0;
+      group.forEach((plan) => {
+        const size = orientation === "horizontal"
+          ? (isSource ? plan.sourceRect.height : plan.targetRect.height)
+          : (isSource ? plan.sourceRect.width : plan.targetRect.width);
+        const limit = Number.isFinite(size)
+          ? Math.max(0, size / 2 - branchMargin)
+          : 0;
+        maxLimit = Math.max(maxLimit, limit);
+      });
+      const cappedLimit = Math.min(120, maxLimit);
+      const offsets = computeBranchOffsets(group.length, cappedLimit, 26);
+      group.forEach((plan, index) => {
+        const rawOffset = offsets[index] ?? 0;
+        const size = orientation === "horizontal"
+          ? (isSource ? plan.sourceRect.height : plan.targetRect.height)
+          : (isSource ? plan.sourceRect.width : plan.targetRect.width);
+        const limit = Number.isFinite(size)
+          ? Math.max(0, size / 2 - branchMargin)
+          : 0;
+        if (isSource) {
+          plan.sourceOffset = clampValue(rawOffset, -limit, limit);
+        } else {
+          plan.targetOffset = clampValue(rawOffset, -limit, limit);
+        }
+      });
+    });
+  };
+
+  assignOffsets(sourceGroups, true);
+  assignOffsets(targetGroups, false);
+
+  plannedEdges.forEach((plan) => {
+    const { edge, sourceRect, targetRect, orientation, direction, dx, dy } = plan;
+    const sourceOffset = Number.isFinite(plan.sourceOffset) ? plan.sourceOffset : 0;
+    const targetOffset = Number.isFinite(plan.targetOffset) ? plan.targetOffset : 0;
+    const sourceCenterX = plan.sourceCenterX;
+    const sourceCenterY = plan.sourceCenterY;
+    const targetCenterX = plan.targetCenterX;
+    const targetCenterY = plan.targetCenterY;
+
+    const key = `${edge.source}||${edge.target}`;
+    const currentIndex = edgeGroupIndex.get(key) || 0;
+    edgeGroupIndex.set(key, currentIndex + 1);
+    const totalInGroup = edgeGroupCounts.get(key) || 1;
+    const centeredIndex =
+      totalInGroup > 1 ? currentIndex - (totalInGroup - 1) / 2 : 0;
+    const offsetSpacing = 20;
+    const maxOffset = 120;
+    let perpendicularOffset = centeredIndex * offsetSpacing;
+    perpendicularOffset = clampValue(perpendicularOffset, -maxOffset, maxOffset);
+
     const points = [];
     const elbowPaddingMax = 36;
-    const arrowGuard = Math.max(10, (visualSizing.edge.headLength * 1.2) / zoomUnit);
-    const targetOverlap = Math.max(4, (visualSizing.edge.headWidth * 0.6) / zoomUnit);
+    const arrowGuard = Math.max(6, (visualSizing.edge.headLength * 1.3) / zoomUnit);
+    const targetOverlap = Math.max(3, (visualSizing.edge.headWidth * 0.65) / zoomUnit);
 
-    if (dominantHorizontal) {
-      const direction = dx >= 0 ? 1 : -1;
+    if (orientation === "horizontal") {
+      const directionSign = direction >= 0 ? 1 : -1;
       const rawStartX =
-        direction >= 0 ? sourceRect.x + sourceRect.width : sourceRect.x;
+        directionSign >= 0 ? sourceRect.x + sourceRect.width : sourceRect.x;
       const rawEndX =
-        direction >= 0 ? targetRect.x : targetRect.x + targetRect.width;
+        directionSign >= 0 ? targetRect.x : targetRect.x + targetRect.width;
       const available = Math.max(0, Math.abs(rawEndX - rawStartX));
       const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
       const exitPadding = Math.min(anchorPadding, Math.max(0, available / 2));
@@ -824,13 +999,18 @@ export const serializeFlowSvg = ({
         Math.max(2, exitPadding),
         sourceRect.width / 2
       );
+      const exitY = clampValue(
+        sourceCenterY + sourceOffset,
+        sourceRect.y + 2,
+        sourceRect.y + sourceRect.height - 2
+      );
       const exit = {
-        x: rawStartX + direction * exitPadding,
-        y: sourceCenterY,
+        x: rawStartX + directionSign * exitPadding,
+        y: exitY,
       };
       const start = {
-        x: rawStartX - direction * insetPadding,
-        y: sourceCenterY,
+        x: rawStartX - directionSign * insetPadding,
+        y: exitY,
       };
       const maxEntryInset = Math.max(
         targetOverlap,
@@ -840,14 +1020,19 @@ export const serializeFlowSvg = ({
         targetOverlap,
         Math.min(maxEntryInset, anchorPadding)
       );
-      const unclampedEndX = rawEndX + direction * entryPadding;
+      const unclampedEndX = rawEndX + directionSign * entryPadding;
+      const endY = clampValue(
+        targetCenterY + targetOffset,
+        targetRect.y + 1,
+        targetRect.y + targetRect.height - 1
+      );
       const end = {
         x: clampValue(
           unclampedEndX,
           targetRect.x + 1,
           targetRect.x + targetRect.width - 1
         ),
-        y: targetCenterY,
+        y: endY,
       };
       const horizontalDistance = Math.max(0, Math.abs(end.x - exit.x));
       const elbowLimit = Math.max(0, horizontalDistance / 2 - 6);
@@ -856,17 +1041,27 @@ export const serializeFlowSvg = ({
         elbowLimit,
         Math.max(0, horizontalDistance / 3)
       );
-      const firstX = exit.x + direction * elbowPadding;
-      const lastX = end.x - direction * elbowPadding;
-      const bendY = exit.y + perpendicularOffset;
+      const firstX = exit.x + directionSign * elbowPadding;
+      const lastX = end.x - directionSign * elbowPadding;
+      const laneBias = (targetOffset - sourceOffset) * 0.5;
+      const desiredBendY = exit.y + perpendicularOffset + laneBias;
+      const bendRange = Math.max(40, Math.abs(end.y - exit.y) + 20);
+      const clampedBendY = clampValue(
+        desiredBendY,
+        exit.y - bendRange,
+        exit.y + bendRange
+      );
+      const verticalDelta = clampedBendY - exit.y;
       const verticalSign =
-        perpendicularOffset !== 0
-          ? Math.sign(perpendicularOffset)
+        Math.abs(verticalDelta) > 0.001
+          ? Math.sign(verticalDelta)
           : dy === 0
             ? 1
             : Math.sign(dy);
       const approachBendY =
-        bendY === exit.y ? bendY + verticalSign * arrowGuard : bendY;
+        Math.abs(verticalDelta) > 0.001
+          ? clampedBendY
+          : clampedBendY + verticalSign * arrowGuard;
       points.push(
         start,
         exit,
@@ -877,11 +1072,11 @@ export const serializeFlowSvg = ({
         end
       );
     } else {
-      const direction = dy >= 0 ? 1 : -1;
+      const directionSign = direction >= 0 ? 1 : -1;
       const rawStartY =
-        direction >= 0 ? sourceRect.y + sourceRect.height : sourceRect.y;
+        directionSign >= 0 ? sourceRect.y + sourceRect.height : sourceRect.y;
       const rawEndY =
-        direction >= 0 ? targetRect.y : targetRect.y + targetRect.height;
+        directionSign >= 0 ? targetRect.y : targetRect.y + targetRect.height;
       const available = Math.max(0, Math.abs(rawEndY - rawStartY));
       const anchorPadding = Math.min(EDGE_ANCHOR_PADDING, available / 3);
       const exitPadding = Math.min(anchorPadding, Math.max(0, available / 2));
@@ -889,13 +1084,18 @@ export const serializeFlowSvg = ({
         Math.max(2, exitPadding),
         sourceRect.height / 2
       );
+      const exitX = clampValue(
+        sourceCenterX + sourceOffset,
+        sourceRect.x + 2,
+        sourceRect.x + sourceRect.width - 2
+      );
       const exit = {
-        x: sourceCenterX,
-        y: rawStartY + direction * exitPadding,
+        x: exitX,
+        y: rawStartY + directionSign * exitPadding,
       };
       const start = {
-        x: sourceCenterX,
-        y: rawStartY - direction * insetPadding,
+        x: exitX,
+        y: rawStartY - directionSign * insetPadding,
       };
       const maxEntryInset = Math.max(
         targetOverlap,
@@ -905,9 +1105,14 @@ export const serializeFlowSvg = ({
         targetOverlap,
         Math.min(maxEntryInset, anchorPadding)
       );
-      const unclampedEndY = rawEndY + direction * entryPadding;
+      const unclampedEndY = rawEndY + directionSign * entryPadding;
+      const endX = clampValue(
+        targetCenterX + targetOffset,
+        targetRect.x + 1,
+        targetRect.x + targetRect.width - 1
+      );
       const end = {
-        x: targetCenterX,
+        x: endX,
         y: clampValue(
           unclampedEndY,
           targetRect.y + 1,
@@ -921,17 +1126,27 @@ export const serializeFlowSvg = ({
         elbowLimit,
         Math.max(0, verticalDistance / 3)
       );
-      const firstY = exit.y + direction * elbowPadding;
-      const lastY = end.y - direction * elbowPadding;
-      const bendX = exit.x + perpendicularOffset;
+      const firstY = exit.y + directionSign * elbowPadding;
+      const lastY = end.y - directionSign * elbowPadding;
+      const laneBias = (targetOffset - sourceOffset) * 0.5;
+      const desiredBendX = exit.x + perpendicularOffset + laneBias;
+      const bendRange = Math.max(40, Math.abs(end.x - exit.x) + 20);
+      const clampedBendX = clampValue(
+        desiredBendX,
+        exit.x - bendRange,
+        exit.x + bendRange
+      );
+      const horizontalDelta = clampedBendX - exit.x;
       const horizontalSign =
-        perpendicularOffset !== 0
-          ? Math.sign(perpendicularOffset)
+        Math.abs(horizontalDelta) > 0.001
+          ? Math.sign(horizontalDelta)
           : dx === 0
             ? 1
             : Math.sign(dx);
       const approachBendX =
-        bendX === exit.x ? bendX + horizontalSign * arrowGuard : bendX;
+        Math.abs(horizontalDelta) > 0.001
+          ? clampedBendX
+          : clampedBendX + horizontalSign * arrowGuard;
       points.push(
         start,
         exit,
