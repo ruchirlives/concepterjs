@@ -55,12 +55,12 @@ const NODE_TEXT_STROKE_WIDTH = 1.1;
 const EDGE_HALO_COLOR = "#f8fafc";
 const EDGE_HALO_OPACITY = 0.7;
 const EDGE_HALO_EXTRA_WIDTH = 2.4;
-const EDGE_ARROW_BASE_LENGTH = 4.8;
-const EDGE_ARROW_MIN_LENGTH = 3.2;
-const EDGE_ARROW_MAX_LENGTH = 6.4;
-const EDGE_ARROW_WIDTH_RATIO = 0.55;
-const EDGE_ARROW_MIN_WIDTH = 2.2;
-const EDGE_ARROW_MAX_WIDTH = 4.4;
+const EDGE_ARROW_BASE_LENGTH = 6.4;
+const EDGE_ARROW_MIN_LENGTH = 4.4;
+const EDGE_ARROW_MAX_LENGTH = 20;
+const EDGE_ARROW_WIDTH_RATIO = 0.6;
+const EDGE_ARROW_MIN_WIDTH = 20;
+const EDGE_ARROW_MAX_WIDTH = 50;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -983,8 +983,8 @@ export const serializeFlowSvg = ({
 
     const points = [];
     const elbowPaddingMax = 36;
-    const arrowGuard = Math.max(6, (visualSizing.edge.headLength * 1.3) / zoomUnit);
-    const targetOverlap = Math.max(3, (visualSizing.edge.headWidth * 0.65) / zoomUnit);
+    const arrowGuard = Math.max(8, (visualSizing.edge.headLength * 1.05) / zoomUnit);
+    const targetOverlap = Math.max(2, (visualSizing.edge.headWidth * 0.55) / zoomUnit);
 
     if (orientation === "horizontal") {
       const directionSign = direction >= 0 ? 1 : -1;
@@ -1012,26 +1012,42 @@ export const serializeFlowSvg = ({
         x: rawStartX - directionSign * insetPadding,
         y: exitY,
       };
-      const maxEntryInset = Math.max(
-        targetOverlap,
-        Math.min(targetRect.width / 2, EDGE_ANCHOR_PADDING)
+      const arrowLengthUnit = Math.max(
+        (visualSizing.edge.headLength * 0.95) / zoomUnit,
+        4
       );
-      const entryPadding = Math.max(
+      const entryGuard = Math.max(
         targetOverlap,
-        Math.min(maxEntryInset, anchorPadding)
+        Math.min(arrowLengthUnit, Math.max(available * 0.75, targetOverlap))
       );
-      const unclampedEndX = rawEndX + directionSign * entryPadding;
+      const boundaryGuard = Math.max(1.5, targetOverlap * 0.6);
+      let endX = rawEndX - directionSign * entryGuard;
+      let minSeparation = Math.max(6, Math.min(available * 0.6, 36));
+      minSeparation = Math.min(minSeparation, Math.max(available - boundaryGuard, 0));
+      if (directionSign >= 0) {
+        const minEnd = exit.x + minSeparation;
+        const maxEnd = rawEndX - boundaryGuard;
+        if (maxEnd >= minEnd) {
+          endX = Math.max(minEnd, Math.min(endX, maxEnd));
+        } else {
+          endX = (minEnd + maxEnd) / 2;
+        }
+      } else {
+        const maxEnd = exit.x - minSeparation;
+        const minEnd = rawEndX + boundaryGuard;
+        if (maxEnd >= minEnd) {
+          endX = Math.min(maxEnd, Math.max(endX, minEnd));
+        } else {
+          endX = (minEnd + maxEnd) / 2;
+        }
+      }
       const endY = clampValue(
         targetCenterY + targetOffset,
         targetRect.y + 1,
         targetRect.y + targetRect.height - 1
       );
       const end = {
-        x: clampValue(
-          unclampedEndX,
-          targetRect.x + 1,
-          targetRect.x + targetRect.width - 1
-        ),
+        x: endX,
         y: endY,
       };
       const horizontalDistance = Math.max(0, Math.abs(end.x - exit.x));
@@ -1097,15 +1113,35 @@ export const serializeFlowSvg = ({
         x: exitX,
         y: rawStartY - directionSign * insetPadding,
       };
-      const maxEntryInset = Math.max(
-        targetOverlap,
-        Math.min(targetRect.height / 2, EDGE_ANCHOR_PADDING)
+      const arrowLengthUnit = Math.max(
+        (visualSizing.edge.headLength * 0.95) / zoomUnit,
+        4
       );
-      const entryPadding = Math.max(
+      const entryGuard = Math.max(
         targetOverlap,
-        Math.min(maxEntryInset, anchorPadding)
+        Math.min(arrowLengthUnit, Math.max(available * 0.75, targetOverlap))
       );
-      const unclampedEndY = rawEndY + directionSign * entryPadding;
+      const boundaryGuard = Math.max(1.5, targetOverlap * 0.6);
+      let endY = rawEndY - directionSign * entryGuard;
+      let minSeparation = Math.max(6, Math.min(available * 0.6, 36));
+      minSeparation = Math.min(minSeparation, Math.max(available - boundaryGuard, 0));
+      if (directionSign >= 0) {
+        const minEnd = exit.y + minSeparation;
+        const maxEnd = rawEndY - boundaryGuard;
+        if (maxEnd >= minEnd) {
+          endY = Math.max(minEnd, Math.min(endY, maxEnd));
+        } else {
+          endY = (minEnd + maxEnd) / 2;
+        }
+      } else {
+        const maxEnd = exit.y - minSeparation;
+        const minEnd = rawEndY + boundaryGuard;
+        if (maxEnd >= minEnd) {
+          endY = Math.min(maxEnd, Math.max(endY, minEnd));
+        } else {
+          endY = (minEnd + maxEnd) / 2;
+        }
+      }
       const endX = clampValue(
         targetCenterX + targetOffset,
         targetRect.x + 1,
@@ -1113,11 +1149,7 @@ export const serializeFlowSvg = ({
       );
       const end = {
         x: endX,
-        y: clampValue(
-          unclampedEndY,
-          targetRect.y + 1,
-          targetRect.y + targetRect.height - 1
-        ),
+        y: endY,
       };
       const verticalDistance = Math.max(0, Math.abs(end.y - exit.y));
       const elbowLimit = Math.max(0, verticalDistance / 2 - 6);
@@ -1162,10 +1194,28 @@ export const serializeFlowSvg = ({
     if (simplifiedPoints.length < 2) return;
     const xs = simplifiedPoints.map((pt) => pt.x);
     const ys = simplifiedPoints.map((pt) => pt.y);
-    const minEdgeX = Math.min(...xs);
-    const maxEdgeX = Math.max(...xs);
-    const minEdgeY = Math.min(...ys);
-    const maxEdgeY = Math.max(...ys);
+    const lastPoint = simplifiedPoints[simplifiedPoints.length - 1];
+    let minEdgeX = Math.min(...xs);
+    let maxEdgeX = Math.max(...xs);
+    let minEdgeY = Math.min(...ys);
+    let maxEdgeY = Math.max(...ys);
+    const arrowExtension = Math.max(
+      (visualSizing.edge.headLength * 1.05) / zoomUnit,
+      2
+    );
+    if (orientation === "horizontal") {
+      if (direction >= 0) {
+        maxEdgeX = Math.max(maxEdgeX, lastPoint.x + arrowExtension);
+      } else {
+        minEdgeX = Math.min(minEdgeX, lastPoint.x - arrowExtension);
+      }
+    } else {
+      if (direction >= 0) {
+        maxEdgeY = Math.max(maxEdgeY, lastPoint.y + arrowExtension);
+      } else {
+        minEdgeY = Math.min(minEdgeY, lastPoint.y - arrowExtension);
+      }
+    }
     registerBounds(minEdgeX, minEdgeY, maxEdgeX - minEdgeX, maxEdgeY - minEdgeY);
 
     edgesOutput.push({ points: simplifiedPoints });
