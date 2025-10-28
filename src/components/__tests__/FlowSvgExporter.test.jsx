@@ -119,4 +119,55 @@ describe("serializeFlowSvg", () => {
     const totalWidth = parseFloat(svgMatch[1]);
     expect(totalWidth).toBeCloseTo(264, 5);
   });
+
+  it("includes edge labels from edge data payloads in the exported markup", () => {
+    const svg = serializeFlowSvg({
+      nodes: [
+        {
+          id: "node-a",
+          position: { x: 0, y: 0 },
+          data: { Name: "Node A" },
+        },
+        {
+          id: "node-b",
+          position: { x: 200, y: 0 },
+          data: { Name: "Node B" },
+        },
+        {
+          id: "node-c",
+          position: { x: 0, y: 200 },
+          data: { Name: "Node C" },
+        },
+      ],
+      edges: [
+        {
+          id: "edge-1",
+          source: "node-a",
+          target: "node-b",
+          data: { fullLabel: "Primary Data Label" },
+        },
+        {
+          id: "edge-2",
+          source: "node-b",
+          target: "node-c",
+          data: { label: "Fallback Data Label" },
+        },
+        {
+          id: "edge-3",
+          source: "node-c",
+          target: "node-a",
+          data: { position: { label: "Position Label" } },
+        },
+      ],
+      grid: baseGrid,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      includeRows: false,
+      includeColumns: false,
+    });
+
+    expect(svg).toContain('<text class="flow-label-text" x="');
+    expect(svg).toContain(">Primary Data Label<");
+    expect(svg).toContain(">Fallback Data Label<");
+    expect(svg).toContain(">Position Label<");
+  });
 });

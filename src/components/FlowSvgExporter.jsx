@@ -61,6 +61,14 @@ const EDGE_ARROW_MAX_LENGTH = 20;
 const EDGE_ARROW_WIDTH_RATIO = 0.6;
 const EDGE_ARROW_MIN_WIDTH = 20;
 const EDGE_ARROW_MAX_WIDTH = 50;
+const EDGE_LABEL_FONT_SIZE = 11;
+const EDGE_LABEL_LINE_HEIGHT = 15;
+const EDGE_LABEL_PADDING_X = 10;
+const EDGE_LABEL_PADDING_Y = 6;
+const EDGE_LABEL_FILL = "#ffffff";
+const EDGE_LABEL_STROKE = "rgba(148,163,184,0.65)";
+const EDGE_LABEL_TEXT_COLOR = "#0f172a";
+const EDGE_LABEL_CORNER_RADIUS = 10;
 
 const ROW_COLOR_PALETTE = [
   "#fef3c7",
@@ -569,6 +577,69 @@ const simplifyOrthogonalPath = (points = []) => {
   return simplified;
 };
 
+const resolveEdgeLabel = (edge = {}) => {
+  if (!edge) return "";
+  const candidates = [
+    edge.label,
+    edge.data?.fullLabel,
+    edge.data?.label,
+    edge.data?.position?.label,
+    edge.data?.positionLabel,
+    edge.data?.position_label,
+  ];
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed.length) return trimmed;
+      continue;
+    }
+    if (typeof candidate === "number" || typeof candidate === "bigint") {
+      return String(candidate);
+    }
+    if (typeof candidate === "boolean") {
+      return candidate ? "true" : "false";
+    }
+  }
+  return "";
+};
+
+const computePolylineMidpoint = (points = []) => {
+  if (!Array.isArray(points) || points.length === 0) return null;
+  let totalLength = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const dx = curr.x - prev.x;
+    const dy = curr.y - prev.y;
+    totalLength += Math.sqrt(dx * dx + dy * dy);
+  }
+  if (totalLength === 0) {
+    const first = points[0];
+    return { x: first.x, y: first.y };
+  }
+  const targetDistance = totalLength / 2;
+  let traversed = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const dx = curr.x - prev.x;
+    const dy = curr.y - prev.y;
+    const segmentLength = Math.sqrt(dx * dx + dy * dy);
+    if (segmentLength === 0) continue;
+    if (traversed + segmentLength >= targetDistance) {
+      const ratio = (targetDistance - traversed) / segmentLength;
+      return {
+        x: prev.x + dx * ratio,
+        y: prev.y + dy * ratio,
+      };
+    }
+    traversed += segmentLength;
+  }
+  const last = points[points.length - 1];
+  return { x: last.x, y: last.y };
+};
+
 export const serializeFlowSvg = ({
   nodes = [],
   edges = [],
@@ -878,6 +949,7 @@ export const serializeFlowSvg = ({
       targetSide,
       sourceOffset: 0,
       targetOffset: 0,
+      label: resolveEdgeLabel(edge),
     });
   });
 
@@ -1218,7 +1290,54 @@ export const serializeFlowSvg = ({
     }
     registerBounds(minEdgeX, minEdgeY, maxEdgeX - minEdgeX, maxEdgeY - minEdgeY);
 
-    edgesOutput.push({ points: simplifiedPoints });
+    let labelInfo = null;
+    if (plan.label) {
+      const midpoint = computePolylineMidpoint(simplifiedPoints);
+      if (midpoint) {
+        const rawLines = plan.label.split(/\r?\n/);
+        const lines = rawLines.length
+          ? rawLines.map((line) => line.trim()).filter((line, index, array) =>
+              line.length > 0 || array.length === 1
+            )
+          : [];
+        if (lines.length) {
+          const scaledFontSize = Math.max(
+            6,
+            EDGE_LABEL_FONT_SIZE * visualSizing.textScale
+          );
+          const fontSize = Number(scaledFontSize.toFixed(2));
+          const lineHeightRaw = Math.max(
+            fontSize * visualSizing.lineSpacingFactor,
+            EDGE_LABEL_LINE_HEIGHT * visualSizing.textScale
+          );
+          const lineHeight = Number(lineHeightRaw.toFixed(2));
+          const maxLineWidth = lines.reduce((acc, line) => {
+            const measured = measureLineWidth(line, fontSize);
+            return Math.max(acc, Number.isFinite(measured) ? measured : 0);
+          }, 0);
+          const contentWidth = Math.max(0, maxLineWidth);
+          const width = contentWidth + EDGE_LABEL_PADDING_X * 2;
+          const height = lineHeight * lines.length + EDGE_LABEL_PADDING_Y * 2;
+          registerBounds(
+            midpoint.x - width / 2,
+            midpoint.y - height / 2,
+            width,
+            height
+          );
+          labelInfo = {
+            lines,
+            fontSize,
+            lineHeight,
+            centerX: midpoint.x,
+            centerY: midpoint.y,
+            width,
+            height,
+          };
+        }
+      }
+    }
+
+    edgesOutput.push({ points: simplifiedPoints, label: labelInfo });
   });
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -1349,6 +1468,27 @@ export const serializeFlowSvg = ({
     parts.push(
       `<path class="flow-edge" d="${pathData}" stroke="${EDGE_STROKE_COLOR}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#${markerId})" />`
     );
+    if (edge.label) {
+      const centerX = edge.label.centerX + offsetX;
+      const centerY = edge.label.centerY + offsetY;
+      const rectWidth = Number(edge.label.width.toFixed(2));
+      const rectHeight = Number(edge.label.height.toFixed(2));
+      const rectX = Number((centerX - rectWidth / 2).toFixed(2));
+      const rectY = Number((centerY - rectHeight / 2).toFixed(2));
+      parts.push(
+        `<rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" rx="${EDGE_LABEL_CORNER_RADIUS}" ry="${EDGE_LABEL_CORNER_RADIUS}" fill="${EDGE_LABEL_FILL}" stroke="${EDGE_LABEL_STROKE}" filter="url(#${LABEL_SHADOW_FILTER_ID})" />`
+      );
+      const baseLineY =
+        rectY + EDGE_LABEL_PADDING_Y + edge.label.lineHeight / 2;
+      edge.label.lines.forEach((line, index) => {
+        const lineY = Number(
+          (baseLineY + index * edge.label.lineHeight).toFixed(2)
+        );
+        parts.push(
+          `<text class="flow-label-text" x="${Number(centerX.toFixed(2))}" y="${lineY}" text-anchor="middle" fill="${EDGE_LABEL_TEXT_COLOR}" font-size="${edge.label.fontSize}" font-weight="600" dominant-baseline="middle">${escapeXml(line)}</text>`
+        );
+      });
+    }
   });
 
   shapes
