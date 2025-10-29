@@ -4,6 +4,7 @@ import { handleWriteBack, requestRefreshChannel } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 import { setPosition } from "./api";
+import { getStateSetter } from "./stateSetterRegistry";
 
 // Excel export button
 function ExcelButton({ handleExportExcel }) {
@@ -442,6 +443,77 @@ const AppLayers = () => {
         const { layer } = context;
         if (!layer) return;
         clearLayerForAll(layer);
+      },
+    },
+    {
+      label: "Rename layer",
+      onClick: async (context) => {
+        const { layer } = context;
+        if (!layer) return;
+        const nextName = prompt("Rename layer:", layer);
+        if (!nextName) return;
+        const trimmed = nextName.trim();
+        if (!trimmed || trimmed === layer) return;
+
+        // Prevent duplicate names
+        if (layerOptions.includes(trimmed)) {
+          alert("Layer name already exists.");
+          return;
+        }
+
+        const layerOptionsSetter = getStateSetter("layerOptions");
+        const activeLayersSetter = getStateSetter("activeLayers");
+
+        const wasActive = activeLayers.includes(layer);
+        const layerIndex = layerOptions.indexOf(layer);
+
+        setRowData((prev) => {
+          const updated = prev.map((row) => {
+            const tags = (row.Tags || "")
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean);
+
+            if (!tags.includes(layer)) return row;
+
+            const nextTags = tags.map((tag) => (tag === layer ? trimmed : tag));
+            return { ...row, Tags: nextTags.join(", ") };
+          });
+          handleWriteBack(updated);
+          requestRefreshChannel();
+          return updated;
+        });
+
+        if (typeof layerOptionsSetter === "function") {
+          layerOptionsSetter((prev) => {
+            const withoutNew = prev.filter((name) => name !== trimmed);
+            const next = withoutNew.map((name) => (name === layer ? trimmed : name));
+            if (!next.includes(trimmed)) {
+              if (layerIndex >= 0 && layerIndex <= next.length) {
+                next.splice(layerIndex, 0, trimmed);
+              } else {
+                next.push(trimmed);
+              }
+            }
+            return next;
+          });
+        }
+
+        updateLayerOrderingForLayer(trimmed, () => {
+          const existing = Array.isArray(layerOrdering?.[layer]) ? layerOrdering[layer] : [];
+          return [...existing];
+        });
+        updateLayerOrderingForLayer(layer, () => []);
+
+        if (typeof activeLayersSetter === "function") {
+          activeLayersSetter((prev) => {
+            const next = prev.filter((name) => name !== layer && name !== trimmed);
+            if (wasActive) {
+              next.push(trimmed);
+            }
+            return next;
+          });
+        }
       },
     },
   ];
