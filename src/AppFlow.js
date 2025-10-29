@@ -19,7 +19,7 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { saveNodes, addChildren, removeChildren } from './api';
+import { saveNodes, addChildren, removeChildren, setPosition } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
@@ -230,7 +230,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     layerOrdering,
   } = useFlowLogic();
 
-  const { setParentChildMap, cellWidthInput, setCellWidthInput, cellHeightInput, setCellHeightInput } = useAppContext();
+  const { parentChildMap, setParentChildMap, cellWidthInput, setCellWidthInput, cellHeightInput, setCellHeightInput } = useAppContext();
 
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
@@ -246,6 +246,35 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const svgExporterRef = useRef(null);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
+  const [ctrlDragging, setCtrlDragging] = useState(false);
+  const [dragLine, setDragLine] = useState(null);
+  const [manualMouseTracking, setManualMouseTracking] = useState(false);
+  const dragNodeRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const activeMouseHandlersRef = useRef({ move: null, up: null });
+  const relationships = useMemo(() => {
+    const map = {};
+    if (!Array.isArray(parentChildMap)) {
+      return map;
+    }
+    parentChildMap.forEach((entry) => {
+      if (!entry) return;
+      const parentId = entry.container_id != null ? entry.container_id.toString() : null;
+      if (!parentId || !Array.isArray(entry.children)) return;
+      entry.children.forEach((child) => {
+        if (!child) return;
+        const childId = child.id != null ? child.id.toString() : null;
+        if (!childId) return;
+        const label = typeof child.label === 'string'
+          ? child.label
+          : (child.position && typeof child.position.label === 'string' ? child.position.label : '');
+        if (label != null) {
+          map[`${parentId}--${childId}`] = label;
+        }
+      });
+    });
+    return map;
+  }, [parentChildMap]);
 
 
 
@@ -623,10 +652,123 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
   }, [exportEnabled]);
 
+  const getLogicalNodeId = useCallback((nodeLike) => {
+    if (!nodeLike) return null;
+    const raw = nodeLike?.data?.originalId ?? nodeLike?.data?.id ?? nodeLike?.id;
+    if (raw == null) return null;
+    return raw.toString().split('__in__')[0];
+  }, []);
+
+  const linkNodes = useCallback(async (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const key = `${sourceId}--${targetId}`;
+    const currentLabel = relationships[key] ?? '';
+    const newLabel = prompt("Enter new label:", currentLabel || "");
+    if (newLabel === null) return;
+    try {
+      const response = await setPosition(sourceId, targetId, newLabel);
+      if (!response) {
+        toast.error("Failed to create link.");
+        return;
+      }
+      requestRefreshChannel();
+    } catch (error) {
+      console.error("Error creating link between nodes:", error);
+      toast.error("Failed to create link.");
+    }
+  }, [relationships]);
+
+  const handleNodeMouseDown = useCallback((event, node) => {
+    if (!event?.ctrlKey) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+
+    const logicalId = getLogicalNodeId(node);
+    if (!logicalId) {
+      return;
+    }
+
+    dragNodeRef.current = { nodeId: node?.id, logicalId };
+    setCtrlDragging(true);
+    setManualMouseTracking(true);
+
+    const nodeElement = event.target?.closest?.('[data-flow-node-id]');
+    const rect = nodeElement?.getBoundingClientRect();
+    const startPos = rect
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : { x: event.clientX, y: event.clientY };
+    setDragLine({ from: startPos, to: startPos });
+
+    const handleMouseMove = (e) => {
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine((line) => (line ? { ...line, to: { x: e.clientX, y: e.clientY } } : line));
+        rafIdRef.current = null;
+      });
+    };
+
+    const handleMouseUp = async (e) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      activeMouseHandlersRef.current = { move: null, up: null };
+
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+
+      setCtrlDragging(false);
+      setManualMouseTracking(false);
+      setDragLine(null);
+
+      const sourceInfo = dragNodeRef.current;
+      dragNodeRef.current = null;
+
+      if (!sourceInfo) return;
+
+      const elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+      const targetNodeElement = elementUnderPointer?.closest?.('[data-flow-node-id]');
+      if (!targetNodeElement) return;
+
+      const dataset = targetNodeElement.dataset || {};
+      const targetOriginalId = dataset.flowNodeOriginalId || dataset.flowNodeId;
+      if (!targetOriginalId) return;
+
+      const normalizedTargetId = targetOriginalId.toString().split('__in__')[0];
+      if (!normalizedTargetId || normalizedTargetId === sourceInfo.logicalId) return;
+
+      await linkNodes(sourceInfo.logicalId, normalizedTargetId);
+    };
+
+    activeMouseHandlersRef.current = { move: handleMouseMove, up: handleMouseUp };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [getLogicalNodeId, linkNodes]);
+
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
     updateViewportTransform(viewport);
   }, [updateViewportTransform]);
+
+  useEffect(() => {
+    return () => {
+      const handlers = activeMouseHandlersRef.current || {};
+      if (handlers.move) {
+        window.removeEventListener('mousemove', handlers.move);
+      }
+      if (handlers.up) {
+        window.removeEventListener('mouseup', handlers.up);
+      }
+      activeMouseHandlersRef.current = { move: null, up: null };
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      dragNodeRef.current = null;
+    };
+  }, []);
 
   const handleFlowMoveEnd = useCallback((_, viewport) => {
     viewportInteractionRef.current = false;
@@ -1238,6 +1380,28 @@ const App = ({ keepLayout, setKeepLayout }) => {
                 ))}
               </div>
             )}
+            {dragLine && (
+              <svg
+                style={{
+                  position: 'fixed',
+                  pointerEvents: 'none',
+                  left: 0,
+                  top: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 1000,
+                }}
+              >
+                <line
+                  x1={dragLine.from.x}
+                  y1={dragLine.from.y}
+                  x2={dragLine.to.x}
+                  y2={dragLine.to.y}
+                  stroke="red"
+                  strokeWidth="2"
+                />
+              </svg>
+            )}
             <ReactFlow
               fitView
               nodes={nodes}
@@ -1261,6 +1425,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onMove={handleFlowMove}
               onMoveEnd={handleFlowMoveEnd}
               onInit={handleFlowInit}
+              onNodeMouseDown={handleNodeMouseDown}
             >
               <Controls position="top-left">
                 <ControlButton onClick={(e) => gearContextMenu(e)}>

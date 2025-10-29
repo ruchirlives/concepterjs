@@ -5,6 +5,10 @@ import { useFlowMenu } from '../components/FlowMenuContext';
 const FlowNode = ({ data, style, selected }) => {
   const nodeId = useNodeId();
   const { handleNodeMenu } = useFlowMenu();
+  const nodeDomId = nodeId != null ? nodeId.toString() : '';
+  const originalId = data?.originalId != null
+    ? data.originalId.toString()
+    : (data?.id != null ? data.id.toString() : nodeDomId);
 
   const handleDoubleClick = () => {
     console.log('Node id:', nodeId);
@@ -71,6 +75,8 @@ const FlowNode = ({ data, style, selected }) => {
     <div
       onDoubleClick={handleDoubleClick}
       onClick={handleClick}
+      data-flow-node-id={nodeDomId}
+      data-flow-original-id={originalId}
       className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg border 
         ${selected ? 'border-red-600 border-4' : 'border-gray-300'}
         ${data.highlighted ? 'bg-gray-400' : getBgColorClass()}`}
