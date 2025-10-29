@@ -244,6 +244,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [pendingCellContext, setPendingCellContext] = useState(null);
   const [isAddRowModalOpen, setIsAddRowModalOpen] = useState(false);
   const svgExporterRef = useRef(null);
+  const [nodesDraggable, setNodesDraggable] = useState(true);
+  const ctrlActiveRef = useRef(false);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
   const [dragLine, setDragLine] = useState(null);
@@ -682,6 +684,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
     event.preventDefault();
     event.stopPropagation();
+    if (event.nativeEvent && typeof event.nativeEvent.stopImmediatePropagation === 'function') {
+      event.nativeEvent.stopImmediatePropagation();
+    }
 
     const logicalId = getLogicalNodeId(node);
     if (!logicalId) {
@@ -689,6 +694,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
 
     dragNodeRef.current = { nodeId: node?.id, logicalId };
+    ctrlActiveRef.current = true;
+    setNodesDraggable(prev => (prev ? false : prev));
     const nodeElement = event.target?.closest?.('[data-flow-node-id]');
     const rect = nodeElement?.getBoundingClientRect();
     const startPos = rect
@@ -715,6 +722,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
       }
 
       setDragLine(null);
+      if (!ctrlActiveRef.current) {
+        setNodesDraggable(prev => (prev ? prev : true));
+      }
 
       const sourceInfo = dragNodeRef.current;
       dragNodeRef.current = null;
@@ -726,7 +736,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       if (!targetNodeElement) return;
 
       const dataset = targetNodeElement.dataset || {};
-      const targetOriginalId = dataset.flowNodeOriginalId || dataset.flowNodeId;
+      const targetOriginalId = dataset.flowNodeOriginalId || dataset.flowNodeId || dataset.flowOriginalId;
       if (!targetOriginalId) return;
 
       const normalizedTargetId = targetOriginalId.toString().split('__in__')[0];
@@ -738,12 +748,35 @@ const App = ({ keepLayout, setKeepLayout }) => {
     activeMouseHandlersRef.current = { move: handleMouseMove, up: handleMouseUp };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [getLogicalNodeId, linkNodes]);
+  }, [getLogicalNodeId, linkNodes, setNodesDraggable]);
 
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
     updateViewportTransform(viewport);
   }, [updateViewportTransform]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Control' && !ctrlActiveRef.current) {
+        ctrlActiveRef.current = true;
+        setNodesDraggable(prev => (prev ? false : prev));
+      }
+    };
+    const handleKeyUp = (event) => {
+      if (event.key === 'Control') {
+        ctrlActiveRef.current = false;
+        setNodesDraggable(prev => (prev ? prev : true));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      ctrlActiveRef.current = false;
+      setNodesDraggable(true);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -760,6 +793,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
         rafIdRef.current = null;
       }
       dragNodeRef.current = null;
+      if (!ctrlActiveRef.current) {
+        setNodesDraggable(prev => (prev ? prev : true));
+      }
     };
   }, []);
 
@@ -1013,7 +1049,15 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }));
   }, [handleGridDrop, keepLayout, setLayoutPositions]);
 
-  const onNodeDragStart = useCallback(() => {
+  const onNodeDragStart = useCallback((event, _node) => {
+    if (event?.ctrlKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.nativeEvent && typeof event.nativeEvent.stopImmediatePropagation === 'function') {
+        event.nativeEvent.stopImmediatePropagation();
+      }
+      return;
+    }
     setDragging(true);
   }, []);
 
@@ -1419,6 +1463,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onMoveEnd={handleFlowMoveEnd}
               onInit={handleFlowInit}
               onNodeMouseDown={handleNodeMouseDown}
+              nodesDraggable={nodesDraggable}
             >
               <Controls position="top-left">
                 <ControlButton onClick={(e) => gearContextMenu(e)}>

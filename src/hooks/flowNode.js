@@ -76,7 +76,7 @@ const FlowNode = ({ data, style, selected }) => {
       onDoubleClick={handleDoubleClick}
       onClick={handleClick}
       data-flow-node-id={nodeDomId}
-      data-flow-original-id={originalId}
+      data-flow-node-original-id={originalId}
       className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg border 
         ${selected ? 'border-red-600 border-4' : 'border-gray-300'}
         ${data.highlighted ? 'bg-gray-400' : getBgColorClass()}`}
