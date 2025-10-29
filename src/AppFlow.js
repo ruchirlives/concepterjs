@@ -678,30 +678,35 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
   }, [relationships]);
 
-  const handleNodeMouseDown = useCallback((event, node) => {
-    if (!event?.ctrlKey) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.nativeEvent && typeof event.nativeEvent.stopImmediatePropagation === 'function') {
-      event.nativeEvent.stopImmediatePropagation();
-    }
+  const beginCtrlLink = useCallback(({ logicalId, nodeId, startPosition }) => {
+    if (!logicalId) return;
 
-    const logicalId = getLogicalNodeId(node);
-    if (!logicalId) {
-      return;
-    }
+    const existingHandlers = activeMouseHandlersRef.current || {};
+    if (existingHandlers.move) window.removeEventListener('mousemove', existingHandlers.move);
+    if (existingHandlers.up) window.removeEventListener('mouseup', existingHandlers.up);
+    activeMouseHandlersRef.current = { move: null, up: null };
 
-    dragNodeRef.current = { nodeId: node?.id, logicalId };
+    dragNodeRef.current = { nodeId, logicalId };
     ctrlActiveRef.current = true;
-    setNodesDraggable(prev => (prev ? false : prev));
-    const nodeElement = event.target?.closest?.('[data-flow-node-id]');
-    const rect = nodeElement?.getBoundingClientRect();
-    const startPos = rect
-      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-      : { x: event.clientX, y: event.clientY };
-    setDragLine({ from: startPos, to: startPos });
+    setNodesDraggable(false);
+
+    const resolveStartPos = () => {
+      if (startPosition && Number.isFinite(startPosition.x) && Number.isFinite(startPosition.y)) {
+        return startPosition;
+      }
+      if (nodeId) {
+        const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeId}"]`);
+        const rect = nodeElement?.getBoundingClientRect();
+        if (rect) {
+          return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        }
+      }
+      return null;
+    };
+
+    const initial = resolveStartPos();
+    if (!initial) return;
+    setDragLine({ from: initial, to: initial });
 
     const handleMouseMove = (e) => {
       if (rafIdRef.current != null) return;
@@ -722,13 +727,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
       }
 
       setDragLine(null);
+      ctrlActiveRef.current = Boolean(e?.ctrlKey);
       if (!ctrlActiveRef.current) {
-        setNodesDraggable(prev => (prev ? prev : true));
+        setNodesDraggable(true);
       }
 
       const sourceInfo = dragNodeRef.current;
       dragNodeRef.current = null;
-
       if (!sourceInfo) return;
 
       const elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
@@ -777,6 +782,31 @@ const App = ({ keepLayout, setKeepLayout }) => {
       setNodesDraggable(true);
     };
   }, []);
+
+  useEffect(() => {
+    const handleCtrlMouseDown = (event) => {
+      const detail = event?.detail || {};
+      const { originalId, nodeId, clientX, clientY } = detail;
+      let sourceNode = null;
+      if (nodeId) {
+        sourceNode = nodes.find((n) => n.id === nodeId) || null;
+      }
+      if (!sourceNode && originalId) {
+        sourceNode = nodes.find((n) => getLogicalNodeId(n) === originalId) || null;
+      }
+      const logicalId = originalId || (sourceNode ? getLogicalNodeId(sourceNode) : null);
+      const resolvedNodeId = sourceNode?.id || nodeId || null;
+      beginCtrlLink({
+        logicalId,
+        nodeId: resolvedNodeId,
+        startPosition: { x: clientX, y: clientY },
+      });
+    };
+    document.addEventListener('flow-node-ctrl-mousedown', handleCtrlMouseDown);
+    return () => {
+      document.removeEventListener('flow-node-ctrl-mousedown', handleCtrlMouseDown);
+    };
+  }, [beginCtrlLink, getLogicalNodeId, nodes]);
 
   useEffect(() => {
     return () => {
@@ -1049,17 +1079,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }));
   }, [handleGridDrop, keepLayout, setLayoutPositions]);
 
-  const onNodeDragStart = useCallback((event, _node) => {
+  const onNodeDragStart = useCallback((event, node) => {
     if (event?.ctrlKey) {
       event.preventDefault();
       event.stopPropagation();
       if (event.nativeEvent && typeof event.nativeEvent.stopImmediatePropagation === 'function') {
         event.nativeEvent.stopImmediatePropagation();
       }
+      const logicalId = getLogicalNodeId(node);
+      beginCtrlLink({
+        logicalId,
+        nodeId: node?.id,
+        startPosition: { x: event.clientX, y: event.clientY },
+      });
       return;
     }
     setDragging(true);
-  }, []);
+  }, [beginCtrlLink, getLogicalNodeId]);
 
   // Removed activeGroup broadcasting
 
@@ -1462,7 +1498,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
               onMove={handleFlowMove}
               onMoveEnd={handleFlowMoveEnd}
               onInit={handleFlowInit}
-              onNodeMouseDown={handleNodeMouseDown}
               nodesDraggable={nodesDraggable}
             >
               <Controls position="top-left">

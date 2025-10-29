@@ -75,6 +75,22 @@ const FlowNode = ({ data, style, selected }) => {
     <div
       onDoubleClick={handleDoubleClick}
       onClick={handleClick}
+      onMouseDown={(event) => {
+        if (!event.ctrlKey) return;
+        const customEvent = new CustomEvent('flow-node-ctrl-mousedown', {
+          detail: {
+            nodeId: nodeDomId,
+            originalId,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          },
+          bubbles: true,
+          cancelable: true,
+        });
+        event.currentTarget.dispatchEvent(customEvent);
+        event.stopPropagation();
+        event.preventDefault();
+      }}
       data-flow-node-id={nodeDomId}
       data-flow-node-original-id={originalId}
       className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg border 
