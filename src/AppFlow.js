@@ -246,9 +246,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const svgExporterRef = useRef(null);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
-  const [ctrlDragging, setCtrlDragging] = useState(false);
   const [dragLine, setDragLine] = useState(null);
-  const [manualMouseTracking, setManualMouseTracking] = useState(false);
   const dragNodeRef = useRef(null);
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
@@ -691,9 +689,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
 
     dragNodeRef.current = { nodeId: node?.id, logicalId };
-    setCtrlDragging(true);
-    setManualMouseTracking(true);
-
     const nodeElement = event.target?.closest?.('[data-flow-node-id]');
     const rect = nodeElement?.getBoundingClientRect();
     const startPos = rect
@@ -719,8 +714,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
         rafIdRef.current = null;
       }
 
-      setCtrlDragging(false);
-      setManualMouseTracking(false);
       setDragLine(null);
 
       const sourceInfo = dragNodeRef.current;
