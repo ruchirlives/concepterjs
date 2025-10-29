@@ -37,6 +37,7 @@ const AppLayers = () => {
   const [newLayer, setNewLayer] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [headerContextMenu, setHeaderContextMenu] = useState(null);
   const [dragLine, setDragLine] = useState(null);
   const dragSourceRef = useRef(null);
   const rafIdRef = useRef(null);
@@ -412,6 +413,39 @@ const AppLayers = () => {
     childrenMap: {}, // Not needed here
   });
 
+  const clearLayerForAll = useCallback((layer) => {
+    if (!layer) return;
+    setRowData((prev) => {
+      let mutated = false;
+      const updated = prev.map((row) => {
+        const tags = (row.Tags || "")
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        if (!tags.includes(layer)) return row;
+        const filtered = tags.filter((tag) => tag !== layer);
+        mutated = true;
+        return { ...row, Tags: filtered.join(", ") };
+      });
+      if (!mutated) return prev;
+      handleWriteBack(updated);
+      requestRefreshChannel();
+      return updated;
+    });
+    updateLayerOrderingForLayer(layer, () => []);
+  }, [setRowData, updateLayerOrderingForLayer]);
+
+  const headerMenuOptions = [
+    {
+      label: "Clear layer",
+      onClick: async (context) => {
+        const { layer } = context;
+        if (!layer) return;
+        clearLayerForAll(layer);
+      },
+    },
+  ];
+
   const layerMenuOptions = [
     { label: "Remove from Layer", onClick: menuHandlers.handleRemoveLayer },
     { label: "Select", onClick: menuHandlers.handleSelect },
@@ -488,6 +522,15 @@ const AppLayers = () => {
                   <th
                     key={layer}
                     className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setHeaderContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        layer,
+                      });
+                    }}
                   >
                     <div className="flex items-center space-x-1">
                       <input
@@ -656,6 +699,11 @@ const AppLayers = () => {
         contextMenu={contextMenu}
         setContextMenu={setContextMenu}
         menuOptions={layerMenuOptions}
+      />
+      <ContextMenu
+        contextMenu={headerContextMenu}
+        setContextMenu={setHeaderContextMenu}
+        menuOptions={headerMenuOptions}
       />
       {/* Modal for adding a row to a layer */}
       <ModalAddRow
