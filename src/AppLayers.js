@@ -41,6 +41,7 @@ const AppLayers = () => {
   const dragSourceRef = useRef(null);
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
+  const [highlightedChildren, setHighlightedChildren] = useState(() => new Set());
 
   // Modal state for adding a row
   const [modalOpen, setModalOpen] = useState(false);
@@ -146,6 +147,24 @@ const AppLayers = () => {
     return map;
   }, [parentChildMap]);
 
+  const childIdsByParent = useMemo(() => {
+    const lookup = {};
+    if (!Array.isArray(parentChildMap)) {
+      return lookup;
+    }
+    parentChildMap.forEach((entry) => {
+      const parentId = entry?.container_id != null ? entry.container_id.toString() : null;
+      if (!parentId) return;
+      const ids = (entry.children || [])
+        .map((child) => (child?.id != null ? child.id.toString() : null))
+        .filter(Boolean);
+      if (ids.length > 0) {
+        lookup[parentId] = ids;
+      }
+    });
+    return lookup;
+  }, [parentChildMap]);
+
   const linkItems = useCallback(async (sourceId, targetId) => {
     if (sourceId == null || targetId == null) return;
     const source = sourceId.toString();
@@ -166,7 +185,10 @@ const AppLayers = () => {
   }, [relationships]);
 
   const beginCtrlLink = useCallback(({ logicalId, startPosition }) => {
-    if (!logicalId) return;
+    if (!logicalId) {
+      setHighlightedChildren(new Set());
+      return;
+    }
 
     const existingHandlers = activeMouseHandlersRef.current || {};
     if (existingHandlers.move) window.removeEventListener("mousemove", existingHandlers.move);
@@ -174,6 +196,8 @@ const AppLayers = () => {
     activeMouseHandlersRef.current = { move: null, up: null };
 
     dragSourceRef.current = logicalId;
+    const childIds = childIdsByParent[logicalId] || [];
+    setHighlightedChildren(new Set(childIds));
 
     const resolveStart = () => {
       if (startPosition && Number.isFinite(startPosition.x) && Number.isFinite(startPosition.y)) {
@@ -210,6 +234,7 @@ const AppLayers = () => {
 
       const sourceId = dragSourceRef.current;
       dragSourceRef.current = null;
+      setHighlightedChildren(new Set());
       if (!sourceId) return;
 
       const element = document.elementFromPoint(event.clientX, event.clientY);
@@ -225,7 +250,7 @@ const AppLayers = () => {
     activeMouseHandlersRef.current = { move: handleMouseMove, up: handleMouseUp };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-  }, [linkItems]);
+  }, [childIdsByParent, linkItems]);
 
   useEffect(() => {
     return () => {
@@ -238,6 +263,7 @@ const AppLayers = () => {
         rafIdRef.current = null;
       }
       dragSourceRef.current = null;
+      setHighlightedChildren(new Set());
     };
   }, []);
 
@@ -508,51 +534,56 @@ const AppLayers = () => {
                     >
                       {items.length > 0 ? (
                         <ul className="text-xs space-y-1">
-                          {items.map((row) => (
-                            <li
-                              key={row.id}
-                              draggable
-                              data-layer-item-id={row.id.toString()}
-                              onMouseDown={(e) => handleCtrlMouseDown(row, e)}
-                              onDragStart={(e) => {
-                                if (e?.ctrlKey) {
+                          {items.map((row) => {
+                            const rowId = row?.id != null ? row.id.toString() : "";
+                            const isHighlighted = highlightedChildren.has(rowId);
+                            return (
+                              <li
+                                key={row.id}
+                                draggable
+                                data-layer-item-id={rowId}
+                                onMouseDown={(e) => handleCtrlMouseDown(row, e)}
+                                onDragStart={(e) => {
+                                  if (e?.ctrlKey) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return;
+                                  }
+                                  if (e?.dataTransfer) {
+                                    e.dataTransfer.effectAllowed = "move";
+                                  }
+                                  setDragItem({ cid: rowId, layer });
+                                }}
+                                onDragOver={(e) => {
+                                  if (!dragItem) return;
+                                  if (dragItem.cid === rowId) return;
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  return;
-                                }
-                                if (e?.dataTransfer) {
-                                  e.dataTransfer.effectAllowed = "move";
-                                }
-                                setDragItem({ cid: row.id.toString(), layer });
-                              }}
-                              onDragOver={(e) => {
-                                if (!dragItem) return;
-                                if (dragItem.cid === row.id.toString()) return;
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e?.dataTransfer) {
-                                  e.dataTransfer.dropEffect = "move";
-                                }
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDrop(layer, { beforeId: row.id.toString() });
-                              }}
-                              onDragEnd={() => setDragItem(null)}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                setContextMenu({
-                                  x: e.clientX,
-                                  y: e.clientY,
-                                  layer,
-                                  cid: row.id.toString(),
-                                });
-                              }}
-                            >
-                              {row.Name}
-                            </li>
-                          ))}
+                                  if (e?.dataTransfer) {
+                                    e.dataTransfer.dropEffect = "move";
+                                  }
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDrop(layer, { beforeId: rowId });
+                                }}
+                                onDragEnd={() => setDragItem(null)}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setContextMenu({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    layer,
+                                    cid: rowId,
+                                  });
+                                }}
+                                className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
+                              >
+                                {row.Name}
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -583,29 +614,34 @@ const AppLayers = () => {
                 >
                   {noLayerItems.length > 0 ? (
                     <ul className="text-xs space-y-1">
-                      {noLayerItems.map((row) => (
-                        <li
-                          key={row.id}
-                          draggable
-                          data-layer-item-id={row.id.toString()}
-                          onMouseDown={(e) => handleCtrlMouseDown(row, e)}
-                          onDragStart={(e) => {
-                            if (e?.ctrlKey) {
+                      {noLayerItems.map((row) => {
+                        const rowId = row?.id != null ? row.id.toString() : "";
+                        const isHighlighted = highlightedChildren.has(rowId);
+                        return (
+                          <li
+                            key={row.id}
+                            draggable
+                            data-layer-item-id={rowId}
+                            onMouseDown={(e) => handleCtrlMouseDown(row, e)}
+                            onDragStart={(e) => {
+                              if (e?.ctrlKey) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return;
+                              }
+                              setDragItem({ cid: rowId, layer: null });
+                            }}
+                            onContextMenu={(e) => {
                               e.preventDefault();
-                              e.stopPropagation();
-                              return;
-                            }
-                            setDragItem({ cid: row.id.toString(), layer: null });
-                          }}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            // Remove all layers from this row
-                            handleRemoveAllLayers(row.id.toString());
-                          }}
-                        >
-                          {row.Name}
-                        </li>
-                      ))}
+                              // Remove all layers from this row
+                              handleRemoveAllLayers(rowId);
+                            }}
+                            className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
+                          >
+                            {row.Name}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <span className="text-xs text-gray-400">—</span>
