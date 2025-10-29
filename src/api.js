@@ -703,7 +703,7 @@ export const deleteProject = async (item) => {
 // Split containers
 // Backend: POST /split_containers { containerId, num_containers }
 // Returns: { split_count }
-export const splitContainers = async (containerId, num_containers = 2) => {
+export const splitContainers = async (containerId, num_containers = 5) => {
     try {
         const response = await apiClient.post(`${getApiUrl()}/split_containers`, {
             containerId,

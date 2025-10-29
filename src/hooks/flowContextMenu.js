@@ -695,7 +695,7 @@ async function splitContainersAction({ nodeId, selectedIds }) {
     }
     let totalSplits = 0;
     for (const id of targets) {
-        const res = await api.splitContainers(id, 2);
+        const res = await api.splitContainers(id, 5);
         if (res && !res.error) {
             totalSplits += (res.split_count ?? 0);
         } else {
