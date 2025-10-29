@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAppContext } from "./AppContext";
-import { handleWriteBack } from "./hooks/effectsShared";
+import { handleWriteBack, requestRefreshChannel } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
+import { setPosition } from "./api";
 
 // Excel export button
 function ExcelButton({ handleExportExcel }) {
@@ -30,11 +31,16 @@ const AppLayers = () => {
     setSelectedContentLayer, // <-- get from context
     layerOrdering,
     updateLayerOrderingForLayer,
+    parentChildMap,
   } = useAppContext();
   const [collapsed, setCollapsed] = useState(false);
   const [newLayer, setNewLayer] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [dragLine, setDragLine] = useState(null);
+  const dragSourceRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const activeMouseHandlersRef = useRef({ move: null, up: null });
 
   // Modal state for adding a row
   const [modalOpen, setModalOpen] = useState(false);
@@ -117,6 +123,140 @@ const AppLayers = () => {
     });
     return { containersByLayer: map, noLayerItems: noLayer };
   }, [layerOptions, layerOrdering, rowData]);
+
+  const relationships = useMemo(() => {
+    const map = {};
+    if (!Array.isArray(parentChildMap)) {
+      return map;
+    }
+    parentChildMap.forEach((entry) => {
+      if (!entry) return;
+      const parentId = entry.container_id != null ? entry.container_id.toString() : null;
+      if (!parentId || !Array.isArray(entry.children)) return;
+      entry.children.forEach((child) => {
+        if (!child) return;
+        const childId = child.id != null ? child.id.toString() : null;
+        if (!childId) return;
+        const label = typeof child.label === "string"
+          ? child.label
+          : (child.position && typeof child.position.label === "string" ? child.position.label : "");
+        map[`${parentId}--${childId}`] = label;
+      });
+    });
+    return map;
+  }, [parentChildMap]);
+
+  const linkItems = useCallback(async (sourceId, targetId) => {
+    if (sourceId == null || targetId == null) return;
+    const source = sourceId.toString();
+    const target = targetId.toString();
+    if (!source || !target || source === target) return;
+    const key = `${source}--${target}`;
+    const currentLabel = relationships[key] ?? "";
+    const newLabel = prompt("Enter new label:", currentLabel || "");
+    if (newLabel === null) return;
+    try {
+      const response = await setPosition(source, target, newLabel);
+      if (response) {
+        requestRefreshChannel();
+      }
+    } catch (error) {
+      console.error("Failed to link items:", error);
+    }
+  }, [relationships]);
+
+  const beginCtrlLink = useCallback(({ logicalId, startPosition }) => {
+    if (!logicalId) return;
+
+    const existingHandlers = activeMouseHandlersRef.current || {};
+    if (existingHandlers.move) window.removeEventListener("mousemove", existingHandlers.move);
+    if (existingHandlers.up) window.removeEventListener("mouseup", existingHandlers.up);
+    activeMouseHandlersRef.current = { move: null, up: null };
+
+    dragSourceRef.current = logicalId;
+
+    const resolveStart = () => {
+      if (startPosition && Number.isFinite(startPosition.x) && Number.isFinite(startPosition.y)) {
+        return startPosition;
+      }
+      return null;
+    };
+
+    const initial = resolveStart();
+    if (!initial) return;
+    setDragLine({ from: initial, to: initial });
+
+    const handleMouseMove = (event) => {
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDragLine((line) =>
+          line ? { ...line, to: { x: event.clientX, y: event.clientY } } : line
+        );
+        rafIdRef.current = null;
+      });
+    };
+
+    const handleMouseUp = async (event) => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      activeMouseHandlersRef.current = { move: null, up: null };
+
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+
+      setDragLine(null);
+
+      const sourceId = dragSourceRef.current;
+      dragSourceRef.current = null;
+      if (!sourceId) return;
+
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      const targetItem = element?.closest?.("[data-layer-item-id]");
+      if (!targetItem) return;
+
+      const targetId = targetItem.dataset.layerItemId;
+      if (!targetId || targetId === sourceId) return;
+
+      await linkItems(sourceId, targetId);
+    };
+
+    activeMouseHandlersRef.current = { move: handleMouseMove, up: handleMouseUp };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }, [linkItems]);
+
+  useEffect(() => {
+    return () => {
+      const handlers = activeMouseHandlersRef.current || {};
+      if (handlers.move) window.removeEventListener("mousemove", handlers.move);
+      if (handlers.up) window.removeEventListener("mouseup", handlers.up);
+      activeMouseHandlersRef.current = { move: null, up: null };
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      dragSourceRef.current = null;
+    };
+  }, []);
+
+  const handleCtrlMouseDown = useCallback((row, event) => {
+    if (!event?.ctrlKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.nativeEvent && typeof event.nativeEvent.stopImmediatePropagation === "function") {
+      event.nativeEvent.stopImmediatePropagation();
+    }
+    setDragItem(null);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const startPosition = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+    const logicalId = row?.id != null ? row.id.toString() : null;
+    beginCtrlLink({ logicalId, startPosition });
+  }, [beginCtrlLink]);
 
   const moveItemWithinLayer = useCallback((layer, itemId, beforeId = null) => {
     if (!layer || itemId == null) return;
@@ -253,7 +393,30 @@ const AppLayers = () => {
   ];
 
   return (
-    <div className="bg-white rounded shadow">
+    <>
+      {dragLine && (
+        <svg
+          style={{
+            position: "fixed",
+            pointerEvents: "none",
+            left: 0,
+            top: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 1000,
+          }}
+        >
+          <line
+            x1={dragLine.from.x}
+            y1={dragLine.from.y}
+            x2={dragLine.to.x}
+            y2={dragLine.to.y}
+            stroke="red"
+            strokeWidth="2"
+          />
+        </svg>
+      )}
+      <div className="bg-white rounded shadow">
       {/* Layers panel */}
       <div
         onClick={() => setCollapsed((c) => !c)}
@@ -349,7 +512,14 @@ const AppLayers = () => {
                             <li
                               key={row.id}
                               draggable
+                              data-layer-item-id={row.id.toString()}
+                              onMouseDown={(e) => handleCtrlMouseDown(row, e)}
                               onDragStart={(e) => {
+                                if (e?.ctrlKey) {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  return;
+                                }
                                 if (e?.dataTransfer) {
                                   e.dataTransfer.effectAllowed = "move";
                                 }
@@ -417,9 +587,16 @@ const AppLayers = () => {
                         <li
                           key={row.id}
                           draggable
-                          onDragStart={() =>
-                            setDragItem({ cid: row.id.toString(), layer: null })
-                          }
+                          data-layer-item-id={row.id.toString()}
+                          onMouseDown={(e) => handleCtrlMouseDown(row, e)}
+                          onDragStart={(e) => {
+                            if (e?.ctrlKey) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              return;
+                            }
+                            setDragItem({ cid: row.id.toString(), layer: null });
+                          }}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             // Remove all layers from this row
@@ -452,6 +629,7 @@ const AppLayers = () => {
         // Remove selectedContentLayer prop, ModalAddRow will get it from context
       />
     </div>
+    </>
   );
 };
 
