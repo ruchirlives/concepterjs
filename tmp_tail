@@ -1,200 +1,250 @@
-    }
-};
+    ch.postMessage({ selectedIds, tags: "input" });
+    ch.close();
+}
+async function makeOutputNode({ selectedIds }) {
+    console.log("Making output node for IDs:", selectedIds);
+    const ch = new BroadcastChannel("addTagsChannel");
 
-// Compare states for given containers (refactored to accept source and target)
-export const compareStates = async (sourceState, targetState, containerIds) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/compare_states`, {
-            sourceState,
-            targetState,
-            containerIds,
-        });
-        return response.data.differences_all || [];
-    } catch (error) {
-        console.error("Error comparing states:", error);
-        throw error;
-    }
-};
+    ch.postMessage({ selectedIds, tags: "output" });
+    ch.close();
+}
+async function unmakeOutputNode({ selectedIds }) {
+    console.log("Removing output node for IDs:", selectedIds);
 
-// Apply differences to specified containers
-export const applyDifferences = async (containerIds, differences, targetState) => {
-    try {
-        console.log("Applying differences:", { containerIds, differences, targetState });
-        const response = await apiClient.post(`${getApiUrl()}/apply_differences`, {
-            containerIds: containerIds,
-            differences: differences,
-            targetState: targetState,
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error applying differences:", error);
-        throw error; // Re-throw to let the caller handle the error display
-    }
-};
-
-// Revert differences from specified containers
-export const revertDifferences = async (containerIds, differences, targetState) => {
-    try {
-        console.log("Reverting differences:", { containerIds, differences, targetState });
-        const response = await apiClient.post(`${getApiUrl()}/revert_differences`, {
-            containerIds: containerIds,
-            differences: differences,
-            targetState: targetState,
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error reverting differences:", error);
-        throw error; // Re-throw to let the caller handle the error display
-    }
-};
-
-// Calculate state scores for containers
-export const calculateStateScores = async (baseState) => {
-    try {
-        console.log("Calculating state scores for base state:", baseState);
-        const response = await apiClient.post(`${getApiUrl()}/calculate_state_scores`, {
-            baseState: baseState,
-        });
-        return response.data.scores || {};
-    } catch (error) {
-        console.error("Error calculating state scores:", error);
-        throw error; // Re-throw to let the caller handle the error display
-    }
-};
-
-export const getContainerBudgetApi = async (containerIds) => {
-    const response = await apiClient.post(`${getApiUrl()}/get_container_budget`, { container_ids: containerIds });
-    return response.data.budgets;
-};
-
-export const convertToBudgetContainerApi = async (containerIds) => {
-    const response = await apiClient.post(`${getApiUrl()}/convert_to_budget_container`, { container_ids: containerIds });
-    return response.data;
-};
-
-export const addFinanceContainerApi = async (containerIds) => {
-    const response = await apiClient.post(`${getApiUrl()}/add_finance_container`, { container_ids: containerIds });
-    return response.data;
-};
-
-export async function joinSimilarContainers(containerIds) {
-    const res = await apiClient.post(`${getApiUrl()}/join_similar`, { container_ids: containerIds });
-    console.log("joinSimilarContainers response:", res);
-    if (res.status !== 200) throw new Error("Failed to join similar containers");
-    return res.data;
+    const ch = new BroadcastChannel("removeTagsChannel");
+    ch.postMessage({ selectedIds, tags: "output" });
+    ch.close();
 }
 
-/**
- * Generate embeddings for relationship positions.
- * @param {string[]} containerIds
- * @returns {Promise<Object>} API response
- */
-export const embedPositions = async (containerIds) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/embed_positions`, {
-            container_ids: containerIds,
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error embedding positions:", error);
-        return null;
-    }
-};
+async function addLayerTag({ selectedIds }, layer) {
+    const ch = new BroadcastChannel("addTagsChannel");
+    ch.postMessage({ selectedIds, tags: layer });
+    ch.close();
+}
 
-/**
- * Find similar positions based on embeddings.
- * @param {string} positionText
- * @returns {Promise<Object>} API response
- */
-export const findSimilarPositions = async (positionText) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/find_similar_positions`, {
-            position_text: positionText,
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error finding similar positions:", error);
-        return null;
-    }
-};
+async function removeLayerTag({ selectedIds }, layer) {
+    const ch = new BroadcastChannel("removeTagsChannel");
+    ch.postMessage({ selectedIds, tags: layer });
+    ch.close();
+}
 
-/**
- * Inherit positions from child containers into a group container.
- * Backend: expects { container_id }
- * @param {string} containerId
- * @returns {Promise<Object|null>} API response with message
- */
-export const inheritPositions = async (containerId) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/inherit_positions`, {
-            container_id: containerId,
-        });
-        return response.data;
-    } catch (error) {
-        // Surface 4xx/5xx messages when available
-        const msg = error?.response?.data?.message || "Error inheriting positions";
-        console.error(msg, error);
-        return { message: msg, error: true };
-    }
-};
+async function createLayerFromVisible({ rowData, addLayer }) {
+    const layer = prompt("Enter new layer name:");
+    if (!layer) return;
 
-/**
- * Fetch a single node by its ID from the backend.
- * @param {string} id - The node ID to load.
- * @returns {Promise<Object|null>} The node object, or null if not found.
- */
-export const loadNode = async (id) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/load_node`, { id: id });
-        const containers = response.data.containers;
-        // Return the first container object, or null if none
-        return Array.isArray(containers) && containers.length > 0
-            ? containers[0]
-            : null;
-    } catch (error) {
-        if (error.response?.status === 404) {
-            console.warn(`Node with ID ${id} not found (404 error expected)`);
-            return null; // Return null for 404 errors
+    if (typeof addLayer === 'function') {
+        addLayer(layer);
+    }
+
+    console.log("rowData", rowData)
+    const selectedIds = rowData
+        .filter(n => {
+            const tags = (n.Tags || '').split(',').map(t => t.trim());
+            return !tags.includes(layer);
+        })
+        .map(n => n.id);
+
+    if (!selectedIds.length) {
+        toast.success(`All visible nodes already contain "${layer}".`);
+        return;
+    }
+
+    console.log("Adding layer", layer, "to visible nodes:", selectedIds);
+
+    const ch = new BroadcastChannel("addTagsChannel");
+    ch.postMessage({ selectedIds, tags: [layer] });
+    ch.close();
+    toast.success(`Layer "${layer}" added to visible nodes.`);
+}
+
+
+async function embedPositionsAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await api.embedPositions(selectedIds);
+    if (res?.message) toast.success(res.message);
+    else toast.error("Failed to embed positions.");
+}
+
+async function findSimilarPositionsAction({ nodes }) {
+    const positionText = prompt("Enter position text to find similar:");
+    if (!positionText) return;
+    const res = await api.findSimilarPositions(positionText);
+    console.log("Similar positions response:", res);
+
+    // Build a map of id -> Name for quick lookup
+    const idToName = {};
+    nodes.forEach(n => {
+        idToName[n.data.id] = n.data.Name;
+    });
+
+    if (res?.similar_positions?.length) {
+        // Sort by score descending
+        const sorted = [...res.similar_positions].sort((a, b) => b.score - a.score);
+        const msg = sorted
+            .map(pos => {
+                const containerName = idToName[pos.container_id] || pos.container_id;
+                const childName = idToName[pos.child_id] || pos.child_id;
+                const label = pos.position_label || "";
+                return `Container: ${containerName}\nLabel: ${label}\nChild: ${childName}\nScore: ${pos.score.toFixed(3)}`;
+            })
+            .join('\n\n');
+        toast.success(
+            <div style={{ whiteSpace: "pre-wrap" }}>
+                <b>Similar positions found:</b>
+                <br />
+                {msg}
+            </div>,
+            { duration: 10000 }
+        );
+    } else {
+        toast.error(res?.message || "No similar positions found.");
+    }
+}
+
+async function convertToTagAction({ selectedIds }) {
+    if (!selectedIds.length) {
+        toast.error("No containers selected.");
+        return;
+    }
+    const res = await api.convertToTag(selectedIds);
+}
+
+async function searchPositionZAction({ nodeId, selectedNodes }) {
+    const node = selectedNodes.find(n => n.data.id === nodeId) || selectedNodes[0];
+    const defaultValue = node?.data?.Name || "";
+    const searchTerm = prompt("Search Position Z for:", defaultValue);
+    if (!searchTerm) return;
+    const results = await api.searchPositionZ(searchTerm);
+    if (results.length) {
+        toast.success(
+            <div style={{ whiteSpace: "pre-wrap" }}>
+                <b>Results:</b>
+                <br />
+                {results.join('\n')}
+            </div>,
+            { duration: 10000 }
+        );
+    } else {
+        toast.error("No results found.");
+    }
+}
+
+async function inheritPositionsAction({ nodeId, selectedIds }) {
+    // prefer explicit selection; if none, use the clicked nodeId
+    let targets = selectedIds && selectedIds.length ? selectedIds : (nodeId ? [nodeId] : []);
+    if (!targets.length) {
+        toast.error("Select at least one group container.");
+        return;
+    }
+    let successes = 0;
+    for (const id of targets) {
+        const res = await api.inheritPositions(id);
+        if (res && !res.error) {
+            successes += 1;
+        } else {
+            const msg = res?.message || "Failed to inherit positions.";
+            toast.error(`${id}: ${msg}`);
         }
-        console.error("Error loading node:", error);
-        return null;
     }
-};
+    if (successes) {
+        toast.success(`Inherited positions for ${successes} container(s).`);
+        // slight delay then refresh so UI can catch up
+        await new Promise(r => setTimeout(r, 200));
+        requestRefreshChannel();
+    }
+}
+/* eslint-enable no-unused-vars */
 
-/**
- * Search nodes by a search term.
- * @param {string} searchTerm - The term to search for.
- * @returns {Promise<Array>} Array of matching node results.
- */
-export const searchNodes = async (searchTerm, tags) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/search_nodes`, {
-            search_term: searchTerm,
-            tags: tags
-        });
-        return response.data.results || [];
-    } catch (error) {
-        console.error("Error searching nodes:", error);
-        return [];
+/* DYNAMIC HANDLER ******************************************/
+function getDynamicHandler(action) {
+    if (action.startsWith('exportApp')) {
+        return (ctx) => ctx.exportApp(ctx.nodeId);
+    } else if (action.startsWith('addLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => addLayerTag(ctx, layer);
+    } else if (action.startsWith('removeLayer:')) {
+        const layer = action.split(':')[1];
+        return (ctx) => removeLayerTag(ctx, layer);
     }
-};
+    return HANDLERS[action] || null;
+}
 
-/**
- * Search for position.z using vector search.
- * @param {string} searchTerm - The search term for position.z.
- * @param {number} [top_n=10] - Number of top results to return.
- * @returns {Promise<Array>} Array of names matching the search.
- * 
- */
-export const searchPositionZ = async (searchTerm, top_n = 5) => {
-    try {
-        const response = await apiClient.post(`${getApiUrl()}/search_position_z`, {
-            searchTerm,
-            top_n
-        });
-        return response.data.result || [];
-    } catch (error) {
-        console.error("Error searching position.z:", error);
-        return [];
-    }
-};
+// HOOK *****************************************
+export function useContextMenu(flowWrapperRef, _unused, baseMenuItems, nodes, rowData, setRowData, history) {
+    const menuRef = useRef(null);
+    const { layerOptions, activeLayers, addLayer, selectedContentLayer } = useAppContext();
+    const { exportApp } = useMenuHandlers(rowData, setRowData);
+    const layerMenus = [
+        { handler: 'addLayerMenu', label: 'Add to Layer', group: 'Layers', children: layerOptions.map(l => ({ handler: `addLayer:${l}`, label: l })) },
+        { handler: 'removeLayerMenu', label: 'Remove from Layer', group: 'Layers', children: layerOptions.map(l => ({ handler: `removeLayer:${l}`, label: l })) },
+    ];
+    const allMenuItems = [...baseMenuItems, ...layerMenus];
+
+    const handleContextMenu = (event, node) => {
+        event.preventDefault();
+        displayContextMenu(menuRef, event, node, flowWrapperRef);
+    };
+
+    const selectionContextMenu = (event, nodes) => {
+        event.preventDefault();
+        displayContextMenu(menuRef, event, nodes[0], flowWrapperRef);
+    };
+
+    const gearContextMenu = (event) => {
+        const m = menuRef.current;
+        if (!m) return;
+        requestAnimationFrame(() =>
+            displayContextMenu(menuRef, event, { data: { id: "gear" } }, flowWrapperRef)
+        );
+    };
+
+    const onMenuItemClick = async (action) => {
+        const m = menuRef.current;
+        const nodeId = m?.dataset.nodeId;
+        const selectedNodes = nodes.filter(n => n.selected);
+        const selectedIds = selectedNodes.map(n => n.data.id);
+
+        // If no nodes are selected:
+        // - When right-clicked on a node, select that node only.
+        // - When opened from the gear menu, select all nodes in view.
+        if (selectedIds.length === 0) {
+            if (nodeId && nodeId !== "gear") {
+                const clickedNode = nodes.find(n => n.data.id === nodeId);
+                if (clickedNode) {
+                    selectedNodes.push(clickedNode);
+                    selectedIds.push(clickedNode.data.id);
+                }
+            } else {
+                selectedIds.push(...nodes.map(n => n.data.id));
+                selectedNodes.push(...nodes);
+            }
+        }
+
+        const ctx = { nodes, nodeId, selectedNodes, selectedIds, rowData, setRowData, history, activeLayers, addLayer, exportApp, selectedContentLayer };
+        const handler = getDynamicHandler(action);
+        if (!handler) return console.warn(`No handler for action "${action}"`);
+        await handler(ctx);
+        if (m) m.style.setProperty("display", "none", "important");
+    };
+
+    const hideMenu = () => {
+        const m = menuRef.current;
+        if (m) m.style.setProperty("display", "none", "important");
+    };
+
+    return {
+        menuItems: allMenuItems,
+        menuRef,
+        handleContextMenu,
+        onMenuItemClick,
+        hideMenu,
+        selectionContextMenu,
+        gearContextMenu,
+    };
+}
+
+export { removeAction };
+

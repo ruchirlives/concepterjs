@@ -48,7 +48,8 @@ const HANDLERS = {
     findSimilarPositionsAction,
     searchPositionZAction,
     inheritPositionsAction,
-    convertToTagAction
+    convertToTagAction,
+    splitContainersAction,
 };
 
 export const menuItems = [
@@ -81,6 +82,9 @@ export const menuItems = [
     // AI
     { handler: "buildChainBeam", label: "Build Chain Beam", group: "AI" },
     { handler: "renameFromDescription", label: "Rename from Description", group: "AI" },
+
+    // Edit
+    { handler: "splitContainersAction", label: "Split Container(s)", group: "Edit" },
 
     // Positions
     { handler: "embedContainers", label: "Embed Containers", group: "Positions" },
@@ -678,6 +682,29 @@ async function inheritPositionsAction({ nodeId, selectedIds }) {
     if (successes) {
         toast.success(`Inherited positions for ${successes} container(s).`);
         // slight delay then refresh so UI can catch up
+        await new Promise(r => setTimeout(r, 200));
+        requestRefreshChannel();
+    }
+}
+
+async function splitContainersAction({ nodeId, selectedIds }) {
+    const targets = selectedIds && selectedIds.length ? selectedIds : (nodeId ? [nodeId] : []);
+    if (!targets.length) {
+        toast.error("Select at least one container to split.");
+        return;
+    }
+    let totalSplits = 0;
+    for (const id of targets) {
+        const res = await api.splitContainers(id, 2);
+        if (res && !res.error) {
+            totalSplits += (res.split_count ?? 0);
+        } else {
+            const msg = res?.error || "Failed to split container.";
+            toast.error(`${id}: ${msg}`);
+        }
+    }
+    if (totalSplits > 0) {
+        toast.success(`Split created for ${targets.length} container(s).`);
         await new Promise(r => setTimeout(r, 200));
         requestRefreshChannel();
     }

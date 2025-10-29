@@ -700,6 +700,24 @@ export const deleteProject = async (item) => {
     }
 }
 
+// Split containers
+// Backend: POST /split_containers { containerId, num_containers }
+// Returns: { split_count }
+export const splitContainers = async (containerId, num_containers = 2) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/split_containers`, {
+            containerId,
+            num_containers,
+        });
+        return response.data; // { split_count }
+    } catch (error) {
+        console.error("Error splitting containers:", error);
+        const msg = error?.response?.data?.error || "Error splitting containers";
+        return { error: msg };
+    }
+};
+
+
 // Load containers by given item
 export const loadContainers = async (item) => {
     console.log("Loading containers for item:", item);
