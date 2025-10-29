@@ -732,14 +732,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
       if (!sourceInfo) return;
 
       const elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
-      const targetNodeElement = elementUnderPointer?.closest?.('[data-flow-node-id]');
+      const targetNodeElement = elementUnderPointer?.closest?.('.react-flow__node');
       if (!targetNodeElement) return;
 
-      const dataset = targetNodeElement.dataset || {};
-      const targetOriginalId = dataset.flowNodeOriginalId || dataset.flowNodeId || dataset.flowOriginalId;
-      if (!targetOriginalId) return;
+      const targetNodeId = targetNodeElement.getAttribute('data-id');
+      if (!targetNodeId) return;
 
-      const normalizedTargetId = targetOriginalId.toString().split('__in__')[0];
+      const targetNode = nodes.find((n) => n.id === targetNodeId);
+      const normalizedTargetId = getLogicalNodeId(targetNode);
       if (!normalizedTargetId || normalizedTargetId === sourceInfo.logicalId) return;
 
       await linkNodes(sourceInfo.logicalId, normalizedTargetId);
@@ -748,7 +748,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     activeMouseHandlersRef.current = { move: handleMouseMove, up: handleMouseUp };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [getLogicalNodeId, linkNodes, setNodesDraggable]);
+  }, [getLogicalNodeId, linkNodes, nodes, setNodesDraggable]);
 
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
