@@ -690,7 +690,7 @@ export const getloadContainers = async () => {
 export const layerToContainer = async (layerName) => {
     console.log("Layer to container for layer:", layerName);
     try {
-        const response = await apiClient.post(`${getApiUrl()}/layer_to_container`, {
+        const response = await apiClient.post(`${getApiUrl()}/convert_layer_to_container`, {
             layerName: layerName,
         });
         return response.data;
