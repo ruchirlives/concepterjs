@@ -3,7 +3,7 @@ import { useAppContext } from "./AppContext";
 import { handleWriteBack, requestRefreshChannel } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
-import { setPosition } from "./api";
+import { setPosition, layerToContainer } from "./api";
 import { getStateSetter } from "./stateSetterRegistry";
 
 // Excel export button
@@ -445,6 +445,25 @@ const AppLayers = () => {
         clearLayerForAll(layer);
       },
     },
+    // convert layer to container option
+    {
+      label: "Convert layer to container",
+      onClick: async (context) => {
+        const { layer } = context;
+        if (!layer) return;
+        const confirmMsg = `Are you sure you want to convert layer "${layer}" to a container? This will create a new container with the same name as the layer and parent the layer's containers to it. This action cannot be undone.`;
+        if (!window.confirm(confirmMsg)) return;
+        // Call API 
+        try {
+          const response = await layerToContainer(layer);
+          if (response) {
+            requestRefreshChannel();
+          }
+        } catch (error) {
+          console.error("Error converting layer to container:", error);
+        }
+      }
+    },
     {
       label: "Rename layer",
       onClick: async (context) => {
@@ -549,242 +568,242 @@ const AppLayers = () => {
         </svg>
       )}
       <div className="bg-white rounded shadow">
-      {/* Layers panel */}
-      <div
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none"
-      >
-        <span className="font-semibold">Layers</span>
-        <button className="text-lg font-bold">{collapsed ? "▼" : "▲"}</button>
-      </div>
-      <div
-        className={`transition-all duration-300 overflow-auto`}
-        style={{ height: collapsed ? 0 : "auto" }}
-      >
-        <div className="p-4 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
-          <div className="flex space-x-2" onMouseDown={(e) => e.stopPropagation()}>
-            <input
-              className="border rounded px-2 py-1 text-sm flex-grow"
-              type="text"
-              value={newLayer}
-              onChange={(e) => setNewLayer(e.target.value)}
-              placeholder="New layer name"
-            />
-            <button
-              onClick={handleAdd}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="bg-blue-600 text-white text-sm px-2 py-1 rounded"
-            >
-              Add
-            </button>
-            <div onMouseDown={(e) => e.stopPropagation()}>
-              <ExcelButton handleExportExcel={handleExportExcel} />
+        {/* Layers panel */}
+        <div
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none"
+        >
+          <span className="font-semibold">Layers</span>
+          <button className="text-lg font-bold">{collapsed ? "▼" : "▲"}</button>
+        </div>
+        <div
+          className={`transition-all duration-300 overflow-auto`}
+          style={{ height: collapsed ? 0 : "auto" }}
+        >
+          <div className="p-4 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex space-x-2" onMouseDown={(e) => e.stopPropagation()}>
+              <input
+                className="border rounded px-2 py-1 text-sm flex-grow"
+                type="text"
+                value={newLayer}
+                onChange={(e) => setNewLayer(e.target.value)}
+                placeholder="New layer name"
+              />
+              <button
+                onClick={handleAdd}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="bg-blue-600 text-white text-sm px-2 py-1 rounded"
+              >
+                Add
+              </button>
+              <div onMouseDown={(e) => e.stopPropagation()}>
+                <ExcelButton handleExportExcel={handleExportExcel} />
+              </div>
             </div>
           </div>
-        </div>
-        {/* Layer assignment table with checkboxes in headers and "No Layer" column */}
-        <div className="p-4 pt-0">
-          <div className="font-semibold mb-2 text-sm">
-            Assign Containers to Layers
-          </div>
-          <table className="table-auto border-collapse border border-gray-300 w-full">
-            <thead>
-              <tr>
-                {layerOptions.map((layer) => (
-                  <th
-                    key={layer}
-                    className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setHeaderContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        layer,
-                      });
-                    }}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <input
-                        type="checkbox"
-                        checked={activeLayers.includes(layer)}
-                        onChange={() => toggleLayer(layer)}
-                        className="h-3 w-3"
-                        title="Toggle layer visibility"
-                      />
-                      <span>{layer}</span>
-                      <button
-                        onClick={() => removeLayer(layer)}
-                        className="ml-1 text-red-500 text-xs"
-                        title="Delete layer"
-                        tabIndex={-1}
-                        style={{ lineHeight: 1 }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </th>
-                ))}
-                <th
-                  className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
-                  key="no-layer"
-                >
-                  <span className="font-semibold text-gray-600">No Layer</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {layerOptions.map((layer) => {
-                  const items = containersByLayer[layer] || [];
-                  return (
-                    <td
+          {/* Layer assignment table with checkboxes in headers and "No Layer" column */}
+          <div className="p-4 pt-0">
+            <div className="font-semibold mb-2 text-sm">
+              Assign Containers to Layers
+            </div>
+            <table className="table-auto border-collapse border border-gray-300 w-full">
+              <thead>
+                <tr>
+                  {layerOptions.map((layer) => (
+                    <th
                       key={layer}
-                      className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30"
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => handleDrop(layer)}
-                      onDoubleClick={() => handleCellDoubleClick(layer)}
-                      style={{ cursor: "pointer" }}
-                      title="Double-click to add a container to this layer"
+                      className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setHeaderContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          layer,
+                        });
+                      }}
                     >
-                      {items.length > 0 ? (
-                        <ul className="text-xs space-y-1">
-                          {items.map((row) => {
-                            const rowId = row?.id != null ? row.id.toString() : "";
-                            const isHighlighted = highlightedChildren.has(rowId);
-                            return (
-                              <li
-                                key={row.id}
-                                draggable
-                                data-layer-item-id={rowId}
-                                onMouseDown={(e) => handleCtrlMouseDown(row, e)}
-                                onDragStart={(e) => {
-                                  if (e?.ctrlKey) {
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={activeLayers.includes(layer)}
+                          onChange={() => toggleLayer(layer)}
+                          className="h-3 w-3"
+                          title="Toggle layer visibility"
+                        />
+                        <span>{layer}</span>
+                        <button
+                          onClick={() => removeLayer(layer)}
+                          className="ml-1 text-red-500 text-xs"
+                          title="Delete layer"
+                          tabIndex={-1}
+                          style={{ lineHeight: 1 }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </th>
+                  ))}
+                  <th
+                    className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                    key="no-layer"
+                  >
+                    <span className="font-semibold text-gray-600">No Layer</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {layerOptions.map((layer) => {
+                    const items = containersByLayer[layer] || [];
+                    return (
+                      <td
+                        key={layer}
+                        className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDrop(layer)}
+                        onDoubleClick={() => handleCellDoubleClick(layer)}
+                        style={{ cursor: "pointer" }}
+                        title="Double-click to add a container to this layer"
+                      >
+                        {items.length > 0 ? (
+                          <ul className="text-xs space-y-1">
+                            {items.map((row) => {
+                              const rowId = row?.id != null ? row.id.toString() : "";
+                              const isHighlighted = highlightedChildren.has(rowId);
+                              return (
+                                <li
+                                  key={row.id}
+                                  draggable
+                                  data-layer-item-id={rowId}
+                                  onMouseDown={(e) => handleCtrlMouseDown(row, e)}
+                                  onDragStart={(e) => {
+                                    if (e?.ctrlKey) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      return;
+                                    }
+                                    if (e?.dataTransfer) {
+                                      e.dataTransfer.effectAllowed = "move";
+                                    }
+                                    setDragItem({ cid: rowId, layer });
+                                  }}
+                                  onDragOver={(e) => {
+                                    if (!dragItem) return;
+                                    if (dragItem.cid === rowId) return;
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    return;
-                                  }
-                                  if (e?.dataTransfer) {
-                                    e.dataTransfer.effectAllowed = "move";
-                                  }
-                                  setDragItem({ cid: rowId, layer });
-                                }}
-                                onDragOver={(e) => {
-                                  if (!dragItem) return;
-                                  if (dragItem.cid === rowId) return;
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (e?.dataTransfer) {
-                                    e.dataTransfer.dropEffect = "move";
-                                  }
-                                }}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleDrop(layer, { beforeId: rowId });
-                                }}
-                                onDragEnd={() => setDragItem(null)}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  setContextMenu({
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    layer,
-                                    cid: rowId,
-                                  });
-                                }}
-                                className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
-                              >
-                                {row.Name}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                  );
-                })}
-                <td
-                  key="no-layer"
-                  className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 bg-gray-50"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (!dragItem) return;
-                    const { cid } = dragItem;
-                    setRowData((prev) => {
-                      const updated = prev.map((row) => {
-                        if (row.id.toString() !== cid) return row;
-                        return { ...row, Tags: "" };
+                                    if (e?.dataTransfer) {
+                                      e.dataTransfer.dropEffect = "move";
+                                    }
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDrop(layer, { beforeId: rowId });
+                                  }}
+                                  onDragEnd={() => setDragItem(null)}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setContextMenu({
+                                      x: e.clientX,
+                                      y: e.clientY,
+                                      layer,
+                                      cid: rowId,
+                                    });
+                                  }}
+                                  className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
+                                >
+                                  {row.Name}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td
+                    key="no-layer"
+                    className="p-2 border border-gray-300 align-top min-w-30 max-w-30 w-30 bg-gray-50"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (!dragItem) return;
+                      const { cid } = dragItem;
+                      setRowData((prev) => {
+                        const updated = prev.map((row) => {
+                          if (row.id.toString() !== cid) return row;
+                          return { ...row, Tags: "" };
+                        });
+                        handleWriteBack(updated);
+                        return updated;
                       });
-                      handleWriteBack(updated);
-                      return updated;
-                    });
-                    setDragItem(null);
-                  }}
-                  onDoubleClick={() => handleCellDoubleClick(null)}
-                  style={{ cursor: "pointer" }}
-                  title="Double-click to add a container with no layer"
-                >
-                  {noLayerItems.length > 0 ? (
-                    <ul className="text-xs space-y-1">
-                      {noLayerItems.map((row) => {
-                        const rowId = row?.id != null ? row.id.toString() : "";
-                        const isHighlighted = highlightedChildren.has(rowId);
-                        return (
-                          <li
-                            key={row.id}
-                            draggable
-                            data-layer-item-id={rowId}
-                            onMouseDown={(e) => handleCtrlMouseDown(row, e)}
-                            onDragStart={(e) => {
-                              if (e?.ctrlKey) {
+                      setDragItem(null);
+                    }}
+                    onDoubleClick={() => handleCellDoubleClick(null)}
+                    style={{ cursor: "pointer" }}
+                    title="Double-click to add a container with no layer"
+                  >
+                    {noLayerItems.length > 0 ? (
+                      <ul className="text-xs space-y-1">
+                        {noLayerItems.map((row) => {
+                          const rowId = row?.id != null ? row.id.toString() : "";
+                          const isHighlighted = highlightedChildren.has(rowId);
+                          return (
+                            <li
+                              key={row.id}
+                              draggable
+                              data-layer-item-id={rowId}
+                              onMouseDown={(e) => handleCtrlMouseDown(row, e)}
+                              onDragStart={(e) => {
+                                if (e?.ctrlKey) {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  return;
+                                }
+                                setDragItem({ cid: rowId, layer: null });
+                              }}
+                              onContextMenu={(e) => {
                                 e.preventDefault();
-                                e.stopPropagation();
-                                return;
-                              }
-                              setDragItem({ cid: rowId, layer: null });
-                            }}
-                            onContextMenu={(e) => {
-                              e.preventDefault();
-                              // Remove all layers from this row
-                              handleRemoveAllLayers(rowId);
-                            }}
-                            className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
-                          >
-                            {row.Name}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                                // Remove all layers from this row
+                                handleRemoveAllLayers(rowId);
+                              }}
+                              className={`px-2 py-1 rounded transition-colors ${isHighlighted ? "bg-yellow-200 border border-yellow-400" : ""}`}
+                            >
+                              {row.Name}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      <ContextMenu
-        contextMenu={contextMenu}
-        setContextMenu={setContextMenu}
-        menuOptions={layerMenuOptions}
-      />
-      <ContextMenu
-        contextMenu={headerContextMenu}
-        setContextMenu={setHeaderContextMenu}
-        menuOptions={headerMenuOptions}
-      />
-      {/* Modal for adding a row to a layer */}
-      <ModalAddRow
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSelect={handleModalSelect}
+        <ContextMenu
+          contextMenu={contextMenu}
+          setContextMenu={setContextMenu}
+          menuOptions={layerMenuOptions}
+        />
+        <ContextMenu
+          contextMenu={headerContextMenu}
+          setContextMenu={setHeaderContextMenu}
+          menuOptions={headerMenuOptions}
+        />
+        {/* Modal for adding a row to a layer */}
+        <ModalAddRow
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSelect={handleModalSelect}
         // Remove selectedContentLayer prop, ModalAddRow will get it from context
-      />
-    </div>
+        />
+      </div>
     </>
   );
 };

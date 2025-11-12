@@ -686,6 +686,20 @@ export const getloadContainers = async () => {
     }
 };
 
+// layer to container
+export const layerToContainer = async (layerName) => {
+    console.log("Layer to container for layer:", layerName);
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/layer_to_container`, {
+            layerName: layerName,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in layer to container:", error);
+        return null;
+    }
+};
+
 export const deleteProject = async (item) => {
     console.log("Deleting project:", item);
     try {
