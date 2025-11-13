@@ -235,6 +235,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [filterEdgesByHandleX, setFilterEdgesByHandleX] = useState(false);
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
@@ -1032,9 +1033,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
   // Memoize edgeTypes so it's not recreated on every render
   const edgeTypes = useMemo(() => ({
     customEdge: (edgeProps) => (
-      <CustomEdge {...edgeProps} setEdges={setEdges} />
+      <CustomEdge
+        {...edgeProps}
+        setEdges={setEdges}
+        filterEdgesByHandleX={filterEdgesByHandleX}
+      />
     ),
-  }), [setEdges]);
+  }), [setEdges, filterEdgesByHandleX]);
 
   // Snapshot positions when Keep Layout toggles on; avoid running on every drag frame
   useEffect(() => {
@@ -1255,6 +1260,17 @@ const App = ({ keepLayout, setKeepLayout }) => {
             onChange={e => setShowGhostConnections(e.target.checked)}
           />
           <label htmlFor="toggleGhostConnections" className="text-sm">Show Ghost Connections</label>
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          <input
+            type="checkbox"
+            id="filterEdgesByHandleX"
+            checked={filterEdgesByHandleX}
+            onChange={e => setFilterEdgesByHandleX(e.target.checked)}
+          />
+          <label htmlFor="filterEdgesByHandleX" className="text-sm">
+            Only show edges flowing left-to-right
+          </label>
         </div>
         {/* Keep Layout toggle */}
         <label className="inline-flex items-center space-x-2 text-sm ml-4">

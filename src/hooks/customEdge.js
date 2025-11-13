@@ -52,9 +52,24 @@ const CustomEdge = ({
     markerEnd,
     data,
     setEdges, // <-- accept as prop
+    filterEdgesByHandleX = false,
 }) => {
     const { handleEdgeMenu } = useFlowMenu();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges); // <-- use here
+
+    const [hovered, setHovered] = useState(false);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const labelRef = useRef();
+    const singleTapTimeout = useRef(null);
+
+    if (
+        filterEdgesByHandleX &&
+        Number.isFinite(sourceX) &&
+        Number.isFinite(targetX) &&
+        sourceX >= targetX
+    ) {
+        return null;
+    }
 
     // compute our stroke colour
     const hue = getHueFromString(source);
@@ -99,12 +114,6 @@ const CustomEdge = ({
         sourcePosition,
         targetPosition,
     });
-
-    // hover and tooltip state for edge label
-    const [hovered, setHovered] = useState(false);
-    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-    const labelRef = useRef();
-    const singleTapTimeout = useRef(null);
 
     const handleMouseEnter = () => {
         if (labelRef.current) {

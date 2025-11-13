@@ -1,5 +1,5 @@
 import colors from "tailwindcss/colors";
-// import { MarkerType } from '@xyflow/react';
+import { MarkerType } from '@xyflow/react';
 
 export function buildVisibleEdges(params) {
     const { childMap, computedNodes: visibleNodes, allNodes } = params;
@@ -47,6 +47,7 @@ export function buildVisibleEdges(params) {
                     source: parentId,
                     target: childId,
                     type: 'customEdge',
+                    markerEnd: { type: MarkerType.Arrow },
                     style: { stroke: colors.black },
                     data: { label: c.position?.label || '', isSourceGroup: isGroupTag }, 
                 });
