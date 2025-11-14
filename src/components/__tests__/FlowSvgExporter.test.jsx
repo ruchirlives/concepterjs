@@ -170,4 +170,68 @@ describe("serializeFlowSvg", () => {
     expect(svg).toContain(">Fallback Data Label<");
     expect(svg).toContain(">Position Label<");
   });
+
+  it("preserves flow node background styling in exported rectangles", () => {
+    const svg = serializeFlowSvg({
+      nodes: [
+        {
+          id: "highlighted",
+          position: { x: 0, y: 0 },
+          data: { Name: "Highlighted", highlighted: true },
+        },
+        {
+          id: "input-tag",
+          position: { x: 220, y: 0 },
+          data: { Name: "Input", Tags: "Input" },
+        },
+        {
+          id: "scored",
+          position: { x: 440, y: 0 },
+          data: { Name: "Scored", score: 0.5, normalizedScore: 0.65 },
+        },
+        {
+          id: "default",
+          position: { x: 660, y: 0 },
+          data: { Name: "Default" },
+        },
+      ],
+      edges: [],
+      grid: baseGrid,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      includeRows: false,
+      includeColumns: false,
+    });
+
+    const nodeRects = Array.from(
+      svg.matchAll(
+        /<rect x="[^"]+" y="[^"]+" width="[^"]+" height="[^"]+" rx="[^"]+" ry="[^"]+" fill="([^"]+)" stroke="#1e293b"/g
+      )
+    );
+    const fills = nodeRects.map(([, fill]) => fill);
+
+    expect(fills).toContain("#9ca3af"); // highlighted nodes use gray background
+    expect(fills).toContain("#e9d5ff"); // input-tag nodes use purple background
+    expect(fills).toContain("#fbbf24"); // normalized score produces yellow background
+    expect(fills).toContain("#f3f4f6"); // default nodes fall back to base gray
+  });
+
+  it("keeps ghost nodes transparent in the export", () => {
+    const svg = serializeFlowSvg({
+      nodes: [
+        {
+          id: "ghost-1",
+          type: "ghost",
+          position: { x: 0, y: 0 },
+          data: { label: "Ghost" },
+        },
+      ],
+      edges: [],
+      grid: baseGrid,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      includeRows: false,
+      includeColumns: false,
+    });
+
+    expect(svg).toContain('fill="none" stroke="#1e293b"');
+  });
 });

@@ -81,6 +81,18 @@ const ROW_COLOR_PALETTE = [
 ];
 const LABEL_CELL_BORDER = "rgba(148,163,184,0.7)";
 
+const NODE_BACKGROUND_COLORS = {
+  highlight: "#9ca3af", // bg-gray-400
+  grayBase: "#f3f4f6", // bg-gray-100
+  yellow100: "#fef3c7",
+  yellow200: "#fde68a",
+  yellow300: "#fcd34d",
+  yellow400: "#fbbf24",
+  yellow500: "#f59e0b",
+  purple200: "#e9d5ff",
+  green200: "#bbf7d0",
+};
+
 const safeNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? value : fallback;
 
@@ -221,6 +233,93 @@ const collectStyleOverrides = (segment) => {
     });
   });
   return overrides;
+};
+
+const clamp01 = (value) => {
+  if (!Number.isFinite(value)) return null;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+};
+
+const resolveParentBackgroundColor = (count) => {
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  if (safeCount === 0) return NODE_BACKGROUND_COLORS.grayBase;
+  if (safeCount === 1) return NODE_BACKGROUND_COLORS.yellow100;
+  if (safeCount === 2) return NODE_BACKGROUND_COLORS.yellow200;
+  if (safeCount === 3) return NODE_BACKGROUND_COLORS.yellow300;
+  if (safeCount === 4) return NODE_BACKGROUND_COLORS.yellow400;
+  return NODE_BACKGROUND_COLORS.yellow500;
+};
+
+const normalizeTags = (tags) =>
+  typeof tags === "string" ? tags.toLowerCase() : "";
+
+const pickRowBandFill = (centerY, entries = []) => {
+  if (!Number.isFinite(centerY) || !Array.isArray(entries)) return null;
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
+    if (
+      Number.isFinite(entry?.top) &&
+      Number.isFinite(entry?.bottom) &&
+      centerY >= entry.top &&
+      centerY <= entry.bottom
+    ) {
+      return entry.color;
+    }
+  }
+  return null;
+};
+
+const resolveNodeFillColor = (node, flowCenterY, rowColorEntries) => {
+  if (node?.type === "ghost") {
+    return "none";
+  }
+
+  const isFlowNodeType = !node?.type || node.type === "custom";
+  if (isFlowNodeType) {
+    const data = node?.data || {};
+    if (data.highlighted) {
+      return NODE_BACKGROUND_COLORS.highlight;
+    }
+
+    if (typeof data.score === "number" && data.normalizedScore !== undefined) {
+      const normalizedScore = clamp01(Number(data.normalizedScore));
+      if (normalizedScore != null) {
+        if (normalizedScore >= 0.8) return NODE_BACKGROUND_COLORS.yellow500;
+        if (normalizedScore >= 0.6) return NODE_BACKGROUND_COLORS.yellow400;
+        if (normalizedScore >= 0.4) return NODE_BACKGROUND_COLORS.yellow300;
+        if (normalizedScore >= 0.2) return NODE_BACKGROUND_COLORS.yellow200;
+        return NODE_BACKGROUND_COLORS.yellow100;
+      }
+    }
+
+    if (data.isHighestScoring) {
+      return NODE_BACKGROUND_COLORS.yellow500;
+    }
+
+    const tags = normalizeTags(data.Tags);
+    if (tags.includes("input")) {
+      return NODE_BACKGROUND_COLORS.purple200;
+    }
+    if (tags.includes("output")) {
+      return NODE_BACKGROUND_COLORS.green200;
+    }
+
+    const parentCount = Array.isArray(data.parents)
+      ? data.parents.length
+      : Number.isFinite(data.parentCount)
+        ? data.parentCount
+        : Number.isFinite(data.parentsCount)
+          ? data.parentsCount
+          : 0;
+    return resolveParentBackgroundColor(parentCount);
+  }
+
+  const rowBandFill = pickRowBandFill(flowCenterY, rowColorEntries);
+  if (rowBandFill) return rowBandFill;
+
+  return NODE_FILL_COLOR;
 };
 
 const baseTextStyleForSegment = (segment, index = 0) => {
@@ -859,19 +958,7 @@ export const serializeFlowSvg = ({
     const centerX = x + width / 2;
     const centerY = y + height / 2;
     const flowCenterY = baseY + heightUnits / 2;
-    let nodeFill = NODE_FILL_COLOR;
-    for (let i = 0; i < rowColorEntries.length; i += 1) {
-      const entry = rowColorEntries[i];
-      if (
-        Number.isFinite(entry.top) &&
-        Number.isFinite(entry.bottom) &&
-        flowCenterY >= entry.top &&
-        flowCenterY <= entry.bottom
-      ) {
-        nodeFill = entry.color;
-        break;
-      }
-    }
+    const nodeFill = resolveNodeFillColor(node, flowCenterY, rowColorEntries);
     shapes.push({
       type: "node",
       x,
