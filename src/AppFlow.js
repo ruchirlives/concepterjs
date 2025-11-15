@@ -19,7 +19,7 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { saveNodes, addChildren, removeChildren, setPosition } from './api';
+import { saveNodes, addChildren, addChildrenBatch, removeChildren, setPosition } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
@@ -129,6 +129,88 @@ const dimensionEqual = (a, b) => {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
   return Math.abs(a - b) <= 0.001;
+};
+
+const toComparableId = (value) => {
+  if (value == null) return null;
+  if (typeof value === 'object') {
+    if (value.originalId != null) return toComparableId(value.originalId);
+    if (value.id != null) return toComparableId(value.id);
+  }
+  return value.toString();
+};
+
+const parseContainerId = (value) => {
+  if (value == null) return value;
+  if (typeof value === 'object') {
+    if (value.originalId != null) return parseContainerId(value.originalId);
+    if (value.id != null) return parseContainerId(value.id);
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const addChildLinksToParentMap = (map, parentIds = [], childIds = []) => {
+  const normalizedParents = parentIds
+    .map((raw) => ({ raw, comparable: toComparableId(raw) }))
+    .filter((entry) => Boolean(entry.comparable));
+  const normalizedChildren = childIds
+    .map((raw) => ({ raw, comparable: toComparableId(raw) }))
+    .filter((entry) => Boolean(entry.comparable));
+
+  if (!normalizedParents.length || !normalizedChildren.length) {
+    return { map, changed: false };
+  }
+
+  const ensureArray = (value) => (Array.isArray(value) ? value : []);
+  const base = Array.isArray(map) ? map : [];
+  let working = base;
+  let mutated = false;
+
+  const ensureWorkingCopy = () => {
+    if (working === base) {
+      working = [...base];
+    }
+  };
+
+  normalizedParents.forEach((parent) => {
+    let index = working.findIndex(
+      (entry) => toComparableId(entry?.container_id) === parent.comparable
+    );
+
+    if (index === -1) {
+      ensureWorkingCopy();
+      working.push({
+        container_id: parseContainerId(parent.raw),
+        children: [],
+      });
+      index = working.length - 1;
+      mutated = true;
+    }
+
+    const entry = working[index];
+    const children = ensureArray(entry.children);
+    const existingKeys = new Set(
+      children.map((child) => toComparableId(child?.id)).filter(Boolean)
+    );
+    const additions = normalizedChildren.filter((child) => !existingKeys.has(child.comparable));
+    if (additions.length === 0) {
+      return;
+    }
+
+    const updatedChildren = [
+      ...children,
+      ...additions.map((child) => ({ id: parseContainerId(child.raw), label: 'child' })),
+    ];
+    ensureWorkingCopy();
+    working[index] = {
+      ...entry,
+      children: updatedChildren,
+    };
+    mutated = true;
+  });
+
+  return mutated ? { map: working, changed: true } : { map, changed: false };
 };
 
 const cellOptionsEqual = (a = {}, b = {}) => (
@@ -284,6 +366,28 @@ const App = ({ keepLayout, setKeepLayout }) => {
     });
     return map;
   }, [parentChildMap]);
+
+  const handleFlowRefreshMessage = useCallback((message) => {
+    if (!message || message.type !== 'linkChildren') return;
+    const parentIds = Array.isArray(message.parentIds) ? message.parentIds : [];
+    const childIds = Array.isArray(message.childIds) ? message.childIds : [];
+    if (!parentIds.length || !childIds.length) return;
+    setParentChildMap((prev) => {
+      const { map: nextMap, changed } = addChildLinksToParentMap(prev, parentIds, childIds);
+      return changed ? nextMap : prev;
+    });
+  }, [setParentChildMap]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') {
+      return undefined;
+    }
+    const channel = new BroadcastChannel('requestRefreshChannel');
+    channel.onmessage = (event) => {
+      handleFlowRefreshMessage(event?.data);
+    };
+    return () => channel.close();
+  }, [handleFlowRefreshMessage]);
 
 
 
@@ -629,25 +733,47 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return;
     }
 
-    let successCount = 0;
-    for (const parentId of parents) {
-      try {
-        const response = await addChildren(parentId, childIds);
-        if (response && !response.error) {
-          successCount += 1;
-        } else {
-          const message = response?.message || `Failed to link containers to parent ${parentId}`;
-          toast.error(message);
-        }
-      } catch (error) {
-        console.error("Failed to add children to parent", parentId, error);
-        toast.error(`Failed to link containers to parent ${parentId}`);
-      }
+    const parentIds = Array.from(parents);
+    const parentEntries = parentIds.map((parentId) => ({
+      parentId,
+      childrenIds: childIds,
+    }));
+
+    let batchResult;
+    try {
+      batchResult = await addChildrenBatch(parentEntries);
+    } catch (error) {
+      console.error("Failed to batch add children", error);
     }
+
+    const results = Array.isArray(batchResult?.results) && batchResult.results.length > 0
+      ? batchResult.results
+      : parentEntries.map((entry) => ({
+          parent_id: entry.parentId,
+          success: batchResult?.success !== false,
+          message: batchResult?.message,
+        }));
+
+    let successCount = 0;
+    results.forEach((result, index) => {
+      const inferredParentId = result?.parent_id ?? parentEntries[index]?.parentId;
+      const succeeded = result?.success ?? !result?.error;
+      if (succeeded) {
+        successCount += 1;
+      } else {
+        const message = result?.message || `Failed to link containers to parent ${inferredParentId}`;
+        toast.error(message);
+      }
+    });
 
     if (successCount > 0) {
       toast.success(`Linked ${childIds.length} container${childIds.length > 1 ? 's' : ''} to ${successCount} parent${successCount > 1 ? 's' : ''}.`);
-      requestRefreshChannel();
+      requestRefreshChannel({
+        reload: true,
+        type: 'linkChildren',
+        parentIds,
+        childIds,
+      });
     }
 
     setPendingCellContext(null);

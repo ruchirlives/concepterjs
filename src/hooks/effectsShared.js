@@ -74,8 +74,18 @@ export async function writeBackUpdatedData(gridApi, prevID, type="mermaid") {
     }
 }
 
-export function requestRefreshChannel() {
+export function requestRefreshChannel(message) {
     const channel = new BroadcastChannel('requestRefreshChannel');
-    channel.postMessage({ reload: true });
+    const payload = (
+        message &&
+        typeof message === 'object' &&
+        !Array.isArray(message)
+    )
+        ? message
+        : { reload: true };
+    if (payload.reload === undefined) {
+        payload.reload = true;
+    }
+    channel.postMessage(payload);
     channel.close();
 }

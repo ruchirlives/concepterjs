@@ -494,6 +494,56 @@ export const addChildren = async (parentId, children) => {
     }
 };
 
+export const addChildrenBatch = async (mappings = []) => {
+    if (!Array.isArray(mappings) || mappings.length === 0) {
+        return { results: [] };
+    }
+
+    const normalized = mappings
+        .map((entry) => {
+            const parent = entry?.parentId ?? entry?.parent_id;
+            const children = Array.isArray(entry?.childrenIds ?? entry?.children_ids)
+                ? (entry.childrenIds ?? entry.children_ids)
+                : [];
+            if (!parent || children.length === 0) return null;
+            return { parent_id: parent, children_ids: children };
+        })
+        .filter(Boolean);
+
+    if (normalized.length === 0) {
+        return { results: [] };
+    }
+
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/add_children_batch`, {
+            mappings: normalized,
+        });
+        return response.data;
+    } catch (error) {
+        console.warn("Batch add_children failed, falling back to sequential calls.", error);
+        const fallbackResults = [];
+        for (const entry of normalized) {
+            try {
+                const response = await addChildren(entry.parent_id, entry.children_ids);
+                const success = !!(response && !response.error);
+                fallbackResults.push({
+                    parent_id: entry.parent_id,
+                    success,
+                    response,
+                    message: response?.message,
+                });
+            } catch (innerError) {
+                fallbackResults.push({
+                    parent_id: entry.parent_id,
+                    success: false,
+                    message: innerError?.message,
+                });
+            }
+        }
+        return { results: fallbackResults, fallback: true };
+    }
+};
+
 export const add_similar = async (parentId, children) => {
     try {
         const response = await apiClient.post(`${getApiUrl()}/add_similar`, {
