@@ -170,4 +170,35 @@ describe("serializeFlowSvg", () => {
     expect(svg).toContain(">Fallback Data Label<");
     expect(svg).toContain(">Position Label<");
   });
+
+  it("omits backward edges when filterEdgesByHandleX is enabled", () => {
+    const svg = serializeFlowSvg({
+      nodes: [
+        {
+          id: "node-a",
+          position: { x: 200, y: 0 },
+          data: { Name: "Node A" },
+        },
+        {
+          id: "node-b",
+          position: { x: 0, y: 0 },
+          data: { Name: "Node B" },
+        },
+      ],
+      edges: [
+        {
+          id: "edge-backward",
+          source: "node-a",
+          target: "node-b",
+        },
+      ],
+      grid: baseGrid,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      includeRows: false,
+      includeColumns: false,
+      filterEdgesByHandleX: true,
+    });
+
+    expect(svg).not.toContain('class="flow-edge"');
+  });
 });

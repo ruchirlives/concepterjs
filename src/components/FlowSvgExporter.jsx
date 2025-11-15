@@ -647,6 +647,7 @@ export const serializeFlowSvg = ({
   viewport = { x: 0, y: 0, zoom: 1 },
   includeRows = true,
   includeColumns = true,
+  filterEdgesByHandleX = false,
 } = {}) => {
   const zoom = safeNumber(viewport?.zoom, 1);
   const visualSizing = createVisualSizing(zoom);
@@ -907,6 +908,9 @@ export const serializeFlowSvg = ({
     const targetCenterY = targetRect.y + targetRect.height / 2;
     const dx = targetCenterX - sourceCenterX;
     const dy = targetCenterY - sourceCenterY;
+    if (filterEdgesByHandleX && !(dx > 0)) {
+      return;
+    }
     const orientation = Math.abs(dx) >= Math.abs(dy) ? "horizontal" : "vertical";
     const direction =
       orientation === "horizontal"
@@ -1582,6 +1586,7 @@ const FlowSvgExporter = forwardRef(
       includeRows = true,
       includeColumns = true,
       fileName = "flow-grid-export.svg",
+      filterEdgesByHandleX = false,
     },
     ref
   ) => {
@@ -1593,6 +1598,7 @@ const FlowSvgExporter = forwardRef(
         viewport,
         includeRows,
         includeColumns,
+        filterEdgesByHandleX,
       });
 
     const triggerDownload = (svgString, targetFileName) => {

@@ -230,12 +230,20 @@ const App = ({ keepLayout, setKeepLayout }) => {
     layerOrdering,
   } = useFlowLogic();
 
-  const { parentChildMap, setParentChildMap, cellWidthInput, setCellWidthInput, cellHeightInput, setCellHeightInput } = useAppContext();
+  const {
+    parentChildMap,
+    setParentChildMap,
+    cellWidthInput,
+    setCellWidthInput,
+    cellHeightInput,
+    setCellHeightInput,
+    filterEdgesByHandleX,
+    setFilterEdgesByHandleX,
+  } = useAppContext();
 
 
   const [showGhostConnections, setShowGhostConnections] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [filterEdgesByHandleX, setFilterEdgesByHandleX] = useState(false);
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
@@ -1552,6 +1560,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               viewport={viewportTransform}
               includeRows={showRowGrid}
               includeColumns={showColumnGrid}
+              filterEdgesByHandleX={filterEdgesByHandleX}
             />
             {cellMenuContext && (
               <div

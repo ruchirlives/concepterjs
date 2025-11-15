@@ -49,6 +49,7 @@ export const AppProvider = ({ children }) => {
   const [selectedContentLayer, setSelectedContentLayer] = useState("");
   const [rowSelectedLayer, setRowSelectedLayer] = useState('');
   const [columnSelectedLayer, setColumnSelectedLayer] = useState('');
+  const [filterEdgesByHandleX, setFilterEdgesByHandleX] = useState(false);
 
   const defaultFlowGridBounds = useMemo(
     () => ({ width: 0, height: 0, top: 0, left: 0, clientTop: 0, clientLeft: 0 }),
@@ -390,6 +391,7 @@ export const AppProvider = ({ children }) => {
       editingCell: setEditingCell,
       flipped: setFlipped,
       flowGridDimensions: setFlowGridDimensions,
+      filterEdgesByHandleX: setFilterEdgesByHandleX,
       hiddenLayers: setHiddenLayers,
       hideEmpty: setHideEmpty,
       hoveredCell: setHoveredCell,
@@ -419,6 +421,7 @@ export const AppProvider = ({ children }) => {
     setActiveState,
     setAvailableStates,
     setColumnSelectedLayer,
+    setFilterEdgesByHandleX,
     setComparatorState,
     setDiffDict,
     setDifferences,
@@ -599,6 +602,8 @@ export const AppProvider = ({ children }) => {
     setRowSelectedLayer,
     columnSelectedLayer,
     setColumnSelectedLayer,
+    filterEdgesByHandleX,
+    setFilterEdgesByHandleX,
     flowGridDimensions,
     setFlowGridDimensions,
     // Matrix management
