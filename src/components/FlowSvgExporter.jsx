@@ -660,6 +660,18 @@ const formatPoint = (point = {}, offsetX = 0, offsetY = 0) => {
   return `${Number(x.toFixed(2))} ${Number(y.toFixed(2))}`;
 };
 
+const normalizeColorKey = (value) => {
+  if (value == null) return null;
+  let raw = value;
+  if (typeof raw === "object") {
+    raw =
+      raw.originalId ?? raw.id ?? (typeof raw.toString === "function" ? raw.toString() : null);
+  }
+  if (raw == null) return null;
+  const str = String(raw);
+  return str.includes("__in__") ? str.split("__in__")[0] : str;
+};
+
 const generateRoundedPath = (points = [], radius = 12, offsetX = 0, offsetY = 0) => {
   if (!Array.isArray(points) || points.length === 0) return "";
   if (points.length === 1) {
@@ -900,6 +912,7 @@ export const serializeFlowSvg = ({
   const nodeLayoutMap = new Map();
   const nodeRenderMap = new Map();
   const nodeColorMap = new Map();
+  let nodeColorAssignments = 0;
   nodes.forEach((node) => {
     const explicitSize = extractNodeSize(node);
     const metrics = measureNodeContent(node, {
@@ -966,9 +979,20 @@ export const serializeFlowSvg = ({
     });
     registerBounds(x, y, width, height);
     nodeRenderMap.set(node.id, { x, y, width, height, centerX, centerY });
-    if (node?.id != null) {
-      const colorIndex = nodeColorMap.size % EDGE_STROKE_COLORS.length;
-      nodeColorMap.set(node.id, EDGE_STROKE_COLORS[colorIndex]);
+    const baseColorKey = normalizeColorKey(
+      node?.data?.originalId ?? node?.data?.id ?? node?.id
+    );
+    if (baseColorKey) {
+      if (!nodeColorMap.has(baseColorKey)) {
+        const colorIndex = nodeColorAssignments % EDGE_STROKE_COLORS.length;
+        nodeColorMap.set(baseColorKey, EDGE_STROKE_COLORS[colorIndex]);
+        nodeColorAssignments += 1;
+      }
+      const colorValue = nodeColorMap.get(baseColorKey);
+      const instanceKey = normalizeColorKey(node?.id);
+      if (instanceKey) {
+        nodeColorMap.set(instanceKey, colorValue);
+      }
     }
   });
 
@@ -1040,7 +1064,7 @@ export const serializeFlowSvg = ({
       sourceOffset: 0,
       targetOffset: 0,
       label: resolveEdgeLabel(edge),
-      strokeColor: nodeColorMap.get(edge?.source) || EDGE_STROKE_COLOR,
+      strokeColor: nodeColorMap.get(normalizeColorKey(edge?.source)) || EDGE_STROKE_COLOR,
     });
   });
 
@@ -1428,7 +1452,7 @@ export const serializeFlowSvg = ({
       }
     }
 
-    edgesOutput.push({ points: simplifiedPoints, label: labelInfo });
+    edgesOutput.push({ points: simplifiedPoints, label: labelInfo, color: plan.strokeColor });
   });
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
