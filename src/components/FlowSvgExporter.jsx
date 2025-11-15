@@ -18,6 +18,20 @@ const BUDGET_TEXT_COLOR = "#1d4ed8";
 const NODE_FILL_COLOR = "#ffffff";
 const NODE_STROKE_COLOR = "#1e293b";
 const EDGE_STROKE_COLOR = "#334155";
+const EDGE_STROKE_COLORS = [
+  "#b24747",
+  "#b27c47",
+  "#b2b247",
+  "#7cb247",
+  "#47b247",
+  "#47b27c",
+  "#47b2b2",
+  "#477cb2",
+  "#4747b2",
+  "#7c47b2",
+  "#b247b2",
+  "#b2477c",
+];
 const EDGE_STROKE_BASE_WIDTH = 2;
 const EDGE_STROKE_MIN_WIDTH = 1.5;
 const EDGE_STROKE_MAX_WIDTH = 3.2;
@@ -61,7 +75,7 @@ const EDGE_ARROW_MAX_LENGTH = 20;
 const EDGE_ARROW_WIDTH_RATIO = 0.6;
 const EDGE_ARROW_MIN_WIDTH = 20;
 const EDGE_ARROW_MAX_WIDTH = 50;
-const EDGE_LABEL_FONT_SIZE = 11;
+const EDGE_LABEL_FONT_SIZE = 10;
 const EDGE_LABEL_LINE_HEIGHT = 15;
 const EDGE_LABEL_PADDING_X = 10;
 const EDGE_LABEL_PADDING_Y = 6;
@@ -640,6 +654,73 @@ const computePolylineMidpoint = (points = []) => {
   return { x: last.x, y: last.y };
 };
 
+const formatPoint = (point = {}, offsetX = 0, offsetY = 0) => {
+  const x = Number.isFinite(point?.x) ? point.x + offsetX : offsetX;
+  const y = Number.isFinite(point?.y) ? point.y + offsetY : offsetY;
+  return `${Number(x.toFixed(2))} ${Number(y.toFixed(2))}`;
+};
+
+const generateRoundedPath = (points = [], radius = 12, offsetX = 0, offsetY = 0) => {
+  if (!Array.isArray(points) || points.length === 0) return "";
+  if (points.length === 1) {
+    return `M ${formatPoint(points[0], offsetX, offsetY)}`;
+  }
+  const segments = [];
+  const pushMove = (pt) => segments.push(`M ${formatPoint(pt, offsetX, offsetY)}`);
+  const pushLine = (pt) => segments.push(`L ${formatPoint(pt, offsetX, offsetY)}`);
+  const pushArc = (from, to, sweepFlag = 0) =>
+    segments.push(
+      `A ${radius} ${radius} 0 0 ${sweepFlag} ${formatPoint(to, offsetX, offsetY)}`
+    );
+
+  pushMove(points[0]);
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prev = points[i - 1];
+    const current = points[i];
+    const next = points[i + 1];
+
+    const vecPrev = { x: current.x - prev.x, y: current.y - prev.y };
+    const vecNext = { x: next.x - current.x, y: next.y - current.y };
+    const lenPrev = Math.hypot(vecPrev.x, vecPrev.y);
+    const lenNext = Math.hypot(vecNext.x, vecNext.y);
+    if (lenPrev < 0.001 || lenNext < 0.001) {
+      pushLine(current);
+      continue;
+    }
+    const unitPrev = { x: vecPrev.x / lenPrev, y: vecPrev.y / lenPrev };
+    const unitNext = { x: vecNext.x / lenNext, y: vecNext.y / lenNext };
+    const dot = unitPrev.x * unitNext.x + unitPrev.y * unitNext.y;
+    if (!Number.isFinite(dot) || Math.abs(dot + 1) < 0.001) {
+      pushLine(current);
+      continue;
+    }
+    const turnAngle = Math.acos(Math.min(Math.max(dot, -1), 1));
+    if (!Number.isFinite(turnAngle) || turnAngle < 0.01) {
+      pushLine(current);
+      continue;
+    }
+    const cornerRadius = Math.min(radius, lenPrev / 2, lenNext / 2);
+    const trimPrev = cornerRadius / Math.tan(turnAngle / 2);
+    const trimNext = cornerRadius / Math.tan(turnAngle / 2);
+    const entry = {
+      x: current.x - unitPrev.x * Math.min(trimPrev, lenPrev / 2),
+      y: current.y - unitPrev.y * Math.min(trimPrev, lenPrev / 2),
+    };
+    const exit = {
+      x: current.x + unitNext.x * Math.min(trimNext, lenNext / 2),
+      y: current.y + unitNext.y * Math.min(trimNext, lenNext / 2),
+    };
+
+    pushLine(entry);
+    const cross = unitPrev.x * unitNext.y - unitPrev.y * unitNext.x;
+    const sweepFlag = cross < 0 ? 0 : 1;
+    pushArc(entry, exit, sweepFlag);
+  }
+
+  pushLine(points[points.length - 1]);
+  return segments.join(" ");
+};
+
 export const serializeFlowSvg = ({
   nodes = [],
   edges = [],
@@ -818,6 +899,7 @@ export const serializeFlowSvg = ({
 
   const nodeLayoutMap = new Map();
   const nodeRenderMap = new Map();
+  const nodeColorMap = new Map();
   nodes.forEach((node) => {
     const explicitSize = extractNodeSize(node);
     const metrics = measureNodeContent(node, {
@@ -884,6 +966,10 @@ export const serializeFlowSvg = ({
     });
     registerBounds(x, y, width, height);
     nodeRenderMap.set(node.id, { x, y, width, height, centerX, centerY });
+    if (node?.id != null) {
+      const colorIndex = nodeColorMap.size % EDGE_STROKE_COLORS.length;
+      nodeColorMap.set(node.id, EDGE_STROKE_COLORS[colorIndex]);
+    }
   });
 
   const edgeGroupCounts = new Map();
@@ -954,6 +1040,7 @@ export const serializeFlowSvg = ({
       sourceOffset: 0,
       targetOffset: 0,
       label: resolveEdgeLabel(edge),
+      strokeColor: nodeColorMap.get(edge?.source) || EDGE_STROKE_COLOR,
     });
   });
 
@@ -1463,14 +1550,14 @@ export const serializeFlowSvg = ({
     });
 
   edgesOutput.forEach((edge) => {
-    const pathData = edge.points
-      .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x + offsetX} ${pt.y + offsetY}`)
-      .join(" ");
+    const pathData = generateRoundedPath(edge.points, 18, offsetX, offsetY);
+    if (!pathData) return;
     parts.push(
       `<path class="flow-edge-halo" d="${pathData}" stroke="${EDGE_HALO_COLOR}" stroke-width="${haloStrokeWidth}" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="${EDGE_HALO_OPACITY}" />`
     );
+    const edgeStrokeColor = edge.color || EDGE_STROKE_COLOR;
     parts.push(
-      `<path class="flow-edge" d="${pathData}" stroke="${EDGE_STROKE_COLOR}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#${markerId})" />`
+      `<path class="flow-edge" d="${pathData}" stroke="${edgeStrokeColor}" stroke-width="${edgeStrokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#${markerId})" />`
     );
     if (edge.label) {
       const centerX = edge.label.centerX + offsetX;
