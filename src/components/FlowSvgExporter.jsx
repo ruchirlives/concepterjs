@@ -1590,12 +1590,12 @@ const FlowSvgExporter = forwardRef(
     },
     ref
   ) => {
-    const serializeSvg = () =>
+    const serializeSvg = (overrideViewport) =>
       serializeFlowSvg({
         nodes,
         edges,
         grid,
-        viewport,
+        viewport: overrideViewport || viewport,
         includeRows,
         includeColumns,
         filterEdgesByHandleX,
@@ -1615,8 +1615,8 @@ const FlowSvgExporter = forwardRef(
     };
 
     useImperativeHandle(ref, () => ({
-      exportSvg(customFileName) {
-        const svgString = serializeSvg();
+      exportSvg(customFileName, viewportOverride) {
+        const svgString = serializeSvg(viewportOverride);
         if (!svgString) return false;
         const chosenName =
           typeof customFileName === "string" && customFileName.trim()

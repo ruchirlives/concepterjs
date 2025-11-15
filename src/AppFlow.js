@@ -131,6 +131,22 @@ const dimensionEqual = (a, b) => {
   return Math.abs(a - b) <= 0.001;
 };
 
+const VIEWPORT_SYNC_MIN_INTERVAL = 80;
+
+const sanitizeViewport = (viewport, fallback = { x: 0, y: 0, zoom: 1 }) => {
+  if (!viewport) return { ...fallback };
+  const safeFallback = {
+    x: Number.isFinite(fallback?.x) ? fallback.x : 0,
+    y: Number.isFinite(fallback?.y) ? fallback.y : 0,
+    zoom: Number.isFinite(fallback?.zoom) ? fallback.zoom : 1,
+  };
+  return {
+    x: Number.isFinite(viewport.x) ? viewport.x : safeFallback.x,
+    y: Number.isFinite(viewport.y) ? viewport.y : safeFallback.y,
+    zoom: Number.isFinite(viewport.zoom) ? viewport.zoom : safeFallback.zoom,
+  };
+};
+
 const toComparableId = (value) => {
   if (value == null) return null;
   if (typeof value === 'object') {
@@ -337,12 +353,15 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const svgExporterRef = useRef(null);
   const [nodesDraggable, setNodesDraggable] = useState(true);
   const ctrlActiveRef = useRef(false);
+  const liveViewportRef = useRef({ x: 0, y: 0, zoom: 1 });
+  const viewportSyncRef = useRef(0);
   const cellMenuRowLabel = cellMenuContext?.rowSegment?.label || 'Row';
   const cellMenuColumnLabel = cellMenuContext?.columnSegment?.label || 'Column';
   const [dragLine, setDragLine] = useState(null);
   const dragNodeRef = useRef(null);
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
+  const overlayRef = useRef(null);
   const relationships = useMemo(() => {
     const map = {};
     if (!Array.isArray(parentChildMap)) {
@@ -535,24 +554,36 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
 
-  const updateViewportTransform = useCallback((nextViewport) => {
+  const applyViewportToOverlay = useCallback((viewport) => {
+    if (!overlayRef.current || !viewport) return;
+    const { x, y, zoom } = viewport;
+    overlayRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  }, []);
+
+  const commitViewportTransform = useCallback((nextViewport, { force = false } = {}) => {
     if (!nextViewport) return;
+    const sanitized = sanitizeViewport(nextViewport, liveViewportRef.current);
+    liveViewportRef.current = sanitized;
+    applyViewportToOverlay(sanitized);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!force) {
+      const last = viewportSyncRef.current || 0;
+      if (now - last < VIEWPORT_SYNC_MIN_INTERVAL) {
+        return;
+      }
+    }
+    viewportSyncRef.current = now;
     setViewportTransform(prev => {
-      const next = {
-        x: Number.isFinite(nextViewport.x) ? nextViewport.x : prev.x,
-        y: Number.isFinite(nextViewport.y) ? nextViewport.y : prev.y,
-        zoom: Number.isFinite(nextViewport.zoom) ? nextViewport.zoom : prev.zoom,
-      };
       if (
-        Math.abs(next.x - prev.x) < 0.5 &&
-        Math.abs(next.y - prev.y) < 0.5 &&
-        Math.abs(next.zoom - prev.zoom) < 0.001
+        Math.abs(sanitized.x - prev.x) < 0.5 &&
+        Math.abs(sanitized.y - prev.y) < 0.5 &&
+        Math.abs(sanitized.zoom - prev.zoom) < 0.001
       ) {
         return prev;
       }
-      return next;
+      return sanitized;
     });
-  }, []);
+  }, [applyViewportToOverlay]);
 
   const updateGridDimensions = useCallback(() => {
     const wrapperEl = flowWrapperRef.current;
@@ -698,6 +729,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setIsAddRowModalOpen(true);
   }, [cellMenuContext]);
 
+  useEffect(() => {
+    applyViewportToOverlay(viewportTransform);
+  }, [applyViewportToOverlay, viewportTransform]);
+
   const handleModalClose = useCallback(() => {
     setIsAddRowModalOpen(false);
     setPendingCellContext(null);
@@ -781,7 +816,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const handleExportSvg = useCallback(() => {
     if (!exportEnabled) return;
-    const exported = svgExporterRef.current?.exportSvg();
+    const exported = svgExporterRef.current?.exportSvg(undefined, liveViewportRef.current);
     if (!exported) {
       toast.error('Unable to generate SVG export.');
     }
@@ -892,8 +927,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const handleFlowMove = useCallback((_, viewport) => {
     viewportInteractionRef.current = true;
-    updateViewportTransform(viewport);
-  }, [updateViewportTransform]);
+    commitViewportTransform(viewport);
+  }, [commitViewportTransform]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -966,18 +1001,18 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const handleFlowMoveEnd = useCallback((_, viewport) => {
     viewportInteractionRef.current = false;
-    updateViewportTransform(viewport);
+    commitViewportTransform(viewport, { force: true });
     requestAnimationFrame(() => {
       updateGridDimensions();
     });
-  }, [updateGridDimensions, updateViewportTransform]);
+  }, [commitViewportTransform, updateGridDimensions]);
 
   const handleFlowInit = useCallback((instance) => {
     if (instance?.getViewport) {
-      updateViewportTransform(instance.getViewport());
+      commitViewportTransform(instance.getViewport(), { force: true });
     }
     updateGridDimensions();
-  }, [updateGridDimensions, updateViewportTransform]);
+  }, [commitViewportTransform, updateGridDimensions]);
 
   const handleGridDrop = useCallback(async (event, node) => {
     // console.log("handleGridDrop called with node:", node);
@@ -1520,6 +1555,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           <FlowMenuProvider handleNodeMenu={handleContextMenu} handleEdgeMenu={handleEdgeMenu}>
               {(showRowGrid || showColumnGrid) && (
                 <div
+                ref={overlayRef}
                 className="absolute pointer-events-none"
                 style={overlayStyle}
                 aria-hidden="true"
