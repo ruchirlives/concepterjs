@@ -1,92 +1,31 @@
 import { forwardRef, useImperativeHandle } from "react";
 
-const MAX_STRING_LENGTH = 160;
-const MAX_ARRAY_ITEMS = 5;
-const MAX_METADATA_ENTRIES = 8;
-
 const safeNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? value : fallback;
 
-const toArray = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
-  return [value];
+const asStringOrNull = (value) => {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text.length ? text : null;
 };
 
-const describeSegment = (segment, fallbackLabel, axis) => {
-  if (segment == null) return fallbackLabel;
-  if (typeof segment === "string" || typeof segment === "number" || typeof segment === "bigint") {
-    const text = segment.toString().trim();
-    return text.length ? text : fallbackLabel;
+const extractSegmentId = (segment, prefix, index) => {
+  const candidates = [segment?.id, segment?.uuid, segment?.key, segment?.nodeId, segment?.originalId];
+  for (const candidate of candidates) {
+    const normalized = asStringOrNull(candidate);
+    if (normalized) return normalized;
   }
-  if (typeof segment !== "object") return fallbackLabel;
-  const labelCandidates = [segment.label, segment.name, segment.id, segment.key];
-  for (const candidate of labelCandidates) {
-    if (candidate == null) continue;
-    const text = String(candidate).trim();
-    if (text.length) return text;
-  }
-  const start = axis === "row" ? segment.top : segment.left;
-  const end = axis === "row" ? segment.bottom : segment.right;
-  if (Number.isFinite(start) && Number.isFinite(end)) {
-    return `${fallbackLabel} (${start}–${end})`;
-  }
-  return fallbackLabel;
+  return `${prefix}-${index + 1}`;
 };
 
-const sanitizeZVectors = (value) => {
-  if (!value || typeof value !== "object") return value;
-  if (Array.isArray(value)) return value.map(sanitizeZVectors);
-  const sanitized = {};
-  Object.entries(value).forEach(([key, entryValue]) => {
-    if (key === "z") return;
-    sanitized[key] = sanitizeZVectors(entryValue);
-  });
-  return sanitized;
-};
-
-const truncateString = (text) => {
-  if (typeof text !== "string") return "";
-  const trimmed = text.trim();
-  if (trimmed.length <= MAX_STRING_LENGTH) return trimmed;
-  return `${trimmed.slice(0, MAX_STRING_LENGTH - 3)}...`;
-};
-
-const formatValue = (value) => {
-  if (value == null) return "";
-  if (typeof value === "string") return truncateString(value);
-  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
-    return value.toString();
+const extractSegmentName = (segment, fallback) => {
+  if (!segment) return fallback;
+  const candidates = [segment.label, segment.name, segment.title, segment.id, segment.key];
+  for (const candidate of candidates) {
+    const normalized = asStringOrNull(candidate);
+    if (normalized) return normalized;
   }
-  if (Array.isArray(value)) {
-    const formatted = value
-      .slice(0, MAX_ARRAY_ITEMS)
-      .map((entry) => formatValue(entry))
-      .filter((entry) => entry.length);
-    const suffix = value.length > MAX_ARRAY_ITEMS ? ", ..." : "";
-    return `${formatted.join(", ")}${suffix}`;
-  }
-  if (typeof value === "object") {
-    try {
-      const stringValue = JSON.stringify(sanitizeZVectors(value));
-      return truncateString(stringValue);
-    } catch (error) {
-      return "[unserializable object]";
-    }
-  }
-  return String(value);
-};
-
-const buildMetadataLines = (payload, indent = "      ") => {
-  if (!payload || typeof payload !== "object") return [];
-  const entries = Object.entries(payload).filter(([key, value]) => key !== "z" && value != null);
-  if (!entries.length) return [];
-  const limitedEntries = entries.slice(0, MAX_METADATA_ENTRIES);
-  const lines = limitedEntries.map(([key, value]) => `${indent}- ${key}: ${formatValue(value)}`);
-  if (entries.length > MAX_METADATA_ENTRIES) {
-    lines.push(`${indent}- ...and ${entries.length - MAX_METADATA_ENTRIES} more`);
-  }
-  return lines;
+  return fallback;
 };
 
 const extractNodeTitle = (node, fallbackIndex) => {
@@ -105,33 +44,89 @@ const extractNodeTitle = (node, fallbackIndex) => {
   return `Node ${fallbackIndex + 1}`;
 };
 
-const formatNumberValue = (value, decimals = 1) => {
-  if (!Number.isFinite(value)) return "n/a";
-  const fixed = value.toFixed(decimals);
-  return Number(fixed).toString();
+const resolveNodeId = (node, fallbackIndex) => {
+  const candidates = [node?.id, node?.data?.id, node?.data?.originalId];
+  for (const candidate of candidates) {
+    const normalized = asStringOrNull(candidate);
+    if (normalized) return normalized;
+  }
+  return `node-${fallbackIndex + 1}`;
 };
 
-const describeRow = (row, index) => {
-  const label = describeSegment(row, `Row ${index + 1}`, "row");
-  const details = [];
-  if (Number.isFinite(row?.top)) details.push(`top ${row.top}`);
-  if (Number.isFinite(row?.bottom)) details.push(`bottom ${row.bottom}`);
-  if (Number.isFinite(row?.height)) details.push(`height ${row.height}`);
-  const detailText = details.length ? ` (${details.join(", ")})` : "";
-  const nodeList = Array.isArray(row?.nodeIds) && row.nodeIds.length
-    ? `\n    nodes: ${row.nodeIds.join(", ")}`
-    : "";
-  return `  ${index + 1}. ${label}${detailText}${nodeList}`;
+const normalizeTags = (node) => {
+  const tagSources = [
+    node?.data?.tags,
+    node?.data?.Tags,
+    node?.data?.tagList,
+    node?.data?.tag_list,
+    node?.data?.Layers,
+  ];
+  const tags = [];
+  const seen = new Set();
+
+  const addTag = (tag) => {
+    const normalized = asStringOrNull(tag);
+    if (!normalized) return;
+    const lower = normalized.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    tags.push(lower);
+  };
+
+  const visit = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === "string") {
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach(addTag);
+      return;
+    }
+    if (typeof value === "object") {
+      const candidate = value?.name ?? value?.label ?? value?.id;
+      if (candidate != null) visit(candidate);
+      return;
+    }
+    visit(String(value));
+  };
+
+  tagSources.forEach(visit);
+  return tags;
 };
 
-const describeColumn = (column, index) => {
-  const label = describeSegment(column, `Column ${index + 1}`, "column");
-  const details = [];
-  if (Number.isFinite(column?.left)) details.push(`left ${column.left}`);
-  if (Number.isFinite(column?.right)) details.push(`right ${column.right}`);
-  if (Number.isFinite(column?.width)) details.push(`width ${column.width}`);
-  const detailText = details.length ? ` (${details.join(", ")})` : "";
-  return `  ${index + 1}. ${label}${detailText}`;
+const collectChildIds = (node) => {
+  const childSources = [node?.data?.children, node?.children];
+  const ids = [];
+  const seen = new Set();
+
+  const addChild = (value) => {
+    const normalized = asStringOrNull(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    ids.push(normalized);
+  };
+
+  const visit = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === "object") {
+      const candidate = value?.id ?? value?.childId ?? value?.data?.id;
+      addChild(candidate);
+      return;
+    }
+    addChild(value);
+  };
+
+  childSources.forEach(visit);
+  return ids;
 };
 
 const resolveEdgeLabel = (edge = {}) => {
@@ -161,38 +156,18 @@ const resolveEdgeLabel = (edge = {}) => {
   return "";
 };
 
-const resolveAssignments = (lookup = {}, nodeId, axis) => {
-  if (!nodeId) return [];
-  const rawValue = lookup[nodeId];
-  if (!rawValue) return [];
-  const segments = toArray(rawValue);
-  return segments.map((segment, index) =>
-    describeSegment(segment, `${axis === "row" ? "Row" : "Column"} ${index + 1}`, axis)
-  );
-};
+const buildSegmentExports = (segments = [], axis) =>
+  segments.map((segment, index) => ({
+    id: extractSegmentId(segment, axis === "row" ? "row" : "column", index),
+    name: extractSegmentName(segment, `${axis === "row" ? "Row" : "Column"} ${index + 1}`),
+  }));
 
-const serializeBounds = (bounds = {}) => {
-  const width = Number.isFinite(bounds.width) ? bounds.width : null;
-  const height = Number.isFinite(bounds.height) ? bounds.height : null;
-  if (width == null && height == null) return null;
-  return `Grid bounds: ${width ?? "?"} × ${height ?? "?"}`;
-};
-
-const serializeCellOptions = (cellOptions = {}) => {
-  const parts = [];
-  if (Number.isFinite(cellOptions.width)) parts.push(`cell width ${cellOptions.width}`);
-  if (Number.isFinite(cellOptions.height)) parts.push(`cell height ${cellOptions.height}`);
-  if (Number.isFinite(cellOptions.adjustedWidth)) parts.push(`adjusted width ${cellOptions.adjustedWidth}`);
-  if (Number.isFinite(cellOptions.adjustedHeight)) parts.push(`adjusted height ${cellOptions.adjustedHeight}`);
-  if (!parts.length) return null;
-  return `Grid settings: ${parts.join(", ")}`;
-};
+const normalizeAssignmentId = (value) => asStringOrNull(value) ?? null;
 
 export const serializeFlowAiSummary = ({
   nodes = [],
   edges = [],
   grid = {},
-  viewport = { x: 0, y: 0, zoom: 1 },
   includeRows = true,
   includeColumns = true,
   filterEdgesByHandleX = false,
@@ -201,119 +176,73 @@ export const serializeFlowAiSummary = ({
   const safeEdges = Array.isArray(edges) ? edges : [];
   const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
   const columns = includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
-  const lookup = grid?.lookup || {};
-  const rowLookup = lookup.rowsByNodeId || {};
-  const columnLookup = lookup.columnsByNodeId || {};
-  const lines = [];
 
-  lines.push("Flow Diagram AI Summary");
-  lines.push("================================");
-  const viewportX = formatNumberValue(viewport?.x ?? 0);
-  const viewportY = formatNumberValue(viewport?.y ?? 0);
-  const viewportZoom = formatNumberValue(viewport?.zoom ?? 1, 2);
-  lines.push(`Viewport origin: (${viewportX}, ${viewportY}) | zoom ${viewportZoom}`);
-
-  const boundsLine = serializeBounds(grid?.bounds);
-  if (boundsLine) lines.push(boundsLine);
-  const cellOptionsLine = serializeCellOptions(grid?.cellOptions);
-  if (cellOptionsLine) lines.push(cellOptionsLine);
-
-  lines.push("");
-  if (includeRows) {
-    lines.push(`Rows (${rows.length} total)`);
-    if (rows.length) {
-      rows.forEach((row, index) => {
-        lines.push(describeRow(row, index));
-      });
-    } else {
-      lines.push("  - No row grid segments available.");
-    }
-  } else {
-    lines.push("Rows: (excluded from export)");
-  }
-
-  lines.push("");
-  if (includeColumns) {
-    lines.push(`Columns (${columns.length} total)`);
-    if (columns.length) {
-      columns.forEach((column, index) => {
-        lines.push(describeColumn(column, index));
-      });
-    } else {
-      lines.push("  - No column grid segments available.");
-    }
-  } else {
-    lines.push("Columns: (excluded from export)");
-  }
-
-  lines.push("");
-  lines.push(`Nodes (${safeNodes.length} total)`);
-  if (!safeNodes.length) {
-    lines.push("  - No nodes available in this view.");
-  }
+  const rowExports = includeRows ? buildSegmentExports(rows, "row") : [];
+  const columnExports = includeColumns ? buildSegmentExports(columns, "column") : [];
 
   const nodeMetadata = new Map();
-  safeNodes.forEach((node, index) => {
-    const title = extractNodeTitle(node, index);
+
+  const nodeExports = safeNodes.map((node, index) => {
+    const nodeId = resolveNodeId(node, index);
+    const name = extractNodeTitle(node, index);
+    const assignment = node?.data?.gridAssignment ?? node?.gridAssignment ?? {};
+    const row = normalizeAssignmentId(assignment?.rowId);
+    const column = normalizeAssignmentId(assignment?.columnId);
+    const tags = normalizeTags(node);
+    const children = collectChildIds(node);
     const position = (node && (node.positionAbsolute || node.position)) || { x: 0, y: 0 };
     const x = safeNumber(position?.x, 0);
     const y = safeNumber(position?.y, 0);
-    const rowAssignments = resolveAssignments(rowLookup, node?.id, "row");
-    const columnAssignments = resolveAssignments(columnLookup, node?.id, "column");
-    const rowSummary = rowAssignments.length ? rowAssignments.join(", ") : "unassigned";
-    const columnSummary = columnAssignments.length ? columnAssignments.join(", ") : "unassigned";
-    const nodeDetails = [
-      `id: ${node?.id ?? "(no id)"}`,
-      `x=${formatNumberValue(x)}`,
-      `y=${formatNumberValue(y)}`,
-      `rows: ${rowSummary}`,
-      `cols: ${columnSummary}`,
-    ];
-    lines.push(`  ${index + 1}. ${title} (${nodeDetails.join(", ")})`);
-    const metadataLines = buildMetadataLines(node?.data);
-    if (metadataLines.length) {
-      lines.push("      metadata:");
-      metadataLines.forEach((line) => lines.push(line));
-    }
-    nodeMetadata.set(node?.id, {
-      title,
+    const meta = {
+      title: name,
       position: { x, y },
-    });
+    };
+    if (node?.id != null) {
+      nodeMetadata.set(node.id, meta);
+    }
+    nodeMetadata.set(nodeId, meta);
+    return {
+      id: nodeId,
+      name,
+      tags,
+      row,
+      column,
+      children,
+    };
   });
 
   const includedEdges = safeEdges.filter((edge) => {
     if (!edge?.source || !edge?.target) return false;
     if (!filterEdgesByHandleX) return true;
-    const sourceMeta = nodeMetadata.get(edge.source);
-    const targetMeta = nodeMetadata.get(edge.target);
+    const sourceMeta = nodeMetadata.get(edge.source) || nodeMetadata.get(asStringOrNull(edge.source));
+    const targetMeta = nodeMetadata.get(edge.target) || nodeMetadata.get(asStringOrNull(edge.target));
     if (!sourceMeta || !targetMeta) return false;
     const dx = targetMeta.position.x - sourceMeta.position.x;
     return dx > 0;
   });
 
-  lines.push("");
-  lines.push(`Edges (${includedEdges.length} total)`);
-  if (!includedEdges.length) {
-    lines.push("  - No edges available with the current filters.");
-  } else {
-    includedEdges.forEach((edge, index) => {
-      const sourceTitle = nodeMetadata.get(edge.source)?.title || edge.source || "(unknown source)";
-      const targetTitle = nodeMetadata.get(edge.target)?.title || edge.target || "(unknown target)";
-      const edgeLabel = resolveEdgeLabel(edge);
-      const edgeDetails = [];
-      if (edge?.id) edgeDetails.push(`id: ${edge.id}`);
-      if (edgeLabel) edgeDetails.push(`label: ${edgeLabel}`);
-      const detailText = edgeDetails.length ? ` (${edgeDetails.join(", ")})` : "";
-      lines.push(`  ${index + 1}. ${sourceTitle} -> ${targetTitle}${detailText}`);
-      const metadataLines = buildMetadataLines(edge?.data);
-      if (metadataLines.length) {
-        lines.push("      metadata:");
-        metadataLines.forEach((line) => lines.push(line));
+  const edgeExports = includedEdges
+    .map((edge) => {
+      const from = asStringOrNull(edge.source);
+      const to = asStringOrNull(edge.target);
+      if (!from || !to) return null;
+      const exportEdge = { from, to };
+      const label = resolveEdgeLabel(edge);
+      if (label) {
+        exportEdge.label = label;
       }
-    });
-  }
+      return exportEdge;
+    })
+    .filter(Boolean);
 
-  return lines.join("\n").trim();
+  const exportObject = {
+    rows: rowExports,
+    columns: columnExports,
+    nodes: nodeExports,
+    edges: edgeExports,
+  };
+
+  return JSON.stringify(exportObject, null, 2);
 };
 
 const copyToClipboard = async (text) => {
@@ -349,7 +278,6 @@ const FlowAIExporter = forwardRef(
       nodes = [],
       edges = [],
       grid,
-      viewport = { x: 0, y: 0, zoom: 1 },
       includeRows = true,
       includeColumns = true,
       filterEdgesByHandleX = false,
@@ -361,7 +289,6 @@ const FlowAIExporter = forwardRef(
         nodes,
         edges,
         grid,
-        viewport,
         includeRows,
         includeColumns,
         filterEdgesByHandleX,
