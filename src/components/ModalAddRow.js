@@ -54,11 +54,15 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
       TimeRequired: 1,
     };
 
+    let pendingRows = null;
     setRowData((prev) => {
-      const updated = [...prev, newRow];
-      writeBackData(updated);
-      return updated;
+      pendingRows = [...prev, newRow];
+      return pendingRows;
     });
+
+    if (pendingRows) {
+      await writeBackData(pendingRows);
+    }
 
     await onSelect([newRow]);
     onClose();
