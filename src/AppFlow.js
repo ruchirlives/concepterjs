@@ -24,6 +24,7 @@ import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
 import FlowSvgExporter from './components/FlowSvgExporter';
+import FlowAIExporter from './components/FlowAIExporter';
 import { requestRefreshChannel } from './hooks/effectsShared';
 import { useAppContext } from './AppContext';
 
@@ -351,6 +352,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [pendingCellContext, setPendingCellContext] = useState(null);
   const [isAddRowModalOpen, setIsAddRowModalOpen] = useState(false);
   const svgExporterRef = useRef(null);
+  const aiExporterRef = useRef(null);
   const [nodesDraggable, setNodesDraggable] = useState(true);
   const ctrlActiveRef = useRef(false);
   const liveViewportRef = useRef({ x: 0, y: 0, zoom: 1 });
@@ -819,6 +821,21 @@ const App = ({ keepLayout, setKeepLayout }) => {
     const exported = svgExporterRef.current?.exportSvg(undefined, liveViewportRef.current);
     if (!exported) {
       toast.error('Unable to generate SVG export.');
+    }
+  }, [exportEnabled]);
+
+  const handleExportAi = useCallback(async () => {
+    if (!exportEnabled) return;
+    try {
+      const exported = await aiExporterRef.current?.exportText();
+      if (exported) {
+        toast.success('Copied flow summary to clipboard.');
+      } else {
+        toast.error('Unable to build AI summary for the current view.');
+      }
+    } catch (error) {
+      console.error('Flow AI export failed', error);
+      toast.error('Unable to build AI summary for the current view.');
     }
   }, [exportEnabled]);
 
@@ -1392,14 +1409,22 @@ const App = ({ keepLayout, setKeepLayout }) => {
           >
           Save Nodes
           </button>
-          <button
-            className={`ml-4 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-            onClick={handleExportSvg}
-            disabled={!exportEnabled}
-            title={exportEnabled ? 'Export the current grid view as SVG' : 'Activate a row or column grid to export'}
-          >
-            Export Grid SVG
-          </button>
+        <button
+          className={`ml-4 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          onClick={handleExportSvg}
+          disabled={!exportEnabled}
+          title={exportEnabled ? 'Export the current grid view as SVG' : 'Activate a row or column grid to export'}
+        >
+          Export Grid SVG
+        </button>
+        <button
+          className={`ml-2 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          onClick={handleExportAi}
+          disabled={!exportEnabled}
+          title={exportEnabled ? 'Copy the current grid data as structured text' : 'Activate a row or column grid to export'}
+        >
+          Copy AI Summary
+        </button>
           {/* Group By Layers tickbox */}
         <div className="flex items-center gap-2 ml-4">
           <input
@@ -1716,6 +1741,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
             />
             <FlowSvgExporter
               ref={svgExporterRef}
+              nodes={nodes}
+              edges={edges}
+              grid={flowGridDimensions}
+              viewport={viewportTransform}
+              includeRows={showRowGrid}
+              includeColumns={showColumnGrid}
+              filterEdgesByHandleX={filterEdgesByHandleX}
+            />
+            <FlowAIExporter
+              ref={aiExporterRef}
               nodes={nodes}
               edges={edges}
               grid={flowGridDimensions}
