@@ -8,30 +8,28 @@ describe("serializeFlowAiSummary", () => {
     columns: [
       { id: "col-1", label: "Col One", left: 0, right: 200, width: 200 },
     ],
-    lookup: {
-      rowsByNodeId: {
-        "node-1": { label: "Row Alpha" },
-      },
-      columnsByNodeId: {
-        "node-1": { label: "Col One" },
-      },
-    },
-    bounds: { width: 800, height: 600 },
-    cellOptions: { width: 200, height: 120 },
   };
 
-  it("summarizes rows, columns, nodes, and edges", () => {
+  it("exports clean semantic graph data", () => {
     const summary = serializeFlowAiSummary({
       nodes: [
         {
           id: "node-1",
           position: { x: 50, y: 60 },
-          data: { Name: "Node Alpha", Description: "Critical task" },
+          data: {
+            Name: "Node Alpha",
+            gridAssignment: { rowId: "row-1", columnId: "col-1" },
+            tags: ["Critical", "critical", "Priority"],
+            children: [{ id: "child-1" }, { id: "child-1" }],
+          },
         },
         {
           id: "node-2",
           position: { x: 300, y: 60 },
-          data: { Name: "Node Beta" },
+          data: {
+            Name: "Node Beta",
+            Tags: "Secondary, Beta",
+          },
         },
       ],
       edges: [
@@ -43,19 +41,37 @@ describe("serializeFlowAiSummary", () => {
         },
       ],
       grid: baseGrid,
-      viewport: { x: 0, y: 0, zoom: 1 },
     });
 
-    expect(summary).toContain("Rows (1 total)");
-    expect(summary).toContain("Row Alpha");
-    expect(summary).toContain("Columns (1 total)");
-    expect(summary).toContain("Col One");
-    expect(summary).toContain("Nodes (2 total)");
-    expect(summary).toContain("Node Alpha");
-    expect(summary).toContain("grid columns: Col One");
-    expect(summary).toContain("Edges (1 total)");
-    expect(summary).toContain("Node Alpha -> Node Beta");
-    expect(summary).toContain("label: Depends on");
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.rows).toEqual([
+      { id: "row-1", name: "Row Alpha" },
+    ]);
+    expect(parsed.columns).toEqual([
+      { id: "col-1", name: "Col One" },
+    ]);
+    expect(parsed.nodes).toEqual([
+      {
+        id: "node-1",
+        name: "Node Alpha",
+        tags: ["critical", "priority"],
+        row: "row-1",
+        column: "col-1",
+        children: ["child-1"],
+      },
+      {
+        id: "node-2",
+        name: "Node Beta",
+        tags: ["secondary", "beta"],
+        row: null,
+        column: null,
+        children: [],
+      },
+    ]);
+    expect(parsed.edges).toEqual([
+      { from: "node-1", to: "node-2", label: "Depends on" },
+    ]);
   });
 
   it("omits backward edges when filtering by handle direction", () => {
@@ -72,8 +88,10 @@ describe("serializeFlowAiSummary", () => {
       filterEdgesByHandleX: true,
     });
 
-    expect(summary).toContain("Edges (1 total)");
-    expect(summary).toContain("Backward -> Forward");
-    expect(summary).not.toContain("Forward -> Backward");
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.edges).toEqual([
+      { from: "b", to: "a" },
+    ]);
   });
 });
