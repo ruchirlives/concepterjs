@@ -63,11 +63,13 @@ const normalizeTags = (node) => {
   ];
   const tags = [];
   const seen = new Set();
+  const blocked = new Set(["group", "groups", "community"]);
 
   const addTag = (tag) => {
     const normalized = asStringOrNull(tag);
     if (!normalized) return;
     const lower = normalized.toLowerCase();
+    if (blocked.has(lower)) return;
     if (seen.has(lower)) return;
     seen.add(lower);
     tags.push(lower);
@@ -156,13 +158,66 @@ const resolveEdgeLabel = (edge = {}) => {
   return "";
 };
 
-const buildSegmentExports = (segments = [], axis) =>
-  segments.map((segment, index) => ({
-    id: extractSegmentId(segment, axis === "row" ? "row" : "column", index),
-    name: extractSegmentName(segment, `${axis === "row" ? "Row" : "Column"} ${index + 1}`),
-  }));
+const sanitizeSegmentId = (value, axis) => {
+  const normalized = asStringOrNull(value);
+  if (!normalized) return null;
+  const pattern =
+    axis === "row"
+      ? /^row-\d+-/i
+      : axis === "column"
+      ? /^column-\d+-/i
+      : /^(?:row|column)-\d+-/i;
+  return normalized.replace(pattern, "");
+};
+
+const buildSegmentExports = (segments = [], axis) => {
+  const idMap = new Map();
+  const fallbackPrefix = axis === "row" ? "row" : "column";
+
+  const registerId = (rawId, sanitizedId) => {
+    if (!sanitizedId) return;
+    if (rawId) {
+      idMap.set(rawId, sanitizedId);
+    }
+    idMap.set(sanitizedId, sanitizedId);
+  };
+
+  const exports = segments.map((segment, index) => {
+    const rawId = extractSegmentId(segment, fallbackPrefix, index);
+    const sanitizedId = sanitizeSegmentId(rawId, axis) || rawId;
+    registerId(rawId, sanitizedId);
+    const name = extractSegmentName(
+      segment,
+      `${axis === "row" ? "Row" : "Column"} ${index + 1}`
+    );
+    return {
+      id: sanitizedId,
+      name,
+    };
+  });
+
+  return { exports, idMap };
+};
 
 const normalizeAssignmentId = (value) => asStringOrNull(value) ?? null;
+
+const sanitizeAssignmentReference = (value, idMap, axis) => {
+  const normalized = normalizeAssignmentId(value);
+  if (!normalized) return null;
+  if (idMap.has(normalized)) return idMap.get(normalized);
+  const sanitized = sanitizeSegmentId(normalized, axis) || normalized;
+  idMap.set(normalized, sanitized);
+  idMap.set(sanitized, sanitized);
+  return sanitized;
+};
+
+const sanitizeNodeName = (name, fallback) => {
+  const base = asStringOrNull(name) ?? fallback;
+  if (!base) return fallback;
+  const trimmed = base.trim();
+  const cleaned = trimmed.replace(/^[*\s\-_.:,]+/, "");
+  return cleaned.length ? cleaned : trimmed;
+};
 
 export const serializeFlowAiSummary = ({
   nodes = [],
@@ -177,17 +232,27 @@ export const serializeFlowAiSummary = ({
   const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
   const columns = includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
 
-  const rowExports = includeRows ? buildSegmentExports(rows, "row") : [];
-  const columnExports = includeColumns ? buildSegmentExports(columns, "column") : [];
+  const emptyMapping = () => ({ exports: [], idMap: new Map() });
+  const { exports: rowExports, idMap: rowIdMap } = includeRows
+    ? buildSegmentExports(rows, "row")
+    : emptyMapping();
+  const { exports: columnExports, idMap: columnIdMap } = includeColumns
+    ? buildSegmentExports(columns, "column")
+    : emptyMapping();
 
   const nodeMetadata = new Map();
 
   const nodeExports = safeNodes.map((node, index) => {
     const nodeId = resolveNodeId(node, index);
-    const name = extractNodeTitle(node, index);
+    const rawName = extractNodeTitle(node, index);
+    const name = sanitizeNodeName(rawName, `Node ${index + 1}`);
     const assignment = node?.data?.gridAssignment ?? node?.gridAssignment ?? {};
-    const row = normalizeAssignmentId(assignment?.rowId);
-    const column = normalizeAssignmentId(assignment?.columnId);
+    const row = sanitizeAssignmentReference(assignment?.rowId, rowIdMap, "row");
+    const column = sanitizeAssignmentReference(
+      assignment?.columnId,
+      columnIdMap,
+      "column"
+    );
     const tags = normalizeTags(node);
     const children = collectChildIds(node);
     const position = (node && (node.positionAbsolute || node.position)) || { x: 0, y: 0 };
@@ -201,15 +266,20 @@ export const serializeFlowAiSummary = ({
       nodeMetadata.set(node.id, meta);
     }
     nodeMetadata.set(nodeId, meta);
-    return {
+    const exportNode = {
       id: nodeId,
       name,
-      tags,
       row,
       column,
       children,
     };
+    if (tags.length) {
+      exportNode.tags = tags;
+    }
+    return exportNode;
   });
+
+  nodeExports.sort((a, b) => a.name.localeCompare(b.name));
 
   const includedEdges = safeEdges.filter((edge) => {
     if (!edge?.source || !edge?.target) return false;
@@ -228,12 +298,20 @@ export const serializeFlowAiSummary = ({
       if (!from || !to) return null;
       const exportEdge = { from, to };
       const label = resolveEdgeLabel(edge);
-      if (label) {
-        exportEdge.label = label;
+      const normalizedLabel = asStringOrNull(label);
+      if (normalizedLabel && normalizedLabel.toLowerCase() !== "none") {
+        exportEdge.label = normalizedLabel;
       }
       return exportEdge;
     })
     .filter(Boolean);
+
+  edgeExports.sort((a, b) => {
+    if (a.from === b.from) {
+      return a.to.localeCompare(b.to);
+    }
+    return a.from.localeCompare(b.from);
+  });
 
   const exportObject = {
     rows: rowExports,
