@@ -3,35 +3,44 @@ import { serializeFlowAiSummary } from "../FlowAIExporter";
 describe("serializeFlowAiSummary", () => {
   const baseGrid = {
     rows: [
-      { id: "row-1", label: "Row Alpha", top: 0, bottom: 120, height: 120 },
+      { id: "row-0-row-alpha", label: "Row Alpha", top: 0, bottom: 120, height: 120 },
     ],
     columns: [
-      { id: "col-1", label: "Col One", left: 0, right: 200, width: 200 },
+      { id: "column-1-col-one", label: "Col One", left: 0, right: 200, width: 200 },
     ],
-    lookup: {
-      rowsByNodeId: {
-        "node-1": { label: "Row Alpha" },
-      },
-      columnsByNodeId: {
-        "node-1": { label: "Col One" },
-      },
-    },
-    bounds: { width: 800, height: 600 },
-    cellOptions: { width: 200, height: 120 },
   };
 
-  it("summarizes rows, columns, nodes, and edges", () => {
+  it("exports clean semantic graph data", () => {
     const summary = serializeFlowAiSummary({
       nodes: [
         {
-          id: "node-1",
-          position: { x: 50, y: 60 },
-          data: { Name: "Node Alpha", Description: "Critical task" },
-        },
-        {
           id: "node-2",
           position: { x: 300, y: 60 },
-          data: { Name: "Node Beta" },
+          data: {
+            Name: "* Node Beta",
+            Tags: "Secondary, group, Beta",
+          },
+        },
+        {
+          id: "node-1",
+          position: { x: 50, y: 60 },
+          data: {
+            Name: "Node Alpha",
+            gridAssignment: {
+              rowId: "row-0-row-alpha",
+              columnId: "column-1-col-one",
+            },
+            tags: ["Critical", "critical", "Priority", "Group"],
+            children: [{ id: "child-1" }, { id: "child-1" }],
+          },
+        },
+        {
+          id: "node-3",
+          position: { x: 500, y: 60 },
+          data: {
+            Name: "Node Gamma",
+            tags: ["Group"],
+          },
         },
       ],
       edges: [
@@ -41,21 +50,53 @@ describe("serializeFlowAiSummary", () => {
           target: "node-2",
           data: { label: "Depends on" },
         },
+        {
+          id: "edge-2",
+          source: "node-3",
+          target: "node-1",
+          data: { label: "None" },
+        },
       ],
       grid: baseGrid,
-      viewport: { x: 0, y: 0, zoom: 1 },
     });
 
-    expect(summary).toContain("Rows (1 total)");
-    expect(summary).toContain("Row Alpha");
-    expect(summary).toContain("Columns (1 total)");
-    expect(summary).toContain("Col One");
-    expect(summary).toContain("Nodes (2 total)");
-    expect(summary).toContain("Node Alpha");
-    expect(summary).toContain("grid columns: Col One");
-    expect(summary).toContain("Edges (1 total)");
-    expect(summary).toContain("Node Alpha -> Node Beta");
-    expect(summary).toContain("label: Depends on");
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.rows).toEqual([
+      { id: "row-alpha", name: "Row Alpha" },
+    ]);
+    expect(parsed.columns).toEqual([
+      { id: "col-one", name: "Col One" },
+    ]);
+    expect(parsed.nodes).toEqual([
+      {
+        id: "node-1",
+        name: "Node Alpha",
+        tags: ["critical", "priority"],
+        row: "row-alpha",
+        column: "col-one",
+        children: ["child-1"],
+      },
+      {
+        id: "node-2",
+        name: "Node Beta",
+        tags: ["secondary", "beta"],
+        row: null,
+        column: null,
+        children: [],
+      },
+      {
+        id: "node-3",
+        name: "Node Gamma",
+        row: null,
+        column: null,
+        children: [],
+      },
+    ]);
+    expect(parsed.edges).toEqual([
+      { from: "node-1", to: "node-2", label: "Depends on" },
+      { from: "node-3", to: "node-1" },
+    ]);
   });
 
   it("omits backward edges when filtering by handle direction", () => {
@@ -72,8 +113,10 @@ describe("serializeFlowAiSummary", () => {
       filterEdgesByHandleX: true,
     });
 
-    expect(summary).toContain("Edges (1 total)");
-    expect(summary).toContain("Backward -> Forward");
-    expect(summary).not.toContain("Forward -> Backward");
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.edges).toEqual([
+      { from: "b", to: "a" },
+    ]);
   });
 });
