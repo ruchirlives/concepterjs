@@ -1,5 +1,9 @@
 import { forwardRef, useImperativeHandle } from "react";
 
+const MAX_STRING_LENGTH = 160;
+const MAX_ARRAY_ITEMS = 5;
+const MAX_METADATA_ENTRIES = 8;
+
 const safeNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? value : fallback;
 
@@ -30,21 +34,42 @@ const describeSegment = (segment, fallbackLabel, axis) => {
   return fallbackLabel;
 };
 
+const sanitizeZVectors = (value) => {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(sanitizeZVectors);
+  const sanitized = {};
+  Object.entries(value).forEach(([key, entryValue]) => {
+    if (key === "z") return;
+    sanitized[key] = sanitizeZVectors(entryValue);
+  });
+  return sanitized;
+};
+
+const truncateString = (text) => {
+  if (typeof text !== "string") return "";
+  const trimmed = text.trim();
+  if (trimmed.length <= MAX_STRING_LENGTH) return trimmed;
+  return `${trimmed.slice(0, MAX_STRING_LENGTH - 3)}...`;
+};
+
 const formatValue = (value) => {
   if (value == null) return "";
-  if (typeof value === "string") return value.trim();
+  if (typeof value === "string") return truncateString(value);
   if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
     return value.toString();
   }
   if (Array.isArray(value)) {
-    return value
+    const formatted = value
+      .slice(0, MAX_ARRAY_ITEMS)
       .map((entry) => formatValue(entry))
-      .filter((entry) => entry.length)
-      .join(", ");
+      .filter((entry) => entry.length);
+    const suffix = value.length > MAX_ARRAY_ITEMS ? ", ..." : "";
+    return `${formatted.join(", ")}${suffix}`;
   }
   if (typeof value === "object") {
     try {
-      return JSON.stringify(value);
+      const stringValue = JSON.stringify(sanitizeZVectors(value));
+      return truncateString(stringValue);
     } catch (error) {
       return "[unserializable object]";
     }
@@ -54,9 +79,14 @@ const formatValue = (value) => {
 
 const buildMetadataLines = (payload, indent = "      ") => {
   if (!payload || typeof payload !== "object") return [];
-  const entries = Object.entries(payload).filter(([, value]) => value != null);
+  const entries = Object.entries(payload).filter(([key, value]) => key !== "z" && value != null);
   if (!entries.length) return [];
-  return entries.map(([key, value]) => `${indent}- ${key}: ${formatValue(value)}`);
+  const limitedEntries = entries.slice(0, MAX_METADATA_ENTRIES);
+  const lines = limitedEntries.map(([key, value]) => `${indent}- ${key}: ${formatValue(value)}`);
+  if (entries.length > MAX_METADATA_ENTRIES) {
+    lines.push(`${indent}- ...and ${entries.length - MAX_METADATA_ENTRIES} more`);
+  }
+  return lines;
 };
 
 const extractNodeTitle = (node, fallbackIndex) => {
@@ -232,11 +262,14 @@ export const serializeFlowAiSummary = ({
     const columnAssignments = resolveAssignments(columnLookup, node?.id, "column");
     const rowSummary = rowAssignments.length ? rowAssignments.join(", ") : "unassigned";
     const columnSummary = columnAssignments.length ? columnAssignments.join(", ") : "unassigned";
-    lines.push(`  ${index + 1}. ${title}`);
-    lines.push(`      id: ${node?.id ?? "(no id)"}`);
-    lines.push(`      position: x=${formatNumberValue(x)}, y=${formatNumberValue(y)}`);
-    lines.push(`      grid rows: ${rowSummary}`);
-    lines.push(`      grid columns: ${columnSummary}`);
+    const nodeDetails = [
+      `id: ${node?.id ?? "(no id)"}`,
+      `x=${formatNumberValue(x)}`,
+      `y=${formatNumberValue(y)}`,
+      `rows: ${rowSummary}`,
+      `cols: ${columnSummary}`,
+    ];
+    lines.push(`  ${index + 1}. ${title} (${nodeDetails.join(", ")})`);
     const metadataLines = buildMetadataLines(node?.data);
     if (metadataLines.length) {
       lines.push("      metadata:");
@@ -266,14 +299,12 @@ export const serializeFlowAiSummary = ({
     includedEdges.forEach((edge, index) => {
       const sourceTitle = nodeMetadata.get(edge.source)?.title || edge.source || "(unknown source)";
       const targetTitle = nodeMetadata.get(edge.target)?.title || edge.target || "(unknown target)";
-      lines.push(`  ${index + 1}. ${sourceTitle} -> ${targetTitle}`);
-      if (edge?.id) {
-        lines.push(`      id: ${edge.id}`);
-      }
       const edgeLabel = resolveEdgeLabel(edge);
-      if (edgeLabel) {
-        lines.push(`      label: ${edgeLabel}`);
-      }
+      const edgeDetails = [];
+      if (edge?.id) edgeDetails.push(`id: ${edge.id}`);
+      if (edgeLabel) edgeDetails.push(`label: ${edgeLabel}`);
+      const detailText = edgeDetails.length ? ` (${edgeDetails.join(", ")})` : "";
+      lines.push(`  ${index + 1}. ${sourceTitle} -> ${targetTitle}${detailText}`);
       const metadataLines = buildMetadataLines(edge?.data);
       if (metadataLines.length) {
         lines.push("      metadata:");
