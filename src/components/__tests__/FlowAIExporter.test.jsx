@@ -3,10 +3,10 @@ import { serializeFlowAiSummary } from "../FlowAIExporter";
 describe("serializeFlowAiSummary", () => {
   const baseGrid = {
     rows: [
-      { id: "row-1", label: "Row Alpha", top: 0, bottom: 120, height: 120 },
+      { id: "row-0-row-alpha", label: "Row Alpha", top: 0, bottom: 120, height: 120 },
     ],
     columns: [
-      { id: "col-1", label: "Col One", left: 0, right: 200, width: 200 },
+      { id: "column-1-col-one", label: "Col One", left: 0, right: 200, width: 200 },
     ],
   };
 
@@ -14,21 +14,32 @@ describe("serializeFlowAiSummary", () => {
     const summary = serializeFlowAiSummary({
       nodes: [
         {
+          id: "node-2",
+          position: { x: 300, y: 60 },
+          data: {
+            Name: "* Node Beta",
+            Tags: "Secondary, group, Beta",
+          },
+        },
+        {
           id: "node-1",
           position: { x: 50, y: 60 },
           data: {
             Name: "Node Alpha",
-            gridAssignment: { rowId: "row-1", columnId: "col-1" },
-            tags: ["Critical", "critical", "Priority"],
+            gridAssignment: {
+              rowId: "row-0-row-alpha",
+              columnId: "column-1-col-one",
+            },
+            tags: ["Critical", "critical", "Priority", "Group"],
             children: [{ id: "child-1" }, { id: "child-1" }],
           },
         },
         {
-          id: "node-2",
-          position: { x: 300, y: 60 },
+          id: "node-3",
+          position: { x: 500, y: 60 },
           data: {
-            Name: "Node Beta",
-            Tags: "Secondary, Beta",
+            Name: "Node Gamma",
+            tags: ["Group"],
           },
         },
       ],
@@ -39,6 +50,12 @@ describe("serializeFlowAiSummary", () => {
           target: "node-2",
           data: { label: "Depends on" },
         },
+        {
+          id: "edge-2",
+          source: "node-3",
+          target: "node-1",
+          data: { label: "None" },
+        },
       ],
       grid: baseGrid,
     });
@@ -46,18 +63,18 @@ describe("serializeFlowAiSummary", () => {
     const parsed = JSON.parse(summary);
 
     expect(parsed.rows).toEqual([
-      { id: "row-1", name: "Row Alpha" },
+      { id: "row-alpha", name: "Row Alpha" },
     ]);
     expect(parsed.columns).toEqual([
-      { id: "col-1", name: "Col One" },
+      { id: "col-one", name: "Col One" },
     ]);
     expect(parsed.nodes).toEqual([
       {
         id: "node-1",
         name: "Node Alpha",
         tags: ["critical", "priority"],
-        row: "row-1",
-        column: "col-1",
+        row: "row-alpha",
+        column: "col-one",
         children: ["child-1"],
       },
       {
@@ -68,9 +85,17 @@ describe("serializeFlowAiSummary", () => {
         column: null,
         children: [],
       },
+      {
+        id: "node-3",
+        name: "Node Gamma",
+        row: null,
+        column: null,
+        children: [],
+      },
     ]);
     expect(parsed.edges).toEqual([
       { from: "node-1", to: "node-2", label: "Depends on" },
+      { from: "node-3", to: "node-1" },
     ]);
   });
 
