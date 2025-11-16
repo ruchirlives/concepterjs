@@ -3,7 +3,6 @@ import Modal from "react-modal";
 import { useAppContext } from "../AppContext";
 import { createContainer, writeBackData } from "../api";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
-import { requestRefreshChannel } from "hooks/effectsShared";
 import NodeSearchBox from "./NodeSearchBox";
 
 Modal.setAppElement("#app");
@@ -70,7 +69,6 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
     if (selectedIds.length > 0) {
       loadedNodes = await loadCheckedNodes();
     }
-    requestRefreshChannel();
     await onSelect(loadedNodes);
     onClose();
   };

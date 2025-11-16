@@ -44,6 +44,9 @@ const AppLayers = () => {
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
   const [highlightedChildren, setHighlightedChildren] = useState(() => new Set());
+  const [layerFilterOpen, setLayerFilterOpen] = useState(false);
+  const [filteredLayerSelection, setFilteredLayerSelection] = useState([]);
+  const layerFilterRef = useRef(null);
 
   // Modal state for adding a row
   const [modalOpen, setModalOpen] = useState(false);
@@ -76,6 +79,31 @@ const AppLayers = () => {
       setNewLayer("");
     }
   };
+
+  useEffect(() => {
+    // Drop any selections that no longer exist
+    setFilteredLayerSelection((prev) => prev.filter((layer) => layerOptions.includes(layer)));
+  }, [layerOptions]);
+
+  useEffect(() => {
+    if (!layerFilterOpen) return;
+    const handleClickOutside = (event) => {
+      if (layerFilterRef.current && !layerFilterRef.current.contains(event.target)) {
+        setLayerFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [layerFilterOpen]);
+
+  const displayedLayers = useMemo(() => {
+    if (!filteredLayerSelection.length) return layerOptions;
+    const selectionSet = new Set(filteredLayerSelection);
+    const ordered = layerOptions.filter((layer) => selectionSet.has(layer));
+    return ordered.length ? ordered : layerOptions;
+  }, [filteredLayerSelection, layerOptions]);
 
   // Compute containers by layer and items with no layer
   const { containersByLayer, noLayerItems } = useMemo(() => {
@@ -348,21 +376,37 @@ const AppLayers = () => {
 
   // When a new row is added via modal, ensure it gets the correct layer tag
   const handleModalSelect = async (newRows) => {
-    if (!selectedContentLayer || !newRows || !newRows.length) return;
+    if (!selectedContentLayer || !Array.isArray(newRows) || newRows.length === 0) {
+      return;
+    }
+
+    let pendingUpdated = null;
     setRowData((prev) => {
+      let mutated = false;
       const updated = prev.map((row) => {
         if (!newRows.some((nr) => nr.id === row.id)) return row;
-        // Ensure the new row has the selectedContentLayer in its Tags
         const tags = (row.Tags || "")
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean);
-        if (!tags.includes(selectedContentLayer)) tags.push(selectedContentLayer);
-        return { ...row, Tags: tags.join(", ") };
+        if (tags.includes(selectedContentLayer)) return row;
+        mutated = true;
+        return { ...row, Tags: [...tags, selectedContentLayer].join(", ") };
       });
-      handleWriteBack(updated);
+
+      if (!mutated) {
+        pendingUpdated = null;
+        return prev;
+      }
+
+      pendingUpdated = updated;
       return updated;
     });
+
+    if (pendingUpdated) {
+      await handleWriteBack(pendingUpdated);
+      requestRefreshChannel();
+    }
   };
 
   // Add a handler to remove all tags from a row (move to "No Layer")
@@ -406,6 +450,51 @@ const AppLayers = () => {
 
   const removeChildFromLayer = removeFromLayer(setRowData);
 
+  const handleLayerFilterToggle = useCallback((layer) => {
+    if (!layer) return;
+    setFilteredLayerSelection((prev) => {
+      if (prev.includes(layer)) {
+        return prev.filter((name) => name !== layer);
+      }
+      return [...prev, layer];
+    });
+  }, []);
+
+  const handleResetLayerFilters = useCallback(() => {
+    setFilteredLayerSelection([]);
+  }, []);
+
+  const handleDeleteLayer = useCallback(async (layer) => {
+    if (!layer) return;
+    let pendingUpdated = null;
+    setRowData((prev) => {
+      let mutated = false;
+      const updated = prev.map((row) => {
+        const tags = (row.Tags || "")
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        if (!tags.includes(layer)) return row;
+        mutated = true;
+        const filtered = tags.filter((tag) => tag !== layer);
+        return { ...row, Tags: filtered.join(", ") };
+      });
+      if (!mutated) {
+        pendingUpdated = null;
+        return prev;
+      }
+      pendingUpdated = updated;
+      return updated;
+    });
+
+    if (pendingUpdated) {
+      await handleWriteBack(pendingUpdated);
+      requestRefreshChannel();
+    }
+    removeLayer(layer);
+    setFilteredLayerSelection((prev) => prev.filter((name) => name !== layer));
+  }, [setRowData, removeLayer, handleWriteBack, requestRefreshChannel]);
+
   const menuHandlers = useMenuHandlers({
     rowData,
     setRowData,
@@ -414,8 +503,9 @@ const AppLayers = () => {
     childrenMap: {}, // Not needed here
   });
 
-  const clearLayerForAll = useCallback((layer) => {
+  const clearLayerForAll = useCallback(async (layer) => {
     if (!layer) return;
+    let pendingUpdated = null;
     setRowData((prev) => {
       let mutated = false;
       const updated = prev.map((row) => {
@@ -428,13 +518,21 @@ const AppLayers = () => {
         mutated = true;
         return { ...row, Tags: filtered.join(", ") };
       });
-      if (!mutated) return prev;
-      handleWriteBack(updated);
-      requestRefreshChannel();
+      if (!mutated) {
+        pendingUpdated = null;
+        return prev;
+      }
+      pendingUpdated = updated;
       return updated;
     });
+
+    if (pendingUpdated) {
+      await handleWriteBack(pendingUpdated);
+      requestRefreshChannel();
+    }
+
     updateLayerOrderingForLayer(layer, () => []);
-  }, [setRowData, updateLayerOrderingForLayer]);
+  }, [setRowData, updateLayerOrderingForLayer, ]);
 
   const headerMenuOptions = [
     {
@@ -442,7 +540,7 @@ const AppLayers = () => {
       onClick: async (context) => {
         const { layer } = context;
         if (!layer) return;
-        clearLayerForAll(layer);
+        await clearLayerForAll(layer);
       },
     },
     // convert layer to container option
@@ -486,7 +584,9 @@ const AppLayers = () => {
         const wasActive = activeLayers.includes(layer);
         const layerIndex = layerOptions.indexOf(layer);
 
+        let pendingRenamedRows = null;
         setRowData((prev) => {
+          let mutated = false;
           const updated = prev.map((row) => {
             const tags = (row.Tags || "")
               .split(",")
@@ -495,13 +595,24 @@ const AppLayers = () => {
 
             if (!tags.includes(layer)) return row;
 
+            mutated = true;
             const nextTags = tags.map((tag) => (tag === layer ? trimmed : tag));
             return { ...row, Tags: nextTags.join(", ") };
           });
-          handleWriteBack(updated);
-          requestRefreshChannel();
+
+          if (!mutated) {
+            pendingRenamedRows = null;
+            return prev;
+          }
+
+          pendingRenamedRows = updated;
           return updated;
         });
+
+        if (pendingRenamedRows) {
+          await handleWriteBack(pendingRenamedRows);
+          requestRefreshChannel();
+        }
 
         if (typeof layerOptionsSetter === "function") {
           layerOptionsSetter((prev) => {
@@ -581,7 +692,7 @@ const AppLayers = () => {
           style={{ height: collapsed ? 0 : "auto" }}
         >
           <div className="p-4 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="flex space-x-2" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex space-x-2 flex-wrap items-center" onMouseDown={(e) => e.stopPropagation()}>
               <input
                 className="border rounded px-2 py-1 text-sm flex-grow"
                 type="text"
@@ -599,6 +710,56 @@ const AppLayers = () => {
               <div onMouseDown={(e) => e.stopPropagation()}>
                 <ExcelButton handleExportExcel={handleExportExcel} />
               </div>
+              <div className="relative" ref={layerFilterRef}>
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => setLayerFilterOpen((open) => !open)}
+                  className="bg-gray-100 text-gray-800 text-sm px-2 py-1 rounded border border-gray-300"
+                  title="Choose which layers are shown"
+                >
+                  Layer Filter
+                </button>
+                {layerFilterOpen && (
+                  <div
+                    className="absolute right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 w-48 z-50"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-600">Visible Layers</span>
+                      <button
+                        className="text-xs text-blue-600 hover:underline"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleResetLayerFilters();
+                        }}
+                      >
+                        Show All
+                      </button>
+                    </div>
+                    {filteredLayerSelection.length === 0 && layerOptions.length > 0 && (
+                      <div className="text-[10px] text-gray-500 mb-1">
+                        No filters selected — showing all layers
+                      </div>
+                    )}
+                    <div className="max-h-48 overflow-auto space-y-1">
+                      {layerOptions.length === 0 && (
+                        <span className="text-xs text-gray-400">No layers available</span>
+                      )}
+                      {layerOptions.map((layer) => (
+                        <label key={layer} className="flex items-center gap-2 text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={filteredLayerSelection.includes(layer)}
+                            onChange={() => handleLayerFilterToggle(layer)}
+                          />
+                          <span className="truncate">{layer}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           {/* Layer assignment table with checkboxes in headers and "No Layer" column */}
@@ -606,13 +767,17 @@ const AppLayers = () => {
             <div className="font-semibold mb-2 text-sm">
               Assign Containers to Layers
             </div>
-            <table className="table-auto border-collapse border border-gray-300 w-full">
+            <div
+              className="border border-gray-300 rounded"
+              style={{ maxHeight: "60vh", overflowY: "auto" }}
+            >
+              <table className="table-auto border-collapse w-full">
               <thead>
                 <tr>
-                  {layerOptions.map((layer) => (
+                  {displayedLayers.map((layer) => (
                     <th
                       key={layer}
-                      className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                      className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left z-10"
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -633,7 +798,7 @@ const AppLayers = () => {
                         />
                         <span>{layer}</span>
                         <button
-                          onClick={() => removeLayer(layer)}
+                          onClick={() => handleDeleteLayer(layer)}
                           className="ml-1 text-red-500 text-xs"
                           title="Delete layer"
                           tabIndex={-1}
@@ -645,7 +810,7 @@ const AppLayers = () => {
                     </th>
                   ))}
                   <th
-                    className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left"
+                    className="sticky top-0 bg-gray-100 p-2 border border-gray-300 text-xs text-left z-10"
                     key="no-layer"
                   >
                     <span className="font-semibold text-gray-600">No Layer</span>
@@ -654,7 +819,7 @@ const AppLayers = () => {
               </thead>
               <tbody>
                 <tr>
-                  {layerOptions.map((layer) => {
+                  {displayedLayers.map((layer) => {
                     const items = containersByLayer[layer] || [];
                     return (
                       <td
@@ -783,7 +948,8 @@ const AppLayers = () => {
                   </td>
                 </tr>
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
         <ContextMenu
