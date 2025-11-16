@@ -1418,7 +1418,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           Export Grid SVG
         </button>
         <button
-          className={`ml-2 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          className={`ml-2 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
           onClick={handleExportAi}
           disabled={!exportEnabled}
           title={exportEnabled ? 'Copy the current grid data as structured text' : 'Activate a row or column grid to export'}
