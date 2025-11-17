@@ -205,7 +205,9 @@ export const useSelectNode = (nodes, edges, setNodes, rowData, handleTransform, 
         const node = nodes.find(n => n.data.id === nodeId);
         if (!node) return;
 
-        centerNode(node);
+        // if (!window.__FLOW_SUPPRESS_CENTERING__) {
+        //     centerNode(node);
+        // }
 
         const descendants = findDescendants(node.id, edges, 2);
 
@@ -213,7 +215,7 @@ export const useSelectNode = (nodes, edges, setNodes, rowData, handleTransform, 
             nds.map(n => {
                 if (n.id === node.id) {
                     n.data.highlighted = true;
-                    return { ...n, selected: true, style: { ...n.style, fontSize: '24px' } };
+                    return { ...n, selected: true, style: { ...n.style } };
                 } else if (descendants.includes(n.id)) {
                     n.data.highlighted = true;
                     return {
@@ -225,7 +227,7 @@ export const useSelectNode = (nodes, edges, setNodes, rowData, handleTransform, 
                 }
             })
         );
-    }, [setNodes, centerNode]);
+    }, [setNodes]);
 
     const rowDataRef = useRef(rowData);
     const nodesDataRef = useRef(nodes);

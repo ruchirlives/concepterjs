@@ -75,6 +75,13 @@ export async function generateNodesAndEdges(params) {
         }
     });
 
+    const idToLabel = new Map();
+    rowData.forEach((item) => {
+        const key = toKey(item?.id);
+        if (!key) return;
+        idToLabel.set(key, item?.Name || `Node ${item?.id ?? ''}`);
+    });
+
     const buildChildLookup = () => {
         const map = new Map();
         (parentChildMap || []).forEach(({ container_id, children }) => {
@@ -94,9 +101,12 @@ export async function generateNodesAndEdges(params) {
                 const childId = toKey(child?.id);
                 if (!childId) return;
                 if (!assignments.has(childId)) {
-                    assignments.set(childId, new Set());
+                    assignments.set(childId, []);
                 }
-                assignments.get(childId).add(parentId);
+                assignments.get(childId).push({
+                    parentId,
+                    label: idToLabel.get(parentId) || '',
+                });
             });
         });
         return assignments;
@@ -107,16 +117,25 @@ export async function generateNodesAndEdges(params) {
 
     const buildGridAssignment = (originalId) => {
         if (!originalId) return null;
-        const rowSet = rowAssignments.get(originalId);
-        const columnSet = columnAssignments.get(originalId);
-        if (!rowSet && !columnSet) return null;
-        const rowIds = rowSet ? Array.from(rowSet) : [];
-        const columnIds = columnSet ? Array.from(columnSet) : [];
+        const rowEntries = rowAssignments.get(originalId);
+        const columnEntries = columnAssignments.get(originalId);
+        if (!rowEntries && !columnEntries) return null;
+        const normalizeEntries = (entries) => {
+            if (!Array.isArray(entries)) return [];
+            return entries.map(({ parentId, label }) => ({
+                parentId,
+                label: label || '',
+            }));
+        };
+        const rowData = normalizeEntries(rowEntries);
+        const columnData = normalizeEntries(columnEntries);
         return {
-            rowId: rowIds[0] ?? null,
-            rowIds,
-            columnId: columnIds[0] ?? null,
-            columnIds,
+            rowId: rowData[0]?.parentId ?? null,
+            rowIds: rowData.map((entry) => entry.parentId),
+            rowLabels: rowData.map((entry) => entry.label),
+            columnId: columnData[0]?.parentId ?? null,
+            columnIds: columnData.map((entry) => entry.parentId),
+            columnLabels: columnData.map((entry) => entry.label),
         };
     };
 
