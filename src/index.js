@@ -48,10 +48,10 @@ const tabs = [
         <AppTiptap />
       </Suspense>
     ) },
-  { key: 'map', label: 'Map', render: () => (
+  { key: 'map', label: 'Map', render: (state) => (
       <div className="h-[600px]">
         <Suspense fallback={<div className="p-4">Loading map...</div>}>
-          <AppMap />
+          <AppMap isActive={state?.isActive} />
         </Suspense>
       </div>
     ) },
@@ -134,7 +134,7 @@ const App = () => {
     if (server) setApiUrl(server);
   }, [server]);
 
-  // Ensure canvases/layouts re-measure when switching to Map tab while kept mounted
+  // Ensure canvases/layouts re-measure whenever the Map tab becomes active
   React.useEffect(() => {
     if (activeTab === 'map') {
       requestAnimationFrame(() => {
@@ -142,6 +142,8 @@ const App = () => {
       });
     }
   }, [activeTab]);
+
+  const activeTabConfig = tabs.find((t) => t.key === activeTab);
 
   const handleCreateFromContent = (result) => {
     console.log('Containers created:', result);
@@ -191,22 +193,8 @@ const App = () => {
           ))}
         </div>
 
-        {/* Active tab content (keep AppGrid and AppMap mounted always) */}
+        {/* Active tab content: keep AppGrid mounted, mount other tabs on demand */}
         <div className="flex-1 min-h-0 overflow-auto bg-white border border-gray-200 rounded-md p-2 relative">
-          {/* Persistently mounted Map layer */}
-          <div
-            style={{
-              position: 'absolute', inset: 0,
-              opacity: activeTab === 'map' ? 1 : 0,
-              pointerEvents: activeTab === 'map' ? 'auto' : 'none',
-            }}
-            className="h-[600px]"
-          >
-            <Suspense fallback={<div className="p-4">Loading map...</div>}>
-              <AppMap isActive={activeTab === 'map'} />
-            </Suspense>
-          </div>
-          {/* Persistently mounted Grid */}
           <div style={{ display: activeTab === 'grid' ? 'block' : 'none' }}>
             <AppGrid
               isLoadModalOpen={isLoadModalOpen}
@@ -214,19 +202,15 @@ const App = () => {
             />
           </div>
 
-          {/* Persistently mounted other tabs (besides Grid/Map) */}
-          {tabs
-            .filter(t => t.key !== 'grid' && t.key !== 'map')
-            .map(t => (
-              <div key={t.key} style={{ display: activeTab === t.key ? 'block' : 'none' }}>
-                {t.render({
-                  isLoadModalOpen,
-                  setIsLoadModalOpen,
-                  keepLayout,
-                  setKeepLayout,
-                })}
-              </div>
-            ))}
+          {activeTab !== 'grid' && activeTabConfig && activeTabConfig.key !== 'grid' && (
+            activeTabConfig.render({
+              isLoadModalOpen,
+              setIsLoadModalOpen,
+              keepLayout,
+              setKeepLayout,
+              isActive: true,
+            })
+          )}
         </div>
       </main>
 
