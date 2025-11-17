@@ -13,7 +13,8 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
   // Always start with no pre-selected items (unticked by default)
   const [selectedIds, setSelectedIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [namesInput, setNamesInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     loadCheckedNodes,
@@ -23,6 +24,7 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
     if (isOpen) {
       setSearchTerm("");
       setSelectedIds([]); // Always unticked by default when modal opens
+      setNamesInput("");
       // Set the content layer to the current layer when modal opens
       if (setSelectedContentLayer && layer) {
         setSelectedContentLayer(layer);
@@ -31,50 +33,88 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, layer, rowData]);
 
+  const appendSearchTermToNames = () => {
+    const trimmed = searchTerm.trim();
+    if (!trimmed) return;
+    setNamesInput((prev) => (prev ? `${prev}\n${trimmed}` : trimmed));
+  };
+
+  const parseNamesInput = () => (
+    namesInput
+      .split('\n')
+      .map(name => name.trim())
+      .filter(Boolean)
+  );
+
   const handleAddNew = async () => {
-    const name = searchTerm.trim();
-    console.log("Adding new row with name:", name);
-    if (!name) return;
-    const id = await createContainer();
-    if (!id) return;
-    // Only add selectedContentLayer as tag (not all activeLayers)
-    let tagsArr = [];
-    if (selectedContentLayer) {
-      tagsArr.push(selectedContentLayer);
-    }
-    const newRow = {
-      id,
-      Name: name,
-      Description: name,
-      Tags: tagsArr.join(", "),
-      StartDate: new Date().toISOString().split("T")[0],
-      EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      TimeRequired: 1,
-    };
+    if (isSubmitting) return;
 
-    let pendingRows = null;
-    setRowData((prev) => {
-      pendingRows = [...prev, newRow];
-      return pendingRows;
-    });
+    const entries = parseNamesInput();
+    if (!entries.length) return;
 
-    if (pendingRows) {
-      await writeBackData(pendingRows);
+    const tagsArr = selectedContentLayer ? [selectedContentLayer] : [];
+
+    const newRows = [];
+    for (const name of entries) {
+      const id = await createContainer();
+      if (!id) continue;
+      newRows.push({
+        id,
+        Name: name,
+        Description: name,
+        Tags: tagsArr.join(", "),
+        StartDate: new Date().toISOString().split("T")[0],
+        EndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
+        TimeRequired: 1,
+      });
     }
 
-    await onSelect([newRow]);
-    onClose();
+    if (!newRows.length && selectedIds.length === 0) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      let pendingRows = null;
+      if (newRows.length) {
+        setRowData((prev) => {
+          pendingRows = [...prev, ...newRows];
+          return pendingRows;
+        });
+
+        if (pendingRows) {
+          await writeBackData(pendingRows);
+        }
+      }
+
+      let loadedNodes = [];
+      if (selectedIds.length > 0) {
+        loadedNodes = await loadCheckedNodes();
+      }
+
+      await onSelect([...newRows, ...loadedNodes]);
+      setNamesInput("");
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOk = async () => {
-    let loadedNodes = [];
-    if (selectedIds.length > 0) {
-      loadedNodes = await loadCheckedNodes();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      let loadedNodes = [];
+      if (selectedIds.length > 0) {
+        loadedNodes = await loadCheckedNodes();
+      }
+      await onSelect(loadedNodes);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
     }
-    await onSelect(loadedNodes);
-    onClose();
   };
 
   const initialResults = rowData.filter(row =>
@@ -91,39 +131,66 @@ const ModalAddRow = ({ isOpen, onClose, onSelect, initialSelectedIds = [], layer
       isOpen={isOpen}
       onRequestClose={onClose}
       contentLabel="Add Row"
-      className="bg-white text-gray-900 w-full max-w-md h-[40rem] overflow-auto p-6 rounded-lg shadow-lg outline-none" // Increased height to h-[40rem]
+      className="bg-white text-gray-900 w-full max-w-2xl h-[40rem] overflow-auto p-6 rounded-lg shadow-lg outline-none" // Increased height to h-[40rem]
       overlayClassName="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50"
     >
       <div className="mb-4">
-        <NodeSearchBox
-          layerOptions={layerOptions}
-          rowData={rowData}
-          showTags={true}
-          selectedIds={selectedIds}
-          setSelectedIds={setSelectedIds}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          selectedContentLayer={layer || selectedContentLayer}
-          initialResults={initialResults}
+        {isSubmitting ? (
+          <div className="p-4 text-sm text-gray-600 border border-dashed border-gray-300 rounded">
+            Saving new rows…
+          </div>
+        ) : (
+          <NodeSearchBox
+            layerOptions={layerOptions}
+            rowData={rowData}
+            showTags={true}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            selectedContentLayer={layer || selectedContentLayer}
+            initialResults={initialResults}
+            renderExtraControls={() => (
+              <button
+                type="button"
+                onClick={appendSearchTermToNames}
+                className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded"
+              >
+                Add to list
+              </button>
+            )}
+          />
+        )}
+        <textarea
+          className="mt-3 w-full border border-gray-300 rounded p-2 text-sm"
+          rows={6}
+          value={namesInput}
+          onChange={(e) => setNamesInput(e.target.value)}
+          placeholder="One container name per line"
         />
         <button
           onClick={handleAddNew}
-          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded"
-          style={{ marginTop: 8 }}
+          className="mt-3 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded disabled:opacity-50"
+          disabled={isSubmitting}
         >
           Add New
         </button>
+        {isSubmitting && (
+          <p className="text-xs text-gray-500 mt-2">Saving new rows…</p>
+        )}
       </div>
       <div className="mt-4 flex justify-end">
         <button
           onClick={handleOk}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded"
+          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded disabled:opacity-50"
+          disabled={isSubmitting}
         >
           OK
         </button>
         <button
           onClick={onClose}
-          className="ml-2 px-3 py-1 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-medium rounded"
+          className="ml-2 px-3 py-1 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-medium rounded disabled:opacity-50"
+          disabled={isSubmitting}
         >
           Cancel
         </button>

@@ -778,6 +778,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     let batchResult;
     try {
+      console.log("Batch adding children", parentEntries);
       batchResult = await addChildrenBatch(parentEntries);
     } catch (error) {
       console.error("Failed to batch add children", error);

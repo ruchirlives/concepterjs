@@ -11,7 +11,8 @@ export default function NodeSearchBox({
     searchTerm,
     setSearchTerm,
     selectedContentLayer = null,
-    initialResults = []
+    initialResults = [],
+    renderExtraControls = null,
 }) {
     const {
         searchResults,
@@ -111,7 +112,7 @@ export default function NodeSearchBox({
                     </div>
                 </div>
             )}
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
                 <input
                     id="search-nodes"
                     type="text"
@@ -145,6 +146,13 @@ export default function NodeSearchBox({
                 >
                     Select All
                 </button>
+                {renderExtraControls && (
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {typeof renderExtraControls === 'function'
+                          ? renderExtraControls()
+                          : renderExtraControls}
+                    </div>
+                )}
             </div>
             {searchError && (
                 <div style={{ color: "red", marginTop: "0.5rem" }}>{searchError}</div>
