@@ -10,7 +10,11 @@ const FlowNode = ({ data, style, selected }) => {
     ? data.originalId.toString()
     : (data?.id != null ? data.id.toString() : nodeDomId);
 
-  const handleDoubleClick = () => {
+  const handleDoubleClick = (event) => {
+    if (event) {
+      if (typeof event.preventDefault === 'function') event.preventDefault();
+      if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
     console.log('Node id:', nodeId);
     const channel = new BroadcastChannel('rowSelectChannel');
     channel.postMessage({ nodeId });
@@ -71,6 +75,16 @@ const FlowNode = ({ data, style, selected }) => {
     }
   }
 
+  const highlightClass = data.highlighted
+    ? 'z-10 shadow-[0_0_30px_10px_rgba(59,130,246,0.45)] ring-4 ring-blue-300/70'
+    : '';
+  const combinedStyle = data.highlighted
+    ? {
+        ...style,
+        boxShadow: '0 0 35px 12px rgba(37,99,235,0.35)',
+      }
+    : style;
+
   return (
     <div
       onDoubleClick={handleDoubleClick}
@@ -94,8 +108,10 @@ const FlowNode = ({ data, style, selected }) => {
       data-flow-node-id={nodeDomId}
       data-flow-node-original-id={originalId}
       className={`relative cursor-pointer whitespace-normal break-words max-w-xs px-3 py-2 rounded-lg border 
-        ${selected ? 'border-red-600 border-4' : 'border-gray-300'}
-        ${data.highlighted ? 'bg-gray-400' : getBgColorClass()}`}
+        ${selected ? 'border-red-600 border-6' : 'border-gray-300'}
+        ${getBgColorClass()}
+        ${highlightClass}`}
+      style={combinedStyle}
     >
       <Handle
         type="target"
