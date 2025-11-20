@@ -1476,7 +1476,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
           Copy AI Summary
         </button>
         <button
-          className="ml-2 px-3 py-1 text-xs rounded bg-orange-500 text-white hover:bg-orange-600"
+          className="ml-2 px-3 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700"
           onClick={() => setShowInstructionImport((prev) => !prev)}
           title="Import a batch of instructions as JSON"
         >
