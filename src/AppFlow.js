@@ -573,7 +573,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     } finally {
       setIsApplyingInstructions(false);
     }
-  }, [applyInstructionSet, instructionInput, requestRefreshChannel, setInstructionInput, setShowInstructionImport]);
+  }, [instructionInput, setInstructionInput, setShowInstructionImport]);
 
   useEffect(() => {
     if (!cellMenuContext) return undefined;
