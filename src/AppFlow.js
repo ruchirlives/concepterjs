@@ -19,7 +19,7 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { saveNodes, addChildren, addChildrenBatch, removeChildren, setPosition } from './api';
+import { applyInstructionSet, saveNodes, addChildren, addChildrenBatch, removeChildren, setPosition } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
@@ -364,6 +364,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
   const overlayRef = useRef(null);
+  const [showInstructionImport, setShowInstructionImport] = useState(false);
+  const [instructionInput, setInstructionInput] = useState('');
+  const [isApplyingInstructions, setIsApplyingInstructions] = useState(false);
   const relationships = useMemo(() => {
     const map = {};
     if (!Array.isArray(parentChildMap)) {
@@ -525,6 +528,52 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
     setCellHeightInput(value.toString());
   }, [cellHeightInput, setCellHeightInput]);
+
+  const handlePasteInstructions = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
+      toast.error('Clipboard access is not available.');
+      return;
+    }
+    try {
+      const pasted = await navigator.clipboard.readText();
+      setInstructionInput(pasted);
+    } catch (error) {
+      console.error('Failed to paste instructions', error);
+      toast.error('Failed to read from clipboard.');
+    }
+  }, [setInstructionInput]);
+
+  const handleSubmitInstructions = useCallback(async () => {
+    const rawText = instructionInput.trim();
+    if (!rawText) {
+      toast.error('Please provide instruction JSON.');
+      return;
+    }
+
+    let parsedPayload;
+    try {
+      parsedPayload = JSON.parse(rawText);
+    } catch (error) {
+      toast.error('Instruction JSON is invalid.');
+      return;
+    }
+
+    setIsApplyingInstructions(true);
+    try {
+      const result = await applyInstructionSet(parsedPayload);
+      const message = result?.message || 'Instruction set applied.';
+      toast.success(message);
+      requestRefreshChannel();
+      setInstructionInput('');
+      setShowInstructionImport(false);
+    } catch (error) {
+      console.error('Failed to apply instruction set', error);
+      const message = error?.response?.data?.error || error?.message || 'Failed to apply instruction set';
+      toast.error(message);
+    } finally {
+      setIsApplyingInstructions(false);
+    }
+  }, [applyInstructionSet, instructionInput, requestRefreshChannel, setInstructionInput, setShowInstructionImport]);
 
   useEffect(() => {
     if (!cellMenuContext) return undefined;
@@ -1426,6 +1475,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
         >
           Copy AI Summary
         </button>
+        <button
+          className="ml-2 px-3 py-1 text-xs rounded bg-orange-500 text-white hover:bg-orange-600"
+          onClick={() => setShowInstructionImport((prev) => !prev)}
+          title="Import a batch of instructions as JSON"
+        >
+          Import Instructions
+        </button>
           {/* Group By Layers tickbox */}
         <div className="flex items-center gap-2 ml-4">
           <input
@@ -1568,6 +1624,49 @@ const App = ({ keepLayout, setKeepLayout }) => {
         </div>
 
       </FlowHeader>
+
+      {showInstructionImport && (
+        <div className="px-4 pb-4">
+          <div className="bg-gray-50 border border-gray-200 rounded p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-800">Instruction JSON</span>
+              <button
+                className="text-xs text-gray-500 hover:text-gray-700"
+                onClick={() => setShowInstructionImport(false)}
+              >
+                Close
+              </button>
+            </div>
+            <textarea
+              className="w-full border border-gray-300 rounded p-2 text-xs font-mono text-gray-800 bg-white"
+              rows={6}
+              value={instructionInput}
+              onChange={(e) => setInstructionInput(e.target.value)}
+              placeholder='[
+  ["remove", "123"],
+  {"action": "add", "id": "temp-1", "label": "New Node"}
+]'
+            />
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button
+                className="px-3 py-1 text-xs rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                onClick={handlePasteInstructions}
+                type="button"
+              >
+                Paste
+              </button>
+              <button
+                className="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                onClick={handleSubmitInstructions}
+                disabled={isApplyingInstructions}
+                type="button"
+              >
+                {isApplyingInstructions ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
         <div

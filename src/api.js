@@ -83,6 +83,17 @@ export const createContainer = async () => {
     }
 };
 
+// Apply a batch of instructions
+export const applyInstructionSet = async (instructionPayload) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/apply_instruction_set`, instructionPayload);
+        return response?.data;
+    } catch (error) {
+        console.error("Error applying instruction set:", error);
+        throw error;
+    }
+};
+
 
 // Get Mermaid json
 export const get_mermaid = async (rowId) => {
