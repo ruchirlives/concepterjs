@@ -72,6 +72,17 @@ export const fetchContainers = async () => {
     }
 };
 
+// Generate a graph from raw text content
+export const generateGraph = async (text) => {
+    try {
+        const response = await apiClient.post(`${getApiUrl()}/generate_graph`, { text });
+        return response.data;
+    } catch (error) {
+        console.error("Error generating graph:", error);
+        throw error;
+    }
+};
+
 // Create a new container in backend
 export const createContainer = async () => {
     try {

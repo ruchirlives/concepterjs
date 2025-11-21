@@ -1,12 +1,22 @@
 // Create a new file: CreateFromContentModal.jsx
 import React, { useState } from "react";
-import { createContainersFromContent } from "../api";
+import { createContainersFromContent, generateGraph } from "../api";
 
 const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
   const [prompt, setPrompt] = useState("");
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGraphLoading, setIsGraphLoading] = useState(false);
   const [error, setError] = useState("");
+  const [graphResult, setGraphResult] = useState(null);
+
+  const resetState = () => {
+    setPrompt("");
+    setContent("");
+    setError("");
+    setGraphResult(null);
+    setIsGraphLoading(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,12 +48,33 @@ const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
     }
   };
 
-  const handleClose = () => {
-    setPrompt("");
-    setContent("");
+  const handleGenerateGraph = async () => {
+    if (!content.trim()) {
+      setError("Content is required");
+      return;
+    }
+
+    setIsGraphLoading(true);
     setError("");
+
+    try {
+      const data = await generateGraph(content.trim());
+      setGraphResult(data);
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.error || err.message || "Failed to generate graph";
+      setError(errorMessage);
+    } finally {
+      setIsGraphLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    resetState();
     setIsOpen(false);
   };
+
+  const isBusy = isLoading || isGraphLoading;
 
   if (!isOpen) return null;
 
@@ -53,7 +84,7 @@ const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-900">Create Containers from Content</h2>
-          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-2xl" disabled={isLoading}>
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 text-2xl" disabled={isBusy}>
             ×
           </button>
         </div>
@@ -75,7 +106,7 @@ const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="e.g., Extract project tasks and their relationships"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isLoading}
+              disabled={isBusy}
             />
             <p className="text-xs text-gray-500 mt-1">Optional prompt to guide how containers are created from your content</p>
           </div>
@@ -92,26 +123,65 @@ const CreateFromContentModal = ({ isOpen, setIsOpen, onCreateContainers }) => {
               placeholder="Paste your text content here. The AI will extract containers and relationships from this text..."
               rows={8}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
-              disabled={isLoading}
+              disabled={isBusy}
               required
             />
             <p className="text-xs text-gray-500 mt-1">Raw text content to extract containers from (meeting notes, documents, etc.)</p>
           </div>
 
+          {graphResult && (
+            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-800">Generated Graph Response</h3>
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                  onClick={() => setGraphResult(null)}
+                >
+                  Clear
+                </button>
+              </div>
+              <pre className="whitespace-pre-wrap text-xs text-gray-800">{JSON.stringify(graphResult, null, 2)}</pre>
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex justify-end space-x-3">
             <button
               type="button"
+              onClick={handleGenerateGraph}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              disabled={isBusy || !content.trim()}
+            >
+              {isGraphLoading && (
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              )}
+              {isGraphLoading ? "Generating Graph..." : "Generate Graph"}
+            </button>
+            <button
+              type="button"
               onClick={handleClose}
               className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
-              disabled={isLoading}
+              disabled={isBusy}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-              disabled={isLoading || !content.trim()}
+              disabled={isBusy || !content.trim()}
             >
               {isLoading && (
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
