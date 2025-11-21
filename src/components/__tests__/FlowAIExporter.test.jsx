@@ -119,4 +119,41 @@ describe("serializeFlowAiSummary", () => {
       { from: "b", to: "a" },
     ]);
   });
+
+  it("only exports selected nodes while pruning unselected children", () => {
+    const summary = serializeFlowAiSummary({
+      nodes: [
+        { id: "row-0-row-alpha", data: { Name: "Row Alpha" } },
+        {
+          id: "node-1",
+          selected: true,
+          data: {
+            Name: "Parent Node",
+            children: ["node-2", "node-3"],
+          },
+        },
+        { id: "node-2", data: { Name: "Hidden Child" } },
+        { id: "node-3", selected: true, data: { Name: "Visible Child" } },
+        { id: "column-0-col-one", data: { Name: "Column One" } },
+      ],
+      edges: [
+        { id: "edge-1", source: "node-1", target: "node-2", data: { label: "Hidden" } },
+        { id: "edge-2", source: "node-1", target: "node-3", data: { label: "Visible" } },
+      ],
+      grid: baseGrid,
+    });
+
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.nodes).toEqual([
+      { id: "column-0-col-one", name: "Column One", children: [] },
+      { id: "node-1", name: "Parent Node", children: ["node-3"], row: null, column: null },
+      { id: "row-0-row-alpha", name: "Row Alpha", children: [] },
+      { id: "node-3", name: "Visible Child", children: [], row: null, column: null },
+    ]);
+
+    expect(parsed.edges).toEqual([
+      { from: "node-1", to: "node-3", label: "Visible" },
+    ]);
+  });
 });
