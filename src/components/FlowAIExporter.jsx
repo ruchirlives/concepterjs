@@ -219,6 +219,22 @@ const sanitizeNodeName = (name, fallback) => {
   return cleaned.length ? cleaned : trimmed;
 };
 
+const isRowOrColumnNode = (node) => {
+  const type = asStringOrNull(node?.type) ?? asStringOrNull(node?.data?.type);
+  const id =
+    asStringOrNull(node?.id) ??
+    asStringOrNull(node?.data?.id) ??
+    asStringOrNull(node?.data?.originalId);
+  const typeLower = type?.toLowerCase();
+  const idLower = id?.toLowerCase();
+  return (
+    typeLower === "row" ||
+    typeLower === "column" ||
+    (idLower?.startsWith("row-")) ||
+    (idLower?.startsWith("column-"))
+  );
+};
+
 export const serializeFlowAiSummary = ({
   nodes = [],
   edges = [],
@@ -232,6 +248,21 @@ export const serializeFlowAiSummary = ({
   const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
   const columns = includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
 
+  const includedNodes = safeNodes.filter(
+    (node) => node?.selected || isRowOrColumnNode(node)
+  );
+
+  const allowedIds = new Set();
+  includedNodes.forEach((node, index) => {
+    const candidates = [
+      resolveNodeId(node, index),
+      asStringOrNull(node?.id),
+      asStringOrNull(node?.data?.id),
+      asStringOrNull(node?.data?.originalId),
+    ];
+    candidates.filter(Boolean).forEach((candidate) => allowedIds.add(candidate));
+  });
+
   const emptyMapping = () => ({ exports: [], idMap: new Map() });
   const { exports: rowExports, idMap: rowIdMap } = includeRows
     ? buildSegmentExports(rows, "row")
@@ -242,7 +273,7 @@ export const serializeFlowAiSummary = ({
 
   const nodeMetadata = new Map();
 
-  const nodeExports = safeNodes.map((node, index) => {
+  const nodeExports = includedNodes.map((node, index) => {
     const nodeId = resolveNodeId(node, index);
     const rawName = extractNodeTitle(node, index);
     const name = sanitizeNodeName(rawName, `Node ${index + 1}`);
@@ -254,7 +285,9 @@ export const serializeFlowAiSummary = ({
       "column"
     );
     const tags = normalizeTags(node);
-    const children = collectChildIds(node);
+    const children = collectChildIds(node).filter((childId) =>
+      allowedIds.has(asStringOrNull(childId))
+    );
     const position = (node && (node.positionAbsolute || node.position)) || { x: 0, y: 0 };
     const x = safeNumber(position?.x, 0);
     const y = safeNumber(position?.y, 0);
@@ -283,6 +316,12 @@ export const serializeFlowAiSummary = ({
 
   const includedEdges = safeEdges.filter((edge) => {
     if (!edge?.source || !edge?.target) return false;
+    if (
+      !allowedIds.has(asStringOrNull(edge.source)) ||
+      !allowedIds.has(asStringOrNull(edge.target))
+    ) {
+      return false;
+    }
     if (!filterEdgesByHandleX) return true;
     const sourceMeta = nodeMetadata.get(edge.source) || nodeMetadata.get(asStringOrNull(edge.source));
     const targetMeta = nodeMetadata.get(edge.target) || nodeMetadata.get(asStringOrNull(edge.target));
