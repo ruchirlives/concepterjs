@@ -156,4 +156,52 @@ describe("serializeFlowAiSummary", () => {
       { from: "node-1", to: "node-3", label: "Visible" },
     ]);
   });
+
+  it("includes all visible nodes when none are selected", () => {
+    const summary = serializeFlowAiSummary({
+      nodes: [
+        { id: "row-0-row-alpha", data: { Name: "Row Alpha" }, type: "row" },
+        { id: "column-0-col-one", data: { Name: "Col One" }, type: "column" },
+        {
+          id: "node-visible-1",
+          data: {
+            Name: "Visible One",
+            children: ["node-hidden", "node-visible-2"],
+          },
+        },
+        { id: "node-hidden", hidden: true, data: { Name: "Hidden Child" } },
+        { id: "node-visible-2", data: { Name: "Visible Two" } },
+      ],
+      edges: [
+        { id: "edge-hidden", source: "node-visible-1", target: "node-hidden" },
+        { id: "edge-visible", source: "node-visible-1", target: "node-visible-2" },
+      ],
+      grid: baseGrid,
+    });
+
+    const parsed = JSON.parse(summary);
+
+    expect(parsed.nodes).toEqual([
+      { id: "column-0-col-one", name: "Col One", children: [] },
+      { id: "row-0-row-alpha", name: "Row Alpha", children: [] },
+      {
+        id: "node-visible-1",
+        name: "Visible One",
+        children: ["node-visible-2"],
+        row: null,
+        column: null,
+      },
+      {
+        id: "node-visible-2",
+        name: "Visible Two",
+        children: [],
+        row: null,
+        column: null,
+      },
+    ]);
+
+    expect(parsed.edges).toEqual([
+      { from: "node-visible-1", to: "node-visible-2" },
+    ]);
+  });
 });

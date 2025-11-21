@@ -44,6 +44,11 @@ const extractNodeTitle = (node, fallbackIndex) => {
   return `Node ${fallbackIndex + 1}`;
 };
 
+const isNodeVisible = (node) => {
+  const hiddenFlag = node?.hidden ?? node?.data?.hidden;
+  return hiddenFlag !== true;
+};
+
 const resolveNodeId = (node, fallbackIndex) => {
   const candidates = [node?.id, node?.data?.id, node?.data?.originalId];
   for (const candidate of candidates) {
@@ -248,9 +253,30 @@ export const serializeFlowAiSummary = ({
   const rows = includeRows && Array.isArray(grid?.rows) ? grid.rows : [];
   const columns = includeColumns && Array.isArray(grid?.columns) ? grid.columns : [];
 
-  const includedNodes = safeNodes.filter(
-    (node) => node?.selected || isRowOrColumnNode(node)
-  );
+  const selectedNodes = safeNodes.filter((node) => node?.selected);
+  const visibleNodes = safeNodes.filter(isNodeVisible);
+
+  const includedNodes = [];
+  const seenNodeIds = new Set();
+
+  const registerNode = (node, fallbackIndex = includedNodes.length) => {
+    const key =
+      asStringOrNull(node?.id) ||
+      asStringOrNull(node?.data?.id) ||
+      asStringOrNull(node?.data?.originalId) ||
+      `index-${fallbackIndex}`;
+    if (seenNodeIds.has(key)) return;
+    seenNodeIds.add(key);
+    includedNodes.push(node);
+  };
+
+  const baseNodes = selectedNodes.length > 0 ? selectedNodes : visibleNodes;
+  baseNodes.forEach((node, index) => registerNode(node, index));
+  safeNodes.forEach((node, index) => {
+    if (isRowOrColumnNode(node)) {
+      registerNode(node, baseNodes.length + index);
+    }
+  });
 
   const allowedIds = new Set();
   includedNodes.forEach((node, index) => {
