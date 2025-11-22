@@ -430,6 +430,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
   const exportEnabled = showRowGrid || showColumnGrid;
+  const aiExportEnabled = Array.isArray(nodes) && nodes.length > 0;
 
   const normalizeTags = useCallback((raw = '') => raw
     .split(',')
@@ -875,7 +876,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }, [exportEnabled]);
 
   const handleExportAi = useCallback(async () => {
-    if (!exportEnabled) return;
+    if (!aiExportEnabled) {
+      toast.error('No nodes available to export.');
+      return;
+    }
+
     try {
       const exported = await aiExporterRef.current?.exportText();
       if (exported) {
@@ -887,7 +892,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       console.error('Flow AI export failed', error);
       toast.error('Unable to build AI summary for the current view.');
     }
-  }, [exportEnabled]);
+  }, [aiExportEnabled]);
 
   const getLogicalNodeId = useCallback((nodeLike) => {
     if (!nodeLike) return null;
@@ -1468,10 +1473,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
           Export Grid SVG
         </button>
         <button
-          className={`ml-2 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          className={`ml-2 px-3 py-1 text-xs rounded ${aiExportEnabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
           onClick={handleExportAi}
-          disabled={!exportEnabled}
-          title={exportEnabled ? 'Copy the current grid data as structured text' : 'Activate a row or column grid to export'}
+          disabled={!aiExportEnabled}
+          title={aiExportEnabled ? 'Copy the current view as structured text' : 'Add nodes to export'}
         >
           Copy AI Summary
         </button>
