@@ -170,8 +170,11 @@ const buildVariableRowSegments = (items = [], rowCounts = new Map(), baseHeight 
   const segments = items.map((item, index) => {
     const { label = '', nodeId, originalId } = item || {};
     const key = toComparableId(originalId ?? nodeId ?? `row-${index}`);
-    const maxNodes = rowCounts?.get(key) ?? 0;
-    const height = clampToPrecision(defaultHeight * Math.max(1, maxNodes));
+    const rawUnits = rowCounts?.get(key) ?? 0;
+    const heightMultiplier = Number.isFinite(rawUnits) && rawUnits > 0
+      ? Math.max(1, Math.ceil(rawUnits))
+      : 1;
+    const height = clampToPrecision(defaultHeight * heightMultiplier);
     const start = clampToPrecision(cursor);
     const end = clampToPrecision(cursor + height);
     cursor = end;
@@ -652,6 +655,18 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return key != null ? key : null;
     };
 
+    const resolveHeight = (node) => {
+      if (!node) return MIN_AUTO_ROW_HEIGHT;
+      const candidates = [
+        node?.height,
+        node?.measured?.height,
+        node?.style?.height,
+        node?.data?.height,
+      ];
+      const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
+      return Number.isFinite(chosen) && chosen > 0 ? chosen : MIN_AUTO_ROW_HEIGHT;
+    };
+
     const rowKeys = new Set(
       rowLayerNodes
         .map((row) => resolveKey(row?.originalId ?? row?.nodeId))
@@ -668,7 +683,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const counts = new Map();
 
-    const register = (rowKey, columnKey) => {
+    const register = (rowKey, columnKey, nodeHeight) => {
       if (!rowKeys.has(rowKey)) return;
       const cellMap = counts.get(rowKey) || new Map();
       const effectiveColumn = showColumnGrid
@@ -679,7 +694,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
         return;
       }
 
-      cellMap.set(effectiveColumn, (cellMap.get(effectiveColumn) || 0) + 1);
+      const nextTotal = (cellMap.get(effectiveColumn) || 0) + nodeHeight;
+      cellMap.set(effectiveColumn, nextTotal);
       counts.set(rowKey, cellMap);
     };
 
@@ -702,13 +718,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
         : [null];
 
       const visitedCells = new Set();
+      const nodeHeight = resolveHeight(node);
 
       rowIds.forEach((rowId) => {
         applicableColumns.forEach((columnId) => {
           const cellKey = `${rowId}::${columnId ?? 'none'}`;
           if (visitedCells.has(cellKey)) return;
           visitedCells.add(cellKey);
-          register(rowId, columnId);
+          register(rowId, columnId, nodeHeight);
         });
       });
     });
@@ -718,8 +735,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     counts.forEach((cellCounts, rowKey) => {
       let rowMax = 0;
-      cellCounts.forEach((count) => {
-        rowMax = Math.max(rowMax, count);
+      cellCounts.forEach((totalHeight) => {
+        const normalized = Number.isFinite(totalHeight) && totalHeight > 0
+          ? Math.max(1, Math.ceil(totalHeight / MIN_AUTO_ROW_HEIGHT))
+          : 1;
+        rowMax = Math.max(rowMax, normalized);
       });
       rowMaxCounts.set(rowKey, rowMax);
       globalMax = Math.max(globalMax, rowMax);
