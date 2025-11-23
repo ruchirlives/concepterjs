@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNodeSearchAndSelect } from "../hooks/useNodeSearchAndSelect";
 
 export default function NodeSearchBox({
@@ -24,6 +24,8 @@ export default function NodeSearchBox({
         setTagsSearchTerm,
         otherTag,
         setOtherTag,
+        selectedRows,
+        rememberRows,
     } = useNodeSearchAndSelect(selectedIds,
         setSelectedIds, searchTerm, setSearchTerm);
 
@@ -53,10 +55,13 @@ export default function NodeSearchBox({
         );
     };
 
+    const getRowId = (row, fallback) => row?.id ?? row?._id ?? row?.__searchId ?? fallback;
+
     // Select all visible search results
     const handleSelectAll = () => {
-        const allIds = searchResults.map((row, idx) => row.id || row._id || idx);
+        const allIds = displayResults.map((row, idx) => getRowId(row, idx));
         setSelectedIds(allIds);
+        rememberRows(displayResults.map((row, idx) => ({ id: getRowId(row, idx), row })));
     };
 
     // console.log("NodeSearchBox selectedIds:", selectedIds);
@@ -72,6 +77,22 @@ export default function NodeSearchBox({
     )
         ? initialResults
         : searchResults;
+
+    const combinedResults = useMemo(() => {
+        const merged = new Map();
+        selectedRows.forEach((row, idx) => {
+            const id = getRowId(row, idx);
+            merged.set(String(id ?? idx), row);
+        });
+        displayResults.forEach((row, idx) => {
+            const id = getRowId(row, idx);
+            const key = String(id ?? idx);
+            if (!merged.has(key)) {
+                merged.set(key, row);
+            }
+        });
+        return Array.from(merged.values());
+    }, [selectedRows, displayResults]);
 
     return (
         <div
@@ -157,65 +178,71 @@ export default function NodeSearchBox({
             {searchError && (
                 <div style={{ color: "red", marginTop: "0.5rem" }}>{searchError}</div>
             )}
-            <ul
-                className="space-y-1"
+            <div
                 style={{
-                    maxHeight: 350, // Increased from 150 to 350 for more vertical space
+                    height: 350,
                     overflowY: "auto",
                     marginTop: 8,
-                    listStyle: "none",
-                    padding: 0,
                 }}
             >
-                {displayResults.map((row, idx) => {
-                    const id = row.id || row._id || idx;
-                    const isExisting = existingIds.has(id);
-                    // Limit name and children string to 50 chars
-                    const displayName = (row.Name || row.name || "(no name)");
-                    const truncatedName = displayName;
-                    let childrenStr = "";
-                    if (row.children && row.children.length > 0) {
-                        childrenStr = row.children
-                            .map(
-                                (child) =>
-                                    `${child.position?.Name || child.position?.name || ""} - ${child.Name || child.name || ""}`
-                            )
-                            .join(", ");
-                        if (childrenStr.length > 50) {
-                            childrenStr = childrenStr.slice(0, 50) + "...";
+                <ul
+                    className="space-y-1"
+                    style={{
+                        listStyle: "none",
+                        padding: 0,
+                        margin: 0,
+                    }}
+                >
+                    {combinedResults.map((row, idx) => {
+                        const id = getRowId(row, idx);
+                        const isExisting = existingIds.has(id);
+                        // Limit name and children string to 50 chars
+                        const displayName = (row.Name || row.name || "(no name)");
+                        const truncatedName = displayName;
+                        let childrenStr = "";
+                        if (row.children && row.children.length > 0) {
+                            childrenStr = row.children
+                                .map(
+                                    (child) =>
+                                        `${child.position?.Name || child.position?.name || ""} - ${child.Name || child.name || ""}`
+                                )
+                                .join(", ");
+                            if (childrenStr.length > 50) {
+                                childrenStr = childrenStr.slice(0, 50) + "...";
+                            }
                         }
-                    }
-                    return (
-                        <li
-                            key={id}
-                            className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer text-gray-900"
-                            style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #eee" }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedIds.map(String).includes(String(id))}
-                                onChange={() => handleCheckboxChange(id)}
-                                style={{ marginRight: 8 }}
-                            />
-                            <span style={{ fontWeight: 500 }}>
-                                {truncatedName}
-                                {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
-                            </span>
-                            {childrenStr && (
-                                <span style={{ color: "#374151", marginLeft: 12, fontSize: "0.95em" }}>
-                                    {childrenStr}
+                        return (
+                            <li
+                                key={id}
+                                className="p-2 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer text-gray-900"
+                                style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #eee" }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.map(String).includes(String(id))}
+                                    onChange={() => handleCheckboxChange(id, row)}
+                                    style={{ marginRight: 8 }}
+                                />
+                                <span style={{ fontWeight: 500 }}>
+                                    {truncatedName}
+                                    {isExisting && <span style={{ color: "#d00", marginLeft: 4 }}>*</span>}
                                 </span>
-                            )}
-                        </li>
-                    );
-                })}
-                {displayResults.length === 0 &&
-                    searchTerm &&
-                    !searchLoading &&
-                    !searchError && (
-                        <li style={{ color: "#374151" }}>No results found.</li>
-                    )}
-            </ul>
+                                {childrenStr && (
+                                    <span style={{ color: "#374151", marginLeft: 12, fontSize: "0.95em" }}>
+                                        {childrenStr}
+                                    </span>
+                                )}
+                            </li>
+                        );
+                    })}
+                    {displayResults.length === 0 &&
+                        searchTerm &&
+                        !searchLoading &&
+                        !searchError && (
+                            <li style={{ color: "#374151" }}>No results found.</li>
+                        )}
+                </ul>
+            </div>
         </div>
     );
 }
