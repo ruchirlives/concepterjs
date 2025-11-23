@@ -35,7 +35,7 @@ const clampToPrecision = (value) => {
   return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
 };
 
-const MIN_AUTO_ROW_HEIGHT = 140;
+const MIN_AUTO_ROW_HEIGHT = 20;
 
 const buildAxisSegments = (items = [], totalSize = 0, axis = 'row', explicitSize = null) => {
   if (!Array.isArray(items) || items.length === 0) {
