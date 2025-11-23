@@ -170,8 +170,11 @@ const buildVariableRowSegments = (items = [], rowCounts = new Map(), baseHeight 
   const segments = items.map((item, index) => {
     const { label = '', nodeId, originalId } = item || {};
     const key = toComparableId(originalId ?? nodeId ?? `row-${index}`);
-    const maxNodes = rowCounts?.get(key) ?? 0;
-    const height = clampToPrecision(defaultHeight * Math.max(1, maxNodes));
+    const rawUnits = rowCounts?.get(key) ?? 0;
+    const heightMultiplier = Number.isFinite(rawUnits) && rawUnits > 0
+      ? Math.max(1, Math.ceil(rawUnits))
+      : 1;
+    const height = clampToPrecision(defaultHeight * heightMultiplier);
     const start = clampToPrecision(cursor);
     const end = clampToPrecision(cursor + height);
     cursor = end;
@@ -652,6 +655,18 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return key != null ? key : null;
     };
 
+    const resolveHeight = (node) => {
+      if (!node) return MIN_AUTO_ROW_HEIGHT;
+      const candidates = [
+        node?.height,
+        node?.measured?.height,
+        node?.style?.height,
+        node?.data?.height,
+      ];
+      const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
+      return Number.isFinite(chosen) && chosen > 0 ? chosen : MIN_AUTO_ROW_HEIGHT;
+    };
+
     const rowKeys = new Set(
       rowLayerNodes
         .map((row) => resolveKey(row?.originalId ?? row?.nodeId))
@@ -668,7 +683,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const counts = new Map();
 
-    const register = (rowKey, columnKey) => {
+    const register = (rowKey, columnKey, nodeHeight) => {
       if (!rowKeys.has(rowKey)) return;
       const cellMap = counts.get(rowKey) || new Map();
       const effectiveColumn = showColumnGrid
@@ -679,7 +694,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
         return;
       }
 
-      cellMap.set(effectiveColumn, (cellMap.get(effectiveColumn) || 0) + 1);
+      const nextTotal = (cellMap.get(effectiveColumn) || 0) + nodeHeight;
+      cellMap.set(effectiveColumn, nextTotal);
       counts.set(rowKey, cellMap);
     };
 
@@ -702,13 +718,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
         : [null];
 
       const visitedCells = new Set();
+      const nodeHeight = resolveHeight(node);
 
       rowIds.forEach((rowId) => {
         applicableColumns.forEach((columnId) => {
           const cellKey = `${rowId}::${columnId ?? 'none'}`;
           if (visitedCells.has(cellKey)) return;
           visitedCells.add(cellKey);
-          register(rowId, columnId);
+          register(rowId, columnId, nodeHeight);
         });
       });
     });
@@ -718,8 +735,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     counts.forEach((cellCounts, rowKey) => {
       let rowMax = 0;
-      cellCounts.forEach((count) => {
-        rowMax = Math.max(rowMax, count);
+      cellCounts.forEach((totalHeight) => {
+        const normalized = Number.isFinite(totalHeight) && totalHeight > 0
+          ? Math.max(1, Math.ceil(totalHeight / MIN_AUTO_ROW_HEIGHT))
+          : 1;
+        rowMax = Math.max(rowMax, normalized);
       });
       rowMaxCounts.set(rowKey, rowMax);
       globalMax = Math.max(globalMax, rowMax);
@@ -781,12 +801,18 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
 
     const rect = wrapperEl.getBoundingClientRect();
+    const measuredWidth = Number.isFinite(wrapperEl.clientWidth) && wrapperEl.clientWidth > 0
+      ? wrapperEl.clientWidth
+      : rect.width;
+    const measuredHeight = Number.isFinite(wrapperEl.clientHeight) && wrapperEl.clientHeight > 0
+      ? wrapperEl.clientHeight
+      : rect.height;
 
     const shouldAutoSizeRows = showRowGrid && !cellHeight;
     const autoRowBaseHeight = (() => {
-      if (!showRowGrid || !Number.isFinite(rect?.height)) return MIN_AUTO_ROW_HEIGHT;
+      if (!showRowGrid || !Number.isFinite(measuredHeight)) return MIN_AUTO_ROW_HEIGHT;
       if (!rowLayerNodes?.length) return MIN_AUTO_ROW_HEIGHT;
-      const average = clampToPrecision(rect.height / rowLayerNodes.length);
+      const average = clampToPrecision(measuredHeight / rowLayerNodes.length);
       return Math.max(average, MIN_AUTO_ROW_HEIGHT);
     })();
 
@@ -796,14 +822,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
     } = showRowGrid
       ? shouldAutoSizeRows
         ? buildVariableRowSegments(rowLayerNodes, rowContentMetrics.rowMaxCounts, autoRowBaseHeight)
-        : buildAxisSegments(rowLayerNodes, rect.height, 'row', cellHeight)
+        : buildAxisSegments(rowLayerNodes, measuredHeight, 'row', cellHeight)
       : { segments: [], totalSize: 0 };
 
     const {
       segments: columnSegments,
       totalSize: columnTotalSize,
     } = showColumnGrid
-      ? buildAxisSegments(columnLayerNodes, rect.width, 'column', cellWidth)
+      ? buildAxisSegments(columnLayerNodes, measuredWidth, 'column', cellWidth)
       : { segments: [], totalSize: 0 };
 
     setGridRows((prev) => (segmentsEqual(prev, rowSegments) ? prev : rowSegments));
@@ -811,14 +837,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const nextBoundsWidth = columnSegments.length > 0
       ? columnTotalSize
-      : clampToPrecision(rect.width);
+      : clampToPrecision(measuredWidth);
 
     const nextBoundsHeight = rowSegments.length > 0
       ? rowTotalSize
-      : clampToPrecision(rect.height);
+      : clampToPrecision(measuredHeight);
 
-    const adjustedColumnWidth = computeAdjustedDimension(columnSegments, rect.width, cellWidth, 'column');
-    const adjustedRowHeight = computeAdjustedDimension(rowSegments, rect.height, cellHeight, 'row');
+    const adjustedColumnWidth = computeAdjustedDimension(columnSegments, measuredWidth, cellWidth, 'column');
+    const adjustedRowHeight = computeAdjustedDimension(rowSegments, measuredHeight, cellHeight, 'row');
 
     const nextGrid = {
       rows: rowSegments,
@@ -1759,6 +1785,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
             className="px-2 py-1 w-20 text-xs border border-gray-300 rounded bg-white"
             title="Custom height for cells that contain nodes (leave blank for auto)"
           />
+          <button
+            type="button"
+            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100"
+            onClick={() => setCellHeightInput('')}
+            title="Reset row heights to auto"
+          >
+            Auto
+          </button>
         </div>
 
       </FlowHeader>
