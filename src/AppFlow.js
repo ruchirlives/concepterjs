@@ -35,6 +35,8 @@ const clampToPrecision = (value) => {
   return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
 };
 
+const MIN_AUTO_ROW_HEIGHT = 140;
+
 const buildAxisSegments = (items = [], totalSize = 0, axis = 'row', explicitSize = null) => {
   if (!Array.isArray(items) || items.length === 0) {
     return { segments: [], totalSize: 0 };
@@ -155,6 +157,40 @@ const toComparableId = (value) => {
     if (value.id != null) return toComparableId(value.id);
   }
   return value.toString();
+};
+
+const buildVariableRowSegments = (items = [], rowCounts = new Map(), baseHeight = MIN_AUTO_ROW_HEIGHT) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { segments: [], totalSize: 0 };
+  }
+
+  const defaultHeight = Math.max(baseHeight, MIN_AUTO_ROW_HEIGHT);
+  let cursor = 0;
+
+  const segments = items.map((item, index) => {
+    const { label = '', nodeId, originalId } = item || {};
+    const key = toComparableId(originalId ?? nodeId ?? `row-${index}`);
+    const maxNodes = rowCounts?.get(key) ?? 0;
+    const height = clampToPrecision(defaultHeight * Math.max(1, maxNodes));
+    const start = clampToPrecision(cursor);
+    const end = clampToPrecision(cursor + height);
+    cursor = end;
+
+    return {
+      id: `row-${index}-${originalId || nodeId || 'unlabeled'}`,
+      key: originalId || nodeId || `unknown-${index}`,
+      label: label || '',
+      nodeId: nodeId || null,
+      originalId: originalId || null,
+      index,
+      isActive: index % 2 === 0,
+      top: start,
+      bottom: end,
+      height: clampToPrecision(end - start),
+    };
+  });
+
+  return { segments, totalSize: clampToPrecision(cursor) };
 };
 
 const parseContainerId = (value) => {
@@ -606,6 +642,92 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
 
+  const rowContentMetrics = useMemo(() => {
+    if (!showRowGrid || !Array.isArray(rowLayerNodes) || rowLayerNodes.length === 0) {
+      return { rowMaxCounts: new Map(), globalMax: 0 };
+    }
+
+    const resolveKey = (value) => {
+      const key = toComparableId(value);
+      return key != null ? key : null;
+    };
+
+    const rowKeys = new Set(
+      rowLayerNodes
+        .map((row) => resolveKey(row?.originalId ?? row?.nodeId))
+        .filter(Boolean)
+    );
+
+    const columnKeys = new Set(
+      showColumnGrid
+        ? columnLayerNodes
+          .map((column) => resolveKey(column?.originalId ?? column?.nodeId))
+          .filter(Boolean)
+        : []
+    );
+
+    const counts = new Map();
+
+    const register = (rowKey, columnKey) => {
+      if (!rowKeys.has(rowKey)) return;
+      const cellMap = counts.get(rowKey) || new Map();
+      const effectiveColumn = showColumnGrid
+        ? (columnKey ?? '__UNSPECIFIED_COL__')
+        : '__SINGLE_COL__';
+
+      if (showColumnGrid && columnKeys.size > 0 && columnKey != null && !columnKeys.has(columnKey)) {
+        return;
+      }
+
+      cellMap.set(effectiveColumn, (cellMap.get(effectiveColumn) || 0) + 1);
+      counts.set(rowKey, cellMap);
+    };
+
+    const normalizeIds = (value) => {
+      if (Array.isArray(value)) return value.map(resolveKey).filter(Boolean);
+      const normalized = resolveKey(value);
+      return normalized ? [normalized] : [];
+    };
+
+    (nodes || []).forEach((node) => {
+      const assignment = node?.gridAssignment || node?.data?.gridAssignment;
+      if (!assignment) return;
+
+      const rowIds = normalizeIds(assignment?.rowIds ?? assignment?.rowId);
+      if (rowIds.length === 0) return;
+
+      const columnIds = normalizeIds(assignment?.columnIds ?? assignment?.columnId);
+      const applicableColumns = showColumnGrid
+        ? (columnIds.length > 0 ? columnIds : [null])
+        : [null];
+
+      const visitedCells = new Set();
+
+      rowIds.forEach((rowId) => {
+        applicableColumns.forEach((columnId) => {
+          const cellKey = `${rowId}::${columnId ?? 'none'}`;
+          if (visitedCells.has(cellKey)) return;
+          visitedCells.add(cellKey);
+          register(rowId, columnId);
+        });
+      });
+    });
+
+    const rowMaxCounts = new Map();
+    let globalMax = 0;
+
+    counts.forEach((cellCounts, rowKey) => {
+      let rowMax = 0;
+      cellCounts.forEach((count) => {
+        rowMax = Math.max(rowMax, count);
+      });
+      rowMaxCounts.set(rowKey, rowMax);
+      globalMax = Math.max(globalMax, rowMax);
+    });
+
+    return { rowMaxCounts, globalMax };
+  }, [columnLayerNodes, nodes, rowLayerNodes, showColumnGrid, showRowGrid]);
+
   const applyViewportToOverlay = useCallback((viewport) => {
     if (!overlayRef.current || !viewport) return;
     const { x, y, zoom } = viewport;
@@ -660,11 +782,21 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const rect = wrapperEl.getBoundingClientRect();
 
+    const shouldAutoSizeRows = showRowGrid && !cellHeight;
+    const autoRowBaseHeight = (() => {
+      if (!showRowGrid || !Number.isFinite(rect?.height)) return MIN_AUTO_ROW_HEIGHT;
+      if (!rowLayerNodes?.length) return MIN_AUTO_ROW_HEIGHT;
+      const average = clampToPrecision(rect.height / rowLayerNodes.length);
+      return Math.max(average, MIN_AUTO_ROW_HEIGHT);
+    })();
+
     const {
       segments: rowSegments,
       totalSize: rowTotalSize,
     } = showRowGrid
-      ? buildAxisSegments(rowLayerNodes, rect.height, 'row', cellHeight)
+      ? shouldAutoSizeRows
+        ? buildVariableRowSegments(rowLayerNodes, rowContentMetrics.rowMaxCounts, autoRowBaseHeight)
+        : buildAxisSegments(rowLayerNodes, rect.height, 'row', cellHeight)
       : { segments: [], totalSize: 0 };
 
     const {
@@ -713,6 +845,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     cellHeight,
     cellWidth,
     columnLayerNodes,
+    rowContentMetrics,
     rowLayerNodes,
     setFlowGridDimensions,
     showColumnGrid,
