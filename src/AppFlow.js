@@ -847,8 +847,25 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const shouldAutoSizeRows = showRowGrid && !cellHeight;
     const autoRowBaseHeight = (() => {
-      if (!showRowGrid || !Number.isFinite(measuredHeight)) return MIN_AUTO_ROW_HEIGHT;
-      if (!rowLayerNodes?.length) return MIN_AUTO_ROW_HEIGHT;
+      if (!showRowGrid) return MIN_AUTO_ROW_HEIGHT;
+
+      // Prefer data-driven heights from row content metrics over DOM measurements.
+      if (rowContentMetrics?.rowHeights?.size) {
+        let totalHeight = 0;
+        let heightCount = 0;
+        rowContentMetrics.rowHeights.forEach((value) => {
+          if (Number.isFinite(value) && value > 0) {
+            totalHeight += value;
+            heightCount += 1;
+          }
+        });
+        if (heightCount > 0) {
+          const average = clampToPrecision(totalHeight / heightCount);
+          return Math.max(average, MIN_AUTO_ROW_HEIGHT);
+        }
+      }
+
+      if (!Number.isFinite(measuredHeight) || !rowLayerNodes?.length) return MIN_AUTO_ROW_HEIGHT;
       const average = clampToPrecision(measuredHeight / rowLayerNodes.length);
       return Math.max(average, MIN_AUTO_ROW_HEIGHT);
     })();
