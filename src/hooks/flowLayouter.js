@@ -1,6 +1,6 @@
 import dagre from 'dagre';
 
-function estimateNodeHeight(label, width, fontSize = 16, paddingY = 16) {
+export function estimateNodeHeight(label, width, fontSize = 16, paddingY = 16) {
     const charsPerLine = Math.floor(width / (fontSize * 0.6));
     const lines = Math.ceil(label.length / charsPerLine);
     const lineHeight = fontSize * 1.25;
