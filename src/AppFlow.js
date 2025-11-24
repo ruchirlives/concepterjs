@@ -159,7 +159,12 @@ const toComparableId = (value) => {
   return value.toString();
 };
 
-const buildVariableRowSegments = (items = [], rowCounts = new Map(), baseHeight = MIN_AUTO_ROW_HEIGHT) => {
+const buildVariableRowSegments = (
+  items = [],
+  rowCounts = new Map(),
+  baseHeight = MIN_AUTO_ROW_HEIGHT,
+  explicitHeights = new Map(),
+) => {
   if (!Array.isArray(items) || items.length === 0) {
     return { segments: [], totalSize: 0 };
   }
@@ -170,11 +175,17 @@ const buildVariableRowSegments = (items = [], rowCounts = new Map(), baseHeight 
   const segments = items.map((item, index) => {
     const { label = '', nodeId, originalId } = item || {};
     const key = toComparableId(originalId ?? nodeId ?? `row-${index}`);
+    const overrideHeight = explicitHeights?.get(key);
+    const hasOverride = Number.isFinite(overrideHeight) && overrideHeight > 0;
+
     const rawUnits = rowCounts?.get(key) ?? 0;
     const heightMultiplier = Number.isFinite(rawUnits) && rawUnits > 0
       ? Math.max(1, Math.ceil(rawUnits))
       : 1;
-    const height = clampToPrecision(defaultHeight * heightMultiplier);
+    const fallbackHeight = clampToPrecision(defaultHeight * heightMultiplier);
+    const height = hasOverride
+      ? clampToPrecision(Math.max(overrideHeight, MIN_AUTO_ROW_HEIGHT))
+      : fallbackHeight;
     const start = clampToPrecision(cursor);
     const end = clampToPrecision(cursor + height);
     cursor = end;
@@ -385,6 +396,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  const [rowHeightOverrides, setRowHeightOverrides] = useState(new Map());
   const viewportInteractionRef = useRef(false);
   const [cellMenuContext, setCellMenuContext] = useState(null);
   const cellMenuRef = useRef(null);
@@ -546,8 +558,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }, [setCellWidthInput]);
 
   const handleCellHeightInputChange = useCallback((event) => {
+    setRowHeightOverrides(new Map());
     setCellHeightInput(event.target.value);
-  }, [setCellHeightInput]);
+  }, [setCellHeightInput, setRowHeightOverrides]);
 
   const handleCellWidthInputBlur = useCallback(() => {
     if (cellWidthInput === '') return;
@@ -568,6 +581,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
     setCellHeightInput(value.toString());
   }, [cellHeightInput, setCellHeightInput]);
+
+  const handleAutoRowHeightFit = useCallback(() => {
+    const overrides = new Map();
+
+    if (showRowGrid && Array.isArray(rowLayerNodes)) {
+      rowLayerNodes.forEach((row) => {
+        const key = toComparableId(row?.originalId ?? row?.nodeId);
+        if (!key) return;
+        const height = rowContentMetrics?.rowHeights?.get(key);
+        if (!Number.isFinite(height) || height <= 0) return;
+        overrides.set(key, clampToPrecision(Math.max(height, MIN_AUTO_ROW_HEIGHT)));
+      });
+    }
+
+    setCellHeightInput('');
+    setRowHeightOverrides(overrides);
+  }, [rowContentMetrics, rowLayerNodes, setCellHeightInput, setRowHeightOverrides, showRowGrid]);
 
   const handlePasteInstructions = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
@@ -682,6 +712,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     );
 
     const counts = new Map();
+    const rowHeights = new Map();
 
     const register = (rowKey, columnKey, nodeHeight) => {
       if (!rowKeys.has(rowKey)) return;
@@ -735,17 +766,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     counts.forEach((cellCounts, rowKey) => {
       let rowMax = 0;
+      let rowHeight = 0;
       cellCounts.forEach((totalHeight) => {
         const normalized = Number.isFinite(totalHeight) && totalHeight > 0
           ? Math.max(1, Math.ceil(totalHeight / MIN_AUTO_ROW_HEIGHT))
           : 1;
         rowMax = Math.max(rowMax, normalized);
+        const effectiveHeight = Number.isFinite(totalHeight) && totalHeight > 0
+          ? totalHeight
+          : MIN_AUTO_ROW_HEIGHT;
+        rowHeight = Math.max(rowHeight, effectiveHeight);
       });
       rowMaxCounts.set(rowKey, rowMax);
+      rowHeights.set(rowKey, rowHeight);
       globalMax = Math.max(globalMax, rowMax);
     });
 
-    return { rowMaxCounts, globalMax };
+    return { rowMaxCounts, rowHeights, globalMax };
   }, [columnLayerNodes, nodes, rowLayerNodes, showColumnGrid, showRowGrid]);
 
   const applyViewportToOverlay = useCallback((viewport) => {
@@ -821,7 +858,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       totalSize: rowTotalSize,
     } = showRowGrid
       ? shouldAutoSizeRows
-        ? buildVariableRowSegments(rowLayerNodes, rowContentMetrics.rowMaxCounts, autoRowBaseHeight)
+        ? buildVariableRowSegments(rowLayerNodes, rowContentMetrics.rowMaxCounts, autoRowBaseHeight, rowHeightOverrides)
         : buildAxisSegments(rowLayerNodes, measuredHeight, 'row', cellHeight)
       : { segments: [], totalSize: 0 };
 
@@ -876,6 +913,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setFlowGridDimensions,
     showColumnGrid,
     showRowGrid,
+    rowHeightOverrides,
   ]);
 
   useLayoutEffect(() => {
@@ -1788,8 +1826,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
           <button
             type="button"
             className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100"
-            onClick={() => setCellHeightInput('')}
-            title="Reset row heights to auto"
+            onClick={handleAutoRowHeightFit}
+            title="Adjust row heights to fit current content"
           >
             Auto
           </button>
