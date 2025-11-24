@@ -582,23 +582,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setCellHeightInput(value.toString());
   }, [cellHeightInput, setCellHeightInput]);
 
-  const handleAutoRowHeightFit = useCallback(() => {
-    const overrides = new Map();
-
-    if (showRowGrid && Array.isArray(rowLayerNodes)) {
-      rowLayerNodes.forEach((row) => {
-        const key = toComparableId(row?.originalId ?? row?.nodeId);
-        if (!key) return;
-        const height = rowContentMetrics?.rowHeights?.get(key);
-        if (!Number.isFinite(height) || height <= 0) return;
-        overrides.set(key, clampToPrecision(Math.max(height, MIN_AUTO_ROW_HEIGHT)));
-      });
-    }
-
-    setCellHeightInput('');
-    setRowHeightOverrides(overrides);
-  }, [rowContentMetrics, rowLayerNodes, setCellHeightInput, setRowHeightOverrides, showRowGrid]);
-
   const handlePasteInstructions = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
       toast.error('Clipboard access is not available.');
@@ -784,6 +767,23 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     return { rowMaxCounts, rowHeights, globalMax };
   }, [columnLayerNodes, nodes, rowLayerNodes, showColumnGrid, showRowGrid]);
+
+  const handleAutoRowHeightFit = useCallback(() => {
+    const overrides = new Map();
+
+    if (showRowGrid && Array.isArray(rowLayerNodes)) {
+      rowLayerNodes.forEach((row) => {
+        const key = toComparableId(row?.originalId ?? row?.nodeId);
+        if (!key) return;
+        const height = rowContentMetrics?.rowHeights?.get(key);
+        if (!Number.isFinite(height) || height <= 0) return;
+        overrides.set(key, clampToPrecision(Math.max(height, MIN_AUTO_ROW_HEIGHT)));
+      });
+    }
+
+    setCellHeightInput('');
+    setRowHeightOverrides(overrides);
+  }, [rowContentMetrics, rowLayerNodes, setCellHeightInput, setRowHeightOverrides, showRowGrid]);
 
   const applyViewportToOverlay = useCallback((viewport) => {
     if (!overlayRef.current || !viewport) return;
