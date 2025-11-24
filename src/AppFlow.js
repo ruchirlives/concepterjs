@@ -27,6 +27,7 @@ import FlowSvgExporter from './components/FlowSvgExporter';
 import FlowAIExporter from './components/FlowAIExporter';
 import { requestRefreshChannel } from './hooks/effectsShared';
 import { useAppContext } from './AppContext';
+import { estimateNodeHeight } from './hooks/flowLayouter';
 
 const PRECISION_FACTOR = 1000;
 
@@ -670,14 +671,29 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const resolveHeight = (node) => {
       if (!node) return MIN_AUTO_ROW_HEIGHT;
+
+      const width = Number.isFinite(node?.width)
+        ? node.width
+        : Number.isFinite(node?.style?.width)
+          ? node.style.width
+          : 320;
+
       const candidates = [
         node?.height,
         node?.measured?.height,
         node?.style?.height,
         node?.data?.height,
       ];
+
       const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
-      return Number.isFinite(chosen) && chosen > 0 ? chosen : MIN_AUTO_ROW_HEIGHT;
+      if (Number.isFinite(chosen) && chosen > 0) {
+        return chosen;
+      }
+
+      const estimated = estimateNodeHeight(node?.data?.Name || '', width);
+      return Number.isFinite(estimated) && estimated > 0
+        ? estimated
+        : MIN_AUTO_ROW_HEIGHT;
     };
 
     const rowKeys = new Set(
