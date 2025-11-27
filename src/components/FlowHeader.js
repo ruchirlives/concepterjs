@@ -3,8 +3,6 @@ import StateDropdown from './StateDropdown';
 import LayerDropdown from './LayerDropdown';
 
 const FlowHeader = ({
-  collapsed,
-  setCollapsed,
   handleStateChange,
   handleCalculateStateScores,
   clearStateScores,
@@ -15,7 +13,7 @@ const FlowHeader = ({
   return (
     <div className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
       <div className="flex flex-wrap items-center gap-4">
-        <span className="font-semibold" onClick={() => setCollapsed((c) => !c)}>
+        <span className="font-semibold" >
           Flow Diagram
         </span>
 
@@ -48,13 +46,6 @@ const FlowHeader = ({
         {children} {/* <-- render children inline here */}
       </div>
 
-      <button
-        className="text-lg font-bold"
-        onClick={() => setCollapsed((c) => !c)}
-        aria-label={collapsed ? "Expand flow diagram" : "Collapse flow diagram"}
-      >
-        {collapsed ? "▼" : "▲"}
-      </button>
     </div>
   );
 };

@@ -354,7 +354,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const flowWrapperRef = React.useRef(null);
 
   const {
-    collapsed, setCollapsed,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
     comparatorState,
@@ -955,16 +954,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
 
 
-  useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(() => {
-      if (viewportInteractionRef.current) return;
-      updateGridDimensions();
-    });
-    const el = flowWrapperRef.current;
-    if (el) observer.observe(el);
-    return () => observer.disconnect();
-  }, [updateGridDimensions]);
+  // useEffect(() => {
+  //   if (typeof ResizeObserver === 'undefined') return undefined;
+  //   const observer = new ResizeObserver(() => {
+  //     if (viewportInteractionRef.current) return;
+  //     updateGridDimensions();
+  //   });
+  //   const el = flowWrapperRef.current;
+  //   if (el) observer.observe(el);
+  //   return () => observer.disconnect();
+  // }, [updateGridDimensions]);
 
   const overlayStyle = useMemo(() => {
     const bounds = flowGridDimensions?.bounds || {};
@@ -1664,8 +1663,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   return (
     <div className="bg-white rounded shadow">
       <FlowHeader
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
         handleStateChange={handleStateChange}
         handleCalculateStateScores={handleCalculateStateScores}
         clearStateScores={clearStateScores}
@@ -1911,7 +1908,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
         </div>
       )}
 
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: "auto" }}>
         <div
           ref={flowWrapperRef}
           className="w-full bg-white relative"

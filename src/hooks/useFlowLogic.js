@@ -4,7 +4,6 @@ import { useAppContext } from '../AppContext';
 import { useStateScores } from './useStateScores';
 
 export const useFlowLogic = () => {
-  const [collapsed, setCollapsed] = useState(false);
 
   const [history, setHistory] = useState([]);
   const [layoutPositions, setLayoutPositions] = useState({});
@@ -67,8 +66,13 @@ export const useFlowLogic = () => {
 
       if (containerTags.length === 0) {
         return !hiddenLayers.has('__UNTAGGED__');
-      }      // Include only if the container has at least one tag in visibleLayers
-      return visibleLayers.size > 0 && containerTags.some(tag => visibleLayers.has(tag));
+      }
+
+      if (visibleLayers.size === 0) {
+        return true;
+      }
+
+      return containerTags.some(tag => visibleLayers.has(tag));
     });
 
     // console.log('Filtered rowData count:', filtered.length);
@@ -110,7 +114,6 @@ export const useFlowLogic = () => {
 
   return {
     // State
-    collapsed, setCollapsed,
     history, setHistory,
     layoutPositions, setLayoutPositions,
 
