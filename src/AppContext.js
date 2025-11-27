@@ -58,6 +58,8 @@ export const AppProvider = ({ children }) => {
 
   const [cellWidthInput, setCellWidthInput] = useState('');
   const [cellHeightInput, setCellHeightInput] = useState('');
+  const [flowRowHeights, setFlowRowHeights] = useState({});
+  const [flowCanvasViewport, setFlowCanvasViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
   const createDefaultFlowGridLookup = useCallback(
     () => ({
@@ -409,6 +411,8 @@ export const AppProvider = ({ children }) => {
       selectedFromLayer: setSelectedFromLayer,
       selectedToLayer: setSelectedToLayer,
       showDropdowns: setShowDropdowns,
+      flowRowHeights: setFlowRowHeights,
+      flowCanvasViewport: setFlowCanvasViewport,
     };
 
     Object.entries(mapping).forEach(([key, setter]) => registerStateSetter(key, setter));
@@ -448,7 +452,9 @@ export const AppProvider = ({ children }) => {
     setSelectedToLayer,
     setShowDropdowns,
     setCellWidthInput,
-    setCellHeightInput
+    setCellHeightInput,
+    setFlowRowHeights,
+    setFlowCanvasViewport
   ]);
 
   useEffect(() => {
@@ -606,6 +612,10 @@ export const AppProvider = ({ children }) => {
     setFilterEdgesByHandleX,
     flowGridDimensions,
     setFlowGridDimensions,
+    flowRowHeights,
+    setFlowRowHeights,
+    flowCanvasViewport,
+    setFlowCanvasViewport,
     // Matrix management
     loading,
     setLoading,

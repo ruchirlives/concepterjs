@@ -431,6 +431,9 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setCellHeightInput,
     filterEdgesByHandleX,
     setFilterEdgesByHandleX,
+    flowCanvasViewport,
+    setFlowCanvasViewport,
+    setFlowRowHeights,
   } = useAppContext();
 
 
@@ -438,8 +441,29 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [dragging, setDragging] = useState(false);
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
-  const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
+  const [viewportTransform, setViewportTransformState] = useState(flowCanvasViewport || { x: 0, y: 0, zoom: 1 });
   const [rowHeightOverrides, setRowHeightOverrides] = useState(new Map());
+  useEffect(() => {
+    const serialized = {};
+    rowHeightOverrides.forEach((height, key) => {
+      if (Number.isFinite(height)) {
+        serialized[key] = height;
+      }
+    });
+    setFlowRowHeights(serialized);
+  }, [rowHeightOverrides, setFlowRowHeights]);
+
+  useEffect(() => {
+    if (!flowCanvasViewport) return;
+    if (
+      Math.abs(viewportTransform.x - flowCanvasViewport.x) < 0.5 &&
+      Math.abs(viewportTransform.y - flowCanvasViewport.y) < 0.5 &&
+      Math.abs(viewportTransform.zoom - flowCanvasViewport.zoom) < 0.001
+    ) {
+      return;
+    }
+    setViewportTransformState(flowCanvasViewport);
+  }, [flowCanvasViewport, viewportTransform]);
   const viewportInteractionRef = useRef(false);
   const [cellMenuContext, setCellMenuContext] = useState(null);
   const cellMenuRef = useRef(null);
@@ -935,7 +959,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
       }
     }
     viewportSyncRef.current = now;
-    setViewportTransform(prev => {
+    let applied = false;
+    setViewportTransformState((prev) => {
       if (
         Math.abs(sanitized.x - prev.x) < 0.5 &&
         Math.abs(sanitized.y - prev.y) < 0.5 &&
@@ -943,9 +968,13 @@ const App = ({ keepLayout, setKeepLayout }) => {
       ) {
         return prev;
       }
+      applied = true;
       return sanitized;
     });
-  }, [applyViewportToOverlay]);
+    if (applied) {
+      setFlowCanvasViewport(sanitized);
+    }
+  }, [applyViewportToOverlay, setFlowCanvasViewport]);
 
   const updateGridDimensions = useCallback(() => {
     const wrapperEl = flowWrapperRef.current;
