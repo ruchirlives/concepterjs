@@ -303,6 +303,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const flowWrapperRef = React.useRef(null);
 
   const {
+    collapsed, setCollapsed,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
     comparatorState,
@@ -1379,6 +1380,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
   return (
     <div className="bg-white rounded shadow">
       <FlowHeader
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
         handleStateChange={handleStateChange}
         handleCalculateStateScores={handleCalculateStateScores}
         clearStateScores={clearStateScores}
@@ -1566,7 +1569,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
       </FlowHeader>
 
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: 600 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
         <div
           ref={flowWrapperRef}
           className="w-full bg-white relative"
