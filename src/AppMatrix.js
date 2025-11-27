@@ -17,8 +17,6 @@ const AppMatrix = () => {
     childrenMap,        // derived from parentChildMap
     loading,
     editingCell,
-    collapsed,
-    setCollapsed,
     hideEmpty,
     setHideEmpty,
     hoveredCell,
@@ -314,13 +312,10 @@ const AppMatrix = () => {
           </button>
         </div>
 
-        <button className="text-lg font-bold" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? "Expand matrix" : "Collapse matrix"}>
-          {collapsed ? "▼" : "▲"}
-        </button>
       </div>
 
       {/* Matrix content */}
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 700 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: 700 }}>
         <div className="h-full flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-32">

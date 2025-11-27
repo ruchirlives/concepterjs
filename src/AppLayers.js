@@ -34,7 +34,6 @@ const AppLayers = () => {
     updateLayerOrderingForLayer,
     parentChildMap,
   } = useAppContext();
-  const [collapsed, setCollapsed] = useState(false);
   const [newLayer, setNewLayer] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -51,7 +50,6 @@ const AppLayers = () => {
   // Modal state for adding a row
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Extract tags from rowData and add as layers, but only when not collapsed
   useEffect(() => {
     if (!rowData) return;
     const tagSet = new Set();
@@ -69,7 +67,7 @@ const AppLayers = () => {
       }
     });
     // eslint-disable-next-line
-  }, [rowData, collapsed]);
+  }, [rowData]);
 
   const handleAdd = () => {
     const name = newLayer.trim();
@@ -747,16 +745,14 @@ const AppLayers = () => {
       <div className="bg-white rounded shadow">
         {/* Layers panel */}
         <div
-          onClick={() => setCollapsed((c) => !c)}
           className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none"
         >
           <span className="font-semibold">Layers</span>
-          <button className="text-lg font-bold">{collapsed ? "▼" : "▲"}</button>
         </div>
         </div>
         <div
           className={`transition-all duration-300 overflow-auto`}
-          style={{ height: collapsed ? 0 : "auto" }}
+          style={{ height: "auto" }}
         >
           <div className="p-4 space-y-2" onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex space-x-2 flex-wrap items-center" onMouseDown={(e) => e.stopPropagation()}>

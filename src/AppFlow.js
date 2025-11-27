@@ -19,7 +19,7 @@ import { GearIcon } from '@radix-ui/react-icons'
 import CustomEdge from './hooks/customEdge';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
-import { applyInstructionSet, saveNodes, addChildren, addChildrenBatch, removeChildren, setPosition } from './api';
+import { saveNodes, addChildren, addChildrenBatch, removeChildren, setPosition } from './api';
 import FlowHeader from './components/FlowHeader';
 import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
@@ -27,7 +27,6 @@ import FlowSvgExporter from './components/FlowSvgExporter';
 import FlowAIExporter from './components/FlowAIExporter';
 import { requestRefreshChannel } from './hooks/effectsShared';
 import { useAppContext } from './AppContext';
-import { estimateNodeHeight } from './hooks/flowLayouter';
 
 const PRECISION_FACTOR = 1000;
 
@@ -35,8 +34,6 @@ const clampToPrecision = (value) => {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * PRECISION_FACTOR) / PRECISION_FACTOR;
 };
-
-const MIN_AUTO_ROW_HEIGHT = 20;
 
 const buildAxisSegments = (items = [], totalSize = 0, axis = 'row', explicitSize = null) => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -158,54 +155,6 @@ const toComparableId = (value) => {
     if (value.id != null) return toComparableId(value.id);
   }
   return value.toString();
-};
-
-const buildVariableRowSegments = (
-  items = [],
-  rowCounts = new Map(),
-  baseHeight = MIN_AUTO_ROW_HEIGHT,
-  explicitHeights = new Map(),
-) => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return { segments: [], totalSize: 0 };
-  }
-
-  const defaultHeight = Math.max(baseHeight, MIN_AUTO_ROW_HEIGHT);
-  let cursor = 0;
-
-  const segments = items.map((item, index) => {
-    const { label = '', nodeId, originalId } = item || {};
-    const key = toComparableId(originalId ?? nodeId ?? `row-${index}`);
-    const overrideHeight = explicitHeights?.get(key);
-    const hasOverride = Number.isFinite(overrideHeight) && overrideHeight > 0;
-
-    const rawUnits = rowCounts?.get(key) ?? 0;
-    const heightMultiplier = Number.isFinite(rawUnits) && rawUnits > 0
-      ? Math.max(1, Math.ceil(rawUnits))
-      : 1;
-    const fallbackHeight = clampToPrecision(defaultHeight * heightMultiplier);
-    const height = hasOverride
-      ? clampToPrecision(Math.max(overrideHeight, MIN_AUTO_ROW_HEIGHT))
-      : fallbackHeight;
-    const start = clampToPrecision(cursor);
-    const end = clampToPrecision(cursor + height);
-    cursor = end;
-
-    return {
-      id: `row-${index}-${originalId || nodeId || 'unlabeled'}`,
-      key: originalId || nodeId || `unknown-${index}`,
-      label: label || '',
-      nodeId: nodeId || null,
-      originalId: originalId || null,
-      index,
-      isActive: index % 2 === 0,
-      top: start,
-      bottom: end,
-      height: clampToPrecision(end - start),
-    };
-  });
-
-  return { segments, totalSize: clampToPrecision(cursor) };
 };
 
 const parseContainerId = (value) => {
@@ -354,7 +303,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const flowWrapperRef = React.useRef(null);
 
   const {
-    collapsed, setCollapsed,
     layoutPositions, setLayoutPositions,
     flowFilteredRowData,
     comparatorState,
@@ -397,7 +345,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const [gridRows, setGridRows] = useState([]);
   const [gridColumns, setGridColumns] = useState([]);
   const [viewportTransform, setViewportTransform] = useState({ x: 0, y: 0, zoom: 1 });
-  const [rowHeightOverrides, setRowHeightOverrides] = useState(new Map());
   const viewportInteractionRef = useRef(false);
   const [cellMenuContext, setCellMenuContext] = useState(null);
   const cellMenuRef = useRef(null);
@@ -416,9 +363,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const rafIdRef = useRef(null);
   const activeMouseHandlersRef = useRef({ move: null, up: null });
   const overlayRef = useRef(null);
-  const [showInstructionImport, setShowInstructionImport] = useState(false);
-  const [instructionInput, setInstructionInput] = useState('');
-  const [isApplyingInstructions, setIsApplyingInstructions] = useState(false);
   const relationships = useMemo(() => {
     const map = {};
     if (!Array.isArray(parentChildMap)) {
@@ -482,7 +426,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const showRowGrid = Boolean(rowSelectedLayer);
   const showColumnGrid = Boolean(columnSelectedLayer);
   const exportEnabled = showRowGrid || showColumnGrid;
-  const aiExportEnabled = Array.isArray(nodes) && nodes.length > 0;
 
   const normalizeTags = useCallback((raw = '') => raw
     .split(',')
@@ -559,9 +502,8 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }, [setCellWidthInput]);
 
   const handleCellHeightInputChange = useCallback((event) => {
-    setRowHeightOverrides(new Map());
     setCellHeightInput(event.target.value);
-  }, [setCellHeightInput, setRowHeightOverrides]);
+  }, [setCellHeightInput]);
 
   const handleCellWidthInputBlur = useCallback(() => {
     if (cellWidthInput === '') return;
@@ -582,52 +524,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
     setCellHeightInput(value.toString());
   }, [cellHeightInput, setCellHeightInput]);
-
-  const handlePasteInstructions = useCallback(async () => {
-    if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
-      toast.error('Clipboard access is not available.');
-      return;
-    }
-    try {
-      const pasted = await navigator.clipboard.readText();
-      setInstructionInput(pasted);
-    } catch (error) {
-      console.error('Failed to paste instructions', error);
-      toast.error('Failed to read from clipboard.');
-    }
-  }, [setInstructionInput]);
-
-  const handleSubmitInstructions = useCallback(async () => {
-    const rawText = instructionInput.trim();
-    if (!rawText) {
-      toast.error('Please provide instruction JSON.');
-      return;
-    }
-
-    let parsedPayload;
-    try {
-      parsedPayload = JSON.parse(rawText);
-    } catch (error) {
-      toast.error('Instruction JSON is invalid.');
-      return;
-    }
-
-    setIsApplyingInstructions(true);
-    try {
-      const result = await applyInstructionSet(parsedPayload);
-      const message = result?.message || 'Instruction set applied.';
-      toast.success(message);
-      requestRefreshChannel();
-      setInstructionInput('');
-      setShowInstructionImport(false);
-    } catch (error) {
-      console.error('Failed to apply instruction set', error);
-      const message = error?.response?.data?.error || error?.message || 'Failed to apply instruction set';
-      toast.error(message);
-    } finally {
-      setIsApplyingInstructions(false);
-    }
-  }, [instructionInput, setInstructionInput, setShowInstructionImport]);
 
   useEffect(() => {
     if (!cellMenuContext) return undefined;
@@ -658,148 +554,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
   const rowLayerNodes = useMemo(() => collectLayerNodes(rowSelectedLayer), [collectLayerNodes, rowSelectedLayer]);
   const columnLayerNodes = useMemo(() => collectLayerNodes(columnSelectedLayer), [collectLayerNodes, columnSelectedLayer]);
-
-  const rowContentMetrics = useMemo(() => {
-    if (!showRowGrid || !Array.isArray(rowLayerNodes) || rowLayerNodes.length === 0) {
-      return { rowMaxCounts: new Map(), globalMax: 0 };
-    }
-
-    const resolveKey = (value) => {
-      const key = toComparableId(value);
-      return key != null ? key : null;
-    };
-
-    const resolveHeight = (node) => {
-      if (!node) return MIN_AUTO_ROW_HEIGHT;
-
-      const width = Number.isFinite(node?.width)
-        ? node.width
-        : Number.isFinite(node?.style?.width)
-          ? node.style.width
-          : 320;
-
-      const candidates = [
-        node?.height,
-        node?.measured?.height,
-        node?.style?.height,
-        node?.data?.height,
-      ];
-
-      const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
-      if (Number.isFinite(chosen) && chosen > 0) {
-        return chosen;
-      }
-
-      const estimated = estimateNodeHeight(node?.data?.Name || '', width);
-      return Number.isFinite(estimated) && estimated > 0
-        ? estimated
-        : MIN_AUTO_ROW_HEIGHT;
-    };
-
-    const rowKeys = new Set(
-      rowLayerNodes
-        .map((row) => resolveKey(row?.originalId ?? row?.nodeId))
-        .filter(Boolean)
-    );
-
-    const columnKeys = new Set(
-      showColumnGrid
-        ? columnLayerNodes
-          .map((column) => resolveKey(column?.originalId ?? column?.nodeId))
-          .filter(Boolean)
-        : []
-    );
-
-    const counts = new Map();
-    const rowHeights = new Map();
-
-    const register = (rowKey, columnKey, nodeHeight) => {
-      if (!rowKeys.has(rowKey)) return;
-      const cellMap = counts.get(rowKey) || new Map();
-      const effectiveColumn = showColumnGrid
-        ? (columnKey ?? '__UNSPECIFIED_COL__')
-        : '__SINGLE_COL__';
-
-      if (showColumnGrid && columnKeys.size > 0 && columnKey != null && !columnKeys.has(columnKey)) {
-        return;
-      }
-
-      const nextTotal = (cellMap.get(effectiveColumn) || 0) + nodeHeight;
-      cellMap.set(effectiveColumn, nextTotal);
-      counts.set(rowKey, cellMap);
-    };
-
-    const normalizeIds = (value) => {
-      if (Array.isArray(value)) return value.map(resolveKey).filter(Boolean);
-      const normalized = resolveKey(value);
-      return normalized ? [normalized] : [];
-    };
-
-    (nodes || []).forEach((node) => {
-      const assignment = node?.gridAssignment || node?.data?.gridAssignment;
-      if (!assignment) return;
-
-      const rowIds = normalizeIds(assignment?.rowIds ?? assignment?.rowId);
-      if (rowIds.length === 0) return;
-
-      const columnIds = normalizeIds(assignment?.columnIds ?? assignment?.columnId);
-      const applicableColumns = showColumnGrid
-        ? (columnIds.length > 0 ? columnIds : [null])
-        : [null];
-
-      const visitedCells = new Set();
-      const nodeHeight = resolveHeight(node);
-
-      rowIds.forEach((rowId) => {
-        applicableColumns.forEach((columnId) => {
-          const cellKey = `${rowId}::${columnId ?? 'none'}`;
-          if (visitedCells.has(cellKey)) return;
-          visitedCells.add(cellKey);
-          register(rowId, columnId, nodeHeight);
-        });
-      });
-    });
-
-    const rowMaxCounts = new Map();
-    let globalMax = 0;
-
-    counts.forEach((cellCounts, rowKey) => {
-      let rowMax = 0;
-      let rowHeight = 0;
-      cellCounts.forEach((totalHeight) => {
-        const normalized = Number.isFinite(totalHeight) && totalHeight > 0
-          ? Math.max(1, Math.ceil(totalHeight / MIN_AUTO_ROW_HEIGHT))
-          : 1;
-        rowMax = Math.max(rowMax, normalized);
-        const effectiveHeight = Number.isFinite(totalHeight) && totalHeight > 0
-          ? totalHeight
-          : MIN_AUTO_ROW_HEIGHT;
-        rowHeight = Math.max(rowHeight, effectiveHeight);
-      });
-      rowMaxCounts.set(rowKey, rowMax);
-      rowHeights.set(rowKey, rowHeight);
-      globalMax = Math.max(globalMax, rowMax);
-    });
-
-    return { rowMaxCounts, rowHeights, globalMax };
-  }, [columnLayerNodes, nodes, rowLayerNodes, showColumnGrid, showRowGrid]);
-
-  const handleAutoRowHeightFit = useCallback(() => {
-    const overrides = new Map();
-
-    if (showRowGrid && Array.isArray(rowLayerNodes)) {
-      rowLayerNodes.forEach((row) => {
-        const key = toComparableId(row?.originalId ?? row?.nodeId);
-        if (!key) return;
-        const height = rowContentMetrics?.rowHeights?.get(key);
-        if (!Number.isFinite(height) || height <= 0) return;
-        overrides.set(key, clampToPrecision(Math.max(height, MIN_AUTO_ROW_HEIGHT)));
-      });
-    }
-
-    setCellHeightInput('');
-    setRowHeightOverrides(overrides);
-  }, [rowContentMetrics, rowLayerNodes, setCellHeightInput, setRowHeightOverrides, showRowGrid]);
 
   const applyViewportToOverlay = useCallback((viewport) => {
     if (!overlayRef.current || !viewport) return;
@@ -854,52 +608,19 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
 
     const rect = wrapperEl.getBoundingClientRect();
-    const measuredWidth = Number.isFinite(wrapperEl.clientWidth) && wrapperEl.clientWidth > 0
-      ? wrapperEl.clientWidth
-      : rect.width;
-    const measuredHeight = Number.isFinite(wrapperEl.clientHeight) && wrapperEl.clientHeight > 0
-      ? wrapperEl.clientHeight
-      : rect.height;
-
-    const shouldAutoSizeRows = showRowGrid && !cellHeight;
-    const autoRowBaseHeight = (() => {
-      if (!showRowGrid) return MIN_AUTO_ROW_HEIGHT;
-
-      // Prefer data-driven heights from row content metrics over DOM measurements.
-      if (rowContentMetrics?.rowHeights?.size) {
-        let totalHeight = 0;
-        let heightCount = 0;
-        rowContentMetrics.rowHeights.forEach((value) => {
-          if (Number.isFinite(value) && value > 0) {
-            totalHeight += value;
-            heightCount += 1;
-          }
-        });
-        if (heightCount > 0) {
-          const average = clampToPrecision(totalHeight / heightCount);
-          return Math.max(average, MIN_AUTO_ROW_HEIGHT);
-        }
-      }
-
-      if (!Number.isFinite(measuredHeight) || !rowLayerNodes?.length) return MIN_AUTO_ROW_HEIGHT;
-      const average = clampToPrecision(measuredHeight / rowLayerNodes.length);
-      return Math.max(average, MIN_AUTO_ROW_HEIGHT);
-    })();
 
     const {
       segments: rowSegments,
       totalSize: rowTotalSize,
     } = showRowGrid
-      ? shouldAutoSizeRows
-        ? buildVariableRowSegments(rowLayerNodes, rowContentMetrics.rowMaxCounts, autoRowBaseHeight, rowHeightOverrides)
-        : buildAxisSegments(rowLayerNodes, measuredHeight, 'row', cellHeight)
+      ? buildAxisSegments(rowLayerNodes, rect.height, 'row', cellHeight)
       : { segments: [], totalSize: 0 };
 
     const {
       segments: columnSegments,
       totalSize: columnTotalSize,
     } = showColumnGrid
-      ? buildAxisSegments(columnLayerNodes, measuredWidth, 'column', cellWidth)
+      ? buildAxisSegments(columnLayerNodes, rect.width, 'column', cellWidth)
       : { segments: [], totalSize: 0 };
 
     setGridRows((prev) => (segmentsEqual(prev, rowSegments) ? prev : rowSegments));
@@ -907,14 +628,14 @@ const App = ({ keepLayout, setKeepLayout }) => {
 
     const nextBoundsWidth = columnSegments.length > 0
       ? columnTotalSize
-      : clampToPrecision(measuredWidth);
+      : clampToPrecision(rect.width);
 
     const nextBoundsHeight = rowSegments.length > 0
       ? rowTotalSize
-      : clampToPrecision(measuredHeight);
+      : clampToPrecision(rect.height);
 
-    const adjustedColumnWidth = computeAdjustedDimension(columnSegments, measuredWidth, cellWidth, 'column');
-    const adjustedRowHeight = computeAdjustedDimension(rowSegments, measuredHeight, cellHeight, 'row');
+    const adjustedColumnWidth = computeAdjustedDimension(columnSegments, rect.width, cellWidth, 'column');
+    const adjustedRowHeight = computeAdjustedDimension(rowSegments, rect.height, cellHeight, 'row');
 
     const nextGrid = {
       rows: rowSegments,
@@ -941,12 +662,10 @@ const App = ({ keepLayout, setKeepLayout }) => {
     cellHeight,
     cellWidth,
     columnLayerNodes,
-    rowContentMetrics,
     rowLayerNodes,
     setFlowGridDimensions,
     showColumnGrid,
     showRowGrid,
-    rowHeightOverrides,
   ]);
 
   useLayoutEffect(() => {
@@ -1106,11 +825,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
   }, [exportEnabled]);
 
   const handleExportAi = useCallback(async () => {
-    if (!aiExportEnabled) {
-      toast.error('No nodes available to export.');
-      return;
-    }
-
+    if (!exportEnabled) return;
     try {
       const exported = await aiExporterRef.current?.exportText();
       if (exported) {
@@ -1122,7 +837,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
       console.error('Flow AI export failed', error);
       toast.error('Unable to build AI summary for the current view.');
     }
-  }, [aiExportEnabled]);
+  }, [exportEnabled]);
 
   const getLogicalNodeId = useCallback((nodeLike) => {
     if (!nodeLike) return null;
@@ -1664,8 +1379,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
   return (
     <div className="bg-white rounded shadow">
       <FlowHeader
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
         handleStateChange={handleStateChange}
         handleCalculateStateScores={handleCalculateStateScores}
         clearStateScores={clearStateScores}
@@ -1703,19 +1416,12 @@ const App = ({ keepLayout, setKeepLayout }) => {
           Export Grid SVG
         </button>
         <button
-          className={`ml-2 px-3 py-1 text-xs rounded ${aiExportEnabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          className={`ml-2 px-3 py-1 text-xs rounded ${exportEnabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
           onClick={handleExportAi}
-          disabled={!aiExportEnabled}
-          title={aiExportEnabled ? 'Copy the current view as structured text' : 'Add nodes to export'}
+          disabled={!exportEnabled}
+          title={exportEnabled ? 'Copy the current grid data as structured text' : 'Activate a row or column grid to export'}
         >
           Copy AI Summary
-        </button>
-        <button
-          className="ml-2 px-3 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700"
-          onClick={() => setShowInstructionImport((prev) => !prev)}
-          title="Import a batch of instructions as JSON"
-        >
-          Import Instructions
         </button>
           {/* Group By Layers tickbox */}
         <div className="flex items-center gap-2 ml-4">
@@ -1856,62 +1562,11 @@ const App = ({ keepLayout, setKeepLayout }) => {
             className="px-2 py-1 w-20 text-xs border border-gray-300 rounded bg-white"
             title="Custom height for cells that contain nodes (leave blank for auto)"
           />
-          <button
-            type="button"
-            className="px-2 py-1 text-xs border border-gray-300 rounded bg-white hover:bg-gray-100"
-            onClick={handleAutoRowHeightFit}
-            title="Adjust row heights to fit current content"
-          >
-            Auto
-          </button>
         </div>
 
       </FlowHeader>
 
-      {showInstructionImport && (
-        <div className="px-4 pb-4">
-          <div className="bg-gray-50 border border-gray-200 rounded p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-gray-800">Instruction JSON</span>
-              <button
-                className="text-xs text-gray-500 hover:text-gray-700"
-                onClick={() => setShowInstructionImport(false)}
-              >
-                Close
-              </button>
-            </div>
-            <textarea
-              className="w-full border border-gray-300 rounded p-2 text-xs font-mono text-gray-800 bg-white"
-              rows={6}
-              value={instructionInput}
-              onChange={(e) => setInstructionInput(e.target.value)}
-              placeholder='[
-  ["remove", "123"],
-  {"action": "add", "id": "temp-1", "label": "New Node"}
-]'
-            />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <button
-                className="px-3 py-1 text-xs rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                onClick={handlePasteInstructions}
-                type="button"
-              >
-                Paste
-              </button>
-              <button
-                className="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
-                onClick={handleSubmitInstructions}
-                disabled={isApplyingInstructions}
-                type="button"
-              >
-                {isApplyingInstructions ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 600 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height: 600 }}>
         <div
           ref={flowWrapperRef}
           className="w-full bg-white relative"

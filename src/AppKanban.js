@@ -316,15 +316,6 @@ function Header(props) {
           {props.flipped ? "Flip (flipped)" : "Flip"}
         </button>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          className="text-lg font-bold"
-          onClick={() => props.setCollapsed(c => !c)}
-          aria-label={props.collapsed ? "Expand Kanban" : "Collapse Kanban"}
-        >
-          {props.collapsed ? "▼" : "▲"}
-        </button>
-      </div>
     </div>
   );
 }
@@ -336,8 +327,6 @@ const AppKanban = () => {
     childrenMap,
     relationships,
     flowWrapperRef,
-    collapsed,
-    setCollapsed,
     hideEmpty,
     setHideEmpty,
     selectedFromLayer,
@@ -739,8 +728,6 @@ const AppKanban = () => {
         contentLayerOptions={contentLayerOptions}
         length={filteredSources.length}
         _length={columns.length}
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
         hideEmpty={hideEmpty}
         setHideEmpty={setHideEmpty}
         layerOptions={layerOptions}
@@ -758,9 +745,8 @@ const AppKanban = () => {
       />
 
       {/* Kanban Table */}
-      <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 700 }}>
+      <div className={`transition-all duration-300 overflow-auto`} style={{ height:700 }}>
         <div className="h-full flex flex-col">
-          {!collapsed && (
             <div className="flex-1 m-4 mb-0 border border-gray-300 relative overflow-auto">
               {/* Draw drag line if active */}
               {dragLine && (
@@ -808,7 +794,6 @@ const AppKanban = () => {
                 />
               </div>
             </div>
-          )}
         </div>
       </div>
 
