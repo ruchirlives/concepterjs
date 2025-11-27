@@ -467,6 +467,12 @@ const App = ({ keepLayout, setKeepLayout }) => {
     }
   }, [rowHeightOverrides, flowRowHeights, setFlowRowHeights]);
 
+  const rowHeightOverridesRef = useRef(rowHeightOverrides);
+
+  useEffect(() => {
+    rowHeightOverridesRef.current = rowHeightOverrides;
+  }, [rowHeightOverrides]);
+
   useEffect(() => {
     if (!flowRowHeights || typeof flowRowHeights !== "object") return;
     const entries = Object.entries(flowRowHeights);
@@ -477,15 +483,16 @@ const App = ({ keepLayout, setKeepLayout }) => {
       if (!Number.isFinite(numeric) || numeric <= 0) return;
       next.set(key, numeric);
     });
+    const current = rowHeightOverridesRef.current;
     const equal =
-      next.size === rowHeightOverrides.size &&
+      next.size === current.size &&
       Array.from(next.entries()).every(
-        ([key, value]) => Number(rowHeightOverrides.get(key)) === value
+        ([key, value]) => Number(current.get(key)) === value
       );
     if (!equal) {
       setRowHeightOverrides(next);
     }
-  }, [flowRowHeights, rowHeightOverrides]);
+  }, [flowRowHeights]);
 
   useEffect(() => {
     if (!flowCanvasViewport) return;
