@@ -11,27 +11,16 @@ import DiffPopup from "./components/DiffPopup";
 const App = () => {
   const { rowData, setDiffDict } = useAppContext();
   const [selectedTargetState, setSelectedTargetState] = useState("base");
-  const [collapsed, setCollapsed] = useState(false);
   const [flipDirection, setFlipDirection] = useState(false);
 
   // Use the custom hook for state comparison logic
-  const {
-    nodes,
-    edges,
-    loading,
-    showDiffPopup,
-    currentDiffResults,
-    selectedDiffs,
-    toggleDiffSelection,
-    copySelectedDiffs,
-    closeDiffPopup
-  } = useStateComparison(
-    rowData,
-    selectedTargetState,
-    setDiffDict,
-    collapsed,
-    flipDirection // <-- add this argument
-  );
+  const { nodes, edges, loading, showDiffPopup, currentDiffResults, selectedDiffs, toggleDiffSelection, copySelectedDiffs, closeDiffPopup } =
+    useStateComparison(
+      rowData,
+      selectedTargetState,
+      setDiffDict,
+      flipDirection // <-- add this argument
+    );
 
   // Define custom node and edge types
   const nodeTypes = useMemo(
@@ -63,32 +52,26 @@ const App = () => {
   // Export state diagram data to Excel/TSV format
   const handleExportExcel = useCallback(() => {
     const exportData = [];
-    exportData.push([
-      "Source State",
-      "Target State",
-      "Change Details",
-      "Costs",
-      "Total Cost"
-    ]);
+    exportData.push(["Source State", "Target State", "Change Details", "Costs", "Total Cost"]);
     edges.forEach((edge) => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const targetNode = nodes.find((n) => n.id === edge.target);
       const edgeData = edge.data || {};
 
       // Restore qualitativeText (change details)
       let qualitativeText = "No qualitative changes available";
       if (edgeData.changesArray && edgeData.changesArray.length > 0) {
-        qualitativeText = edgeData.changesArray.join('\n');
-        if (qualitativeText.includes('\n')) {
+        qualitativeText = edgeData.changesArray.join("\n");
+        if (qualitativeText.includes("\n")) {
           qualitativeText = `"${qualitativeText}"`;
         }
       }
 
       // Add qual_label column
       let qualLabelText = "";
-      if (edgeData.qual_label && edgeData.qual_label.some(q => q)) {
-        qualLabelText = edgeData.qual_label.filter(q => q).join('\n');
-        if (qualLabelText.includes('\n')) {
+      if (edgeData.qual_label && edgeData.qual_label.some((q) => q)) {
+        qualLabelText = edgeData.qual_label.filter((q) => q).join("\n");
+        if (qualLabelText.includes("\n")) {
           qualLabelText = `"${qualLabelText}"`;
         }
       }
@@ -98,12 +81,12 @@ const App = () => {
         targetNode?.data.label || edge.target,
         qualitativeText,
         qualLabelText,
-        edgeData.totalWeight || "0"
+        edgeData.totalWeight || "0",
       ]);
     });
 
     // Convert to TSV format
-    const tsv = exportData.map(row => row.join("\t")).join("\n");
+    const tsv = exportData.map((row) => row.join("\t")).join("\n");
 
     // Copy to clipboard and alert, matching Kanban behavior
     if (navigator && navigator.clipboard) {
@@ -120,20 +103,18 @@ const App = () => {
         <div className="flex items-center gap-4">
           <span className="font-semibold">State Diagram</span>
           <div className="flex items-center gap-2">
-            <span className="text-sm">
-              {flipDirection ? "Source State:" : "Target State:"}
-            </span>
+            <span className="text-sm">{flipDirection ? "Source State:" : "Target State:"}</span>
             <StateDropdown onStateChange={handleTargetStateChange} className="min-w-32" />
             <button
               className="ml-2 px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300"
-              onClick={() => setFlipDirection(f => !f)}
+              onClick={() => setFlipDirection((f) => !f)}
               title="Flip source/target direction"
             >
               Flip
             </button>
           </div>
           {loading && <span className="text-xs text-gray-500">Loading...</span>}
-          
+
           {/* Export to Excel Button */}
           <button
             className="px-3 py-1 text-xs rounded bg-green-500 text-white hover:bg-green-600 disabled:bg-gray-300"
@@ -144,35 +125,25 @@ const App = () => {
             Export to Excel
           </button>
         </div>
-
-        <button
-          className="text-lg font-bold"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand state diagram" : "Collapse state diagram"}
-        >
-          {collapsed ? "▼" : "▲"}
-        </button>
       </div>
 
-      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: collapsed ? 0 : 400 }}>
-        {!collapsed && (
-          <div style={{ width: "100%", height: "400px", position: "relative" }}>
-            <ReactFlow 
-              nodes={nodes} 
-              edges={edges} 
-              nodeTypes={nodeTypes} 
-              edgeTypes={edgeTypes} 
-              fitView
-              fitViewOptions={{ padding: 0.1 }}
-              minZoom={0.1}
-              maxZoom={2}
-              attributionPosition="bottom-left"
-            >
-              <Background />
-              <Controls />
-            </ReactFlow>
-          </div>
-        )}
+      <div className={`transition-all duration-300 overflow-hidden`} style={{ height: 400 }}>
+        <div style={{ width: "100%", height: "400px", position: "relative" }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.1 }}
+            minZoom={0.1}
+            maxZoom={2}
+            attributionPosition="bottom-left"
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
       </div>
 
       {/* Diff Selection Popup */}

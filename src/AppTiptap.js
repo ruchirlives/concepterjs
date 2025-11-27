@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 const AppTiptap = () => {
     const { tiptapContent, setTiptapContent } = useTiptapContext();
     const [editor, setEditor] = useState(null);
-    const [collapsed, setCollapsed] = useState(false);
     const [ghostSuggestion, setGhostSuggestion] = useState('');
     const tabPressCount = useRef(0);
     const containerRef = useRef(null);
@@ -245,7 +244,6 @@ const AppTiptap = () => {
 
     // After liveHtml updates, place overlay marker and scroll only the preview container
     React.useEffect(() => {
-        if (collapsed) return;
         const container = previewRef.current;
         if (!container) return;
         const anchor = container.querySelector('#tiptap-cursor-anchor');
@@ -290,7 +288,7 @@ const AppTiptap = () => {
         const targetScrollTop = top - (container.clientHeight / 2) + (height / 2);
         const maxScroll = container.scrollHeight - container.clientHeight;
         container.scrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-    }, [liveHtml, collapsed, PREVIEW_MARKER_TOP_OFFSET]);
+    }, [liveHtml, PREVIEW_MARKER_TOP_OFFSET]);
 
     return (
         <div
@@ -303,7 +301,6 @@ const AppTiptap = () => {
             <div className="flex-1 min-w-0">
                 <div
                     className="flex justify-between items-center cursor-pointer select-none px-4 py-2"
-                    onClick={() => setCollapsed(!collapsed)}
                 >
                     <span className="font-semibold text-lg">Editor</span>
                     <div className="flex items-center gap-2">
@@ -316,34 +313,25 @@ const AppTiptap = () => {
                         >
                             Export Word
                         </button>
-                        <button
-                            aria-label={collapsed ? "Expand editor" : "Collapse editor"}
-                            className="text-xl font-bold"
-                        >
-                            {collapsed ? "▼" : "▲"}
-                        </button>
                     </div>
                 </div>
 
                 <div
                     className="transition-all duration-300 overflow-auto w-full"
-                    style={{ height: collapsed ? 0 : "600px" }}
+                    style={{ height: "auto" }}
                 >
-                    {!collapsed && (
-                        <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
-                            <SimpleEditor onEditorReady={setEditor} />
-                        </div>
-                    )}
+                    <div className="h-full flex flex-col mx-auto px-4 py-2 max-w-7xl">
+                        <SimpleEditor onEditorReady={setEditor} />
+                    </div>
                 </div>
             </div>
 
             {/* Right navigation/preview panel */}
             <div
                 className="w-1/3 min-w-[280px] max-w-[420px] border-l bg-gray-50 p-4 overflow-auto relative"
-                style={{ height: collapsed ? 0 : "600px", transition: 'height 0.3s' }}
+                style={{ height: "auto", transition: 'height 0.3s' }}
                 ref={previewRef}
             >
-                {!collapsed && (
                     <>
                         <div className="font-semibold mb-2">Live Document Preview</div>
                         <div
@@ -470,7 +458,6 @@ const AppTiptap = () => {
                             )
                         )}
                     </>
-                )}
             </div>
         </div>
     );

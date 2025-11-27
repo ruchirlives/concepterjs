@@ -70,7 +70,6 @@ function AppMermaid() {
     const [mermaidCode, setMermaidCode] = useState(initialCode);
     console.log("Initial mermaid code:", mermaidCode);
     const containerRef = useRef(null);
-    const [collapsed, setCollapsed] = useState(false);
 
     // Define the global callback function
     useEffect(() => {
@@ -123,19 +122,8 @@ function AppMermaid() {
 
     return (
         <div className="bg-white rounded shadow">
-            {/* Header with collapse button */}
-            <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between items-center bg-white text-black px-4 py-2 cursor-pointer select-none">
-                <span className="font-semibold">Mermaid Diagram</span>
-                <button
-                    className="text-lg font-bold"
-                    aria-label={collapsed ? "Expand mermaid diagram" : "Collapse mermaid diagram"}
-                >
-                    {collapsed ? "▼" : "▲"}
-                </button>
-            </div>
-
             {/* Mermaid content */}
-            <div className={`transition-all duration-300 overflow-auto`} style={{ height: collapsed ? 0 : 'auto' }}>
+            <div className={`transition-all duration-300 overflow-auto`} style={{ height: 'auto' }}>
                 <div className="p-4">
                     {/* This container will receive the rendered SVG */}
                     <div ref={containerRef} />

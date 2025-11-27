@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { setPosition, compareStates, revertDifferences } from '../api';
 import { requestRefreshChannel } from "hooks/effectsShared";
 import { useAppContext } from '../AppContext';
