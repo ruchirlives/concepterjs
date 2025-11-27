@@ -5,6 +5,7 @@ import * as api from "../api";
 import { handleWriteBack, requestRefreshChannel } from "./effectsShared";
 import { displayContextMenu, requestAddChild } from "./flowFunctions";
 import { useMenuHandlers } from "./useContextMenu";
+import { openRenameModal } from "../components/ModalRename";
 
 // Explicit handler map to avoid eval and ensure bundlers keep references
 const HANDLERS = {
@@ -202,19 +203,30 @@ async function rename({ selectedNodes, selectedIds, rowData, setRowData }) {
         toast.error("No nodes selected to rename.");
         return;
     }
-    const name = prompt("Enter new name for the selected node(s):");
-    if (!name) return;
+    const firstSelectedId = selectedIds[0];
+    const targetRow = rowData.find((row) => row.id === firstSelectedId);
+    const defaultName = targetRow?.Name || selectedNodes[0]?.data?.Name || "";
+    const defaultDescription = targetRow?.Description || selectedNodes[0]?.data?.Description || "";
+    const renameResult = await openRenameModal(defaultName, defaultDescription);
+    if (!renameResult || !renameResult.name) return;
+    const { name, description } = renameResult;
 
     // Update the nodes in rowData
-    const updatedRowData = rowData.map(row =>
-        selectedIds.includes(row.id) ? { ...row, Name: name } : row
-    );
+    const updatedRowData = rowData.map(row => {
+        if (!selectedIds.includes(row.id)) return row;
+        return {
+            ...row,
+            Name: name,
+            Description: description,
+        };
+    });
     setRowData(updatedRowData);
 
     // Optionally update selectedNodes too
     selectedNodes.forEach(node => {
         if (selectedIds.includes(node.data.id)) {
             node.data.Name = name;
+            node.data.Description = description;
         }
     });
 

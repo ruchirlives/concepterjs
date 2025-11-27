@@ -25,6 +25,7 @@ import { useFlowLogic } from './hooks/useFlowLogic';
 import ModalAddRow from './components/ModalAddRow';
 import FlowSvgExporter from './components/FlowSvgExporter';
 import FlowAIExporter from './components/FlowAIExporter';
+import RenameModal from './components/ModalRename';
 import { requestRefreshChannel } from './hooks/effectsShared';
 import { useAppContext } from './AppContext';
 import { estimateNodeHeight } from './hooks/flowLayouter';
@@ -2214,6 +2215,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
               includeColumns={showColumnGrid}
               filterEdgesByHandleX={filterEdgesByHandleX}
             />
+            <RenameModal />
             {cellMenuContext && (
               <div
                 ref={cellMenuRef}
