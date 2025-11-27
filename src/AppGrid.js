@@ -44,7 +44,6 @@ const App = () => {
 
   // State to store name of the current container
   const [currentContainer, setCurrentContainer] = useState(null);
-  const [collapsed, setCollapsed] = React.useState(false);
 
   // Reference to the grid API
   const gridApiRef = useRef(null); // Ref to store gridApi
@@ -280,21 +279,13 @@ const App = () => {
     onClick={hideMenu}
     onContextMenu={(e) => e.preventDefault()}
   >
-    {/* Header with collapse button */}
-    <div onClick={() => setCollapsed((c) => !c)} className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
+    <div className="flex justify-between rounded items-center bg-white text-black px-4 py-1 cursor-pointer select-none">
       <span className="font-semibold">Container Grid</span>
-      <button
-        className="text-lg font-bold"
-        aria-label={collapsed ? "Expand grid" : "Collapse grid"}
-      >
-        {collapsed ? "▼" : "▲"}
-      </button>
     </div>
 
-    {/* Grid content collapsible but always mounted */}
     <div
       className={`transition-all duration-300 overflow-auto`}
-      style={{ height: collapsed ? 0 : 600 }}
+      style={{ height: 600 }}
     >
       <div style={{ height: 600 }}> {/* 👈 Keep grid a fixed height always */}
         <AgGridReact

@@ -27,7 +27,6 @@ export const useMatrixLogic = () => {
     parentChildMap, setParentChildMap // <-- only these for relationships
   } = useAppContext();
 
-  const [collapsed, setCollapsed] = useState(false);
   const inputRef = useRef(null);
   const flowWrapperRef = useRef(null);
 
@@ -353,7 +352,7 @@ export const useMatrixLogic = () => {
   }, [editingCell]);
 
   useEffect(() => {
-    if (filteredSources.length === 0 || collapsed) return;
+    if (filteredSources.length === 0) return;
 
     const fetchDifferences = async () => {
       setLoadingDifferences(true);
@@ -403,7 +402,6 @@ export const useMatrixLogic = () => {
   }, [
     comparatorState,
     differencesTrigger,
-    collapsed,
     filteredSources,
     nameById,
     containerIdsString,
@@ -452,8 +450,6 @@ export const useMatrixLogic = () => {
     childrenMap, // only once!
     loading,
     editingCell,
-    collapsed,
-    setCollapsed,
     hideEmpty,
     setHideEmpty,
     hoveredCell,
