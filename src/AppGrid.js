@@ -285,9 +285,8 @@ const App = () => {
 
     <div
       className={`transition-all duration-300 overflow-auto`}
-      style={{ height: 600 }}
     >
-      <div style={{ height: 600 }}> {/* 👈 Keep grid a fixed height always */}
+      <div style={{ height: "800px" }}> {/* 👈 Keep grid a fixed height always */}
         <AgGridReact
           rowSelection="multiple"
           theme={myTheme}
