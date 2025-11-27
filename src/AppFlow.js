@@ -38,6 +38,48 @@ const clampToPrecision = (value) => {
 
 const MIN_AUTO_ROW_HEIGHT = 20;
 
+const getNodeHeight = (node) => {
+  if (!node) return MIN_AUTO_ROW_HEIGHT;
+
+  const width = Number.isFinite(node?.width)
+    ? node.width
+    : Number.isFinite(node?.style?.width)
+      ? node.style.width
+      : 320;
+
+  const candidates = [
+    node?.height,
+    node?.measured?.height,
+    node?.style?.height,
+    node?.data?.height,
+  ];
+
+  const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
+  if (Number.isFinite(chosen) && chosen > 0) {
+    return chosen;
+  }
+
+  const estimated = estimateNodeHeight(node?.data?.Name || "", width);
+  return Number.isFinite(estimated) && estimated > 0
+    ? estimated
+    : MIN_AUTO_ROW_HEIGHT;
+};
+
+const getNodeTop = (node) => {
+  if (!node) return null;
+  const pos = node.positionAbsolute ?? node.position;
+  const y = pos ? pos.y : null;
+  return Number.isFinite(y) ? y : null;
+};
+
+const normalizeAssignmentIds = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((id) => toComparableId(id)).filter(Boolean);
+  }
+  const normalized = toComparableId(value);
+  return normalized ? [normalized] : [];
+};
+
 const buildAxisSegments = (items = [], totalSize = 0, axis = 'row', explicitSize = null) => {
   if (!Array.isArray(items) || items.length === 0) {
     return { segments: [], totalSize: 0 };
@@ -668,33 +710,6 @@ const App = ({ keepLayout, setKeepLayout }) => {
       return key != null ? key : null;
     };
 
-    const resolveHeight = (node) => {
-      if (!node) return MIN_AUTO_ROW_HEIGHT;
-
-      const width = Number.isFinite(node?.width)
-        ? node.width
-        : Number.isFinite(node?.style?.width)
-          ? node.style.width
-          : 320;
-
-      const candidates = [
-        node?.height,
-        node?.measured?.height,
-        node?.style?.height,
-        node?.data?.height,
-      ];
-
-      const chosen = candidates.find((value) => Number.isFinite(value) && value > 0);
-      if (Number.isFinite(chosen) && chosen > 0) {
-        return chosen;
-      }
-
-      const estimated = estimateNodeHeight(node?.data?.Name || '', width);
-      return Number.isFinite(estimated) && estimated > 0
-        ? estimated
-        : MIN_AUTO_ROW_HEIGHT;
-    };
-
     const rowKeys = new Set(
       rowLayerNodes
         .map((row) => resolveKey(row?.originalId ?? row?.nodeId))
@@ -728,26 +743,20 @@ const App = ({ keepLayout, setKeepLayout }) => {
       counts.set(rowKey, cellMap);
     };
 
-    const normalizeIds = (value) => {
-      if (Array.isArray(value)) return value.map(resolveKey).filter(Boolean);
-      const normalized = resolveKey(value);
-      return normalized ? [normalized] : [];
-    };
-
     (nodes || []).forEach((node) => {
       const assignment = node?.gridAssignment || node?.data?.gridAssignment;
       if (!assignment) return;
 
-      const rowIds = normalizeIds(assignment?.rowIds ?? assignment?.rowId);
+      const rowIds = normalizeAssignmentIds(assignment?.rowIds ?? assignment?.rowId);
       if (rowIds.length === 0) return;
 
-      const columnIds = normalizeIds(assignment?.columnIds ?? assignment?.columnId);
+      const columnIds = normalizeAssignmentIds(assignment?.columnIds ?? assignment?.columnId);
       const applicableColumns = showColumnGrid
         ? (columnIds.length > 0 ? columnIds : [null])
         : [null];
 
       const visitedCells = new Set();
-      const nodeHeight = resolveHeight(node);
+      const nodeHeight = getNodeHeight(node);
 
       rowIds.forEach((rowId) => {
         applicableColumns.forEach((columnId) => {
@@ -786,19 +795,125 @@ const App = ({ keepLayout, setKeepLayout }) => {
   const handleAutoRowHeightFit = useCallback(() => {
     const overrides = new Map();
 
-    if (showRowGrid && Array.isArray(rowLayerNodes)) {
-      rowLayerNodes.forEach((row) => {
-        const key = toComparableId(row?.originalId ?? row?.nodeId);
-        if (!key) return;
-        const height = rowContentMetrics?.rowHeights?.get(key);
+    if (!showRowGrid || !Array.isArray(rowLayerNodes)) {
+      setCellHeightInput('');
+      setRowHeightOverrides(overrides);
+      return;
+    }
+
+    const rowKeySet = new Set(
+      rowLayerNodes
+        .map((row) => toComparableId(row?.originalId ?? row?.nodeId))
+        .filter(Boolean)
+    );
+
+    const rowBounds = new Map();
+    const nodeRowKeysMap = new Map();
+    const rowEdgeExtents = new Map();
+
+    const rowSegmentRanges = new Map();
+    gridRows.forEach((segment) => {
+      const key = segment?.originalId ?? segment?.nodeId;
+      if (!key) return;
+      rowSegmentRanges.set(key.toString(), { top: segment.top, bottom: segment.bottom });
+    });
+
+    if (Array.isArray(nodes)) {
+      nodes.forEach((node) => {
+        const assignment = node?.gridAssignment || node?.data?.gridAssignment;
+        if (!assignment) return;
+
+        const rowIds = normalizeAssignmentIds(assignment?.rowIds ?? assignment?.rowId);
+        if (rowIds.length === 0) return;
+
+        const top = getNodeTop(node);
+        if (!Number.isFinite(top)) return;
+        const height = getNodeHeight(node);
         if (!Number.isFinite(height) || height <= 0) return;
-        overrides.set(key, clampToPrecision(Math.max(height, MIN_AUTO_ROW_HEIGHT)));
+        const bottom = top + Math.max(height, MIN_AUTO_ROW_HEIGHT);
+
+        const normalizedRowKeys = rowIds.filter(Boolean);
+        if (normalizedRowKeys.length > 0 && node.id != null) {
+          nodeRowKeysMap.set(node.id, normalizedRowKeys);
+        }
+
+        normalizedRowKeys.forEach((rowId) => {
+          if (!rowKeySet.has(rowId)) return;
+          const range = rowSegmentRanges.get(rowId);
+          if (range && (bottom <= range.top || top >= range.bottom)) return;
+          const bounds = rowBounds.get(rowId);
+          if (!bounds) {
+            rowBounds.set(rowId, { min: top, max: bottom });
+          } else {
+            bounds.min = Math.min(bounds.min, top);
+            bounds.max = Math.max(bounds.max, bottom);
+          }
+        });
       });
     }
 
+    if (Array.isArray(edges)) {
+      edges.forEach((edge) => {
+        const sourceRows = nodeRowKeysMap.get(edge.source) || [];
+        const targetRows = nodeRowKeysMap.get(edge.target) || [];
+        const rowKeys = new Set([...sourceRows, ...targetRows]);
+        rowKeys.forEach((rowKey) => {
+          if (!rowKeySet.has(rowKey)) return;
+          const range = rowSegmentRanges.get(rowKey);
+          const points = [];
+          if (sourceRows.includes(rowKey)) points.push(edge.sourceY);
+          if (targetRows.includes(rowKey)) points.push(edge.targetY);
+          points.forEach((yValue) => {
+            if (!Number.isFinite(yValue)) return;
+            if (range && (yValue < range.top || yValue > range.bottom)) return;
+            const existing = rowEdgeExtents.get(rowKey);
+            if (!existing) {
+              rowEdgeExtents.set(rowKey, { min: yValue, max: yValue });
+            } else {
+              existing.min = Math.min(existing.min, yValue);
+              existing.max = Math.max(existing.max, yValue);
+            }
+          });
+        });
+      });
+    }
+
+    rowEdgeExtents.forEach(({ min, max }, key) => {
+      const rawHeight = max - min;
+      if (rawHeight > 0) {
+        overrides.set(key, clampToPrecision(Math.max(rawHeight, MIN_AUTO_ROW_HEIGHT)));
+      }
+    });
+
+    rowBounds.forEach(({ min, max }, key) => {
+      if (overrides.has(key)) return;
+      const rawHeight = max - min;
+      if (rawHeight > 0) {
+        overrides.set(key, clampToPrecision(Math.max(rawHeight, MIN_AUTO_ROW_HEIGHT)));
+      }
+    });
+
+    rowLayerNodes.forEach((row) => {
+      const key = toComparableId(row?.originalId ?? row?.nodeId);
+      if (!key || overrides.has(key)) return;
+      const fallback = rowContentMetrics?.rowHeights?.get(key);
+      if (Number.isFinite(fallback) && fallback > 0) {
+        overrides.set(key, clampToPrecision(Math.max(fallback, MIN_AUTO_ROW_HEIGHT)));
+      }
+    });
+
     setCellHeightInput('');
     setRowHeightOverrides(overrides);
-  }, [rowContentMetrics, rowLayerNodes, setCellHeightInput, setRowHeightOverrides, showRowGrid]);
+  }, [
+    edges,
+    gridRows,
+    nodes,
+    rowContentMetrics,
+    rowLayerNodes,
+    setCellHeightInput,
+    setRowHeightOverrides,
+    showRowGrid,
+  ]);
 
   const applyViewportToOverlay = useCallback((viewport) => {
     if (!overlayRef.current || !viewport) return;
