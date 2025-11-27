@@ -433,6 +433,7 @@ const App = ({ keepLayout, setKeepLayout }) => {
     setFilterEdgesByHandleX,
     flowCanvasViewport,
     setFlowCanvasViewport,
+    flowRowHeights,
     setFlowRowHeights,
   } = useAppContext();
 
@@ -450,8 +451,41 @@ const App = ({ keepLayout, setKeepLayout }) => {
         serialized[key] = height;
       }
     });
-    setFlowRowHeights(serialized);
-  }, [rowHeightOverrides, setFlowRowHeights]);
+
+    const flowHeightKeys = flowRowHeights ? Object.keys(flowRowHeights) : [];
+    const serializedKeys = Object.keys(serialized);
+    const isSame =
+      flowHeightKeys.length === serializedKeys.length &&
+      serializedKeys.every(
+        (key) =>
+          flowRowHeights?.hasOwnProperty(key) &&
+          Number(flowRowHeights[key]) === serialized[key]
+      );
+
+    if (!isSame) {
+      setFlowRowHeights(serialized);
+    }
+  }, [rowHeightOverrides, flowRowHeights, setFlowRowHeights]);
+
+  useEffect(() => {
+    if (!flowRowHeights || typeof flowRowHeights !== "object") return;
+    const entries = Object.entries(flowRowHeights);
+    if (!entries.length) return;
+    const next = new Map();
+    entries.forEach(([key, value]) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return;
+      next.set(key, numeric);
+    });
+    const equal =
+      next.size === rowHeightOverrides.size &&
+      Array.from(next.entries()).every(
+        ([key, value]) => Number(rowHeightOverrides.get(key)) === value
+      );
+    if (!equal) {
+      setRowHeightOverrides(next);
+    }
+  }, [flowRowHeights, rowHeightOverrides]);
 
   useEffect(() => {
     if (!flowCanvasViewport) return;
