@@ -3,9 +3,16 @@ import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
 import { listStates, switchState, removeState, clearStates, manyChildren, getInfluencers as fetchInfluencers } from './api';
 import toast from "react-hot-toast";
-import { registerStateSetter, unregisterStateSetter } from './stateSetterRegistry';
 
 const AppContext = createContext();
+
+// Split the shared state into focused slices for map data, layers, matrix UI, flow helpers, and API state.
+const MapContext = createContext(null);
+const LayerContext = createContext(null);
+const MatrixContext = createContext(null);
+const FlowContext = createContext(null);
+const StateManagementContext = createContext(null);
+const InfluencerContext = createContext(null);
 
 export const AppProvider = ({ children }) => {
   const [rowData, setRowData] = useState([]);
@@ -49,6 +56,123 @@ export const AppProvider = ({ children }) => {
   const [selectedContentLayer, setSelectedContentLayer] = useState("");
   const [rowSelectedLayer, setRowSelectedLayer] = useState('');
   const [columnSelectedLayer, setColumnSelectedLayer] = useState('');
+  const normalizeId = useCallback((value) => {
+    if (value == null) return null;
+    return String(value).trim();
+  }, []);
+
+  const arraysEqual = useCallback((a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }, []);
+
+  const sanitizeOrder = useCallback((order = []) => {
+    const seen = new Set();
+    const result = [];
+    order.forEach((raw) => {
+      const id = normalizeId(raw);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      result.push(id);
+    });
+    return result;
+  }, [normalizeId]);
+
+  const updateLayerOrderingForLayer = useCallback((layer, updater) => {
+    if (!layer || typeof updater !== 'function') return;
+    setLayerOrdering((prev) => {
+      const prevOrder = Array.isArray(prev?.[layer]) ? prev[layer] : [];
+      const nextOrder = sanitizeOrder(updater(prevOrder));
+      if (arraysEqual(prevOrder, nextOrder)) return prev;
+      return { ...prev, [layer]: nextOrder };
+    });
+  }, [sanitizeOrder]);
+
+  const addLayer = (layer) => {
+    setLayerOptions((prev) => (prev.includes(layer) ? prev : [...prev, layer]));
+    setLayerOrdering((prev) => {
+      if (!layer || prev[layer]) return prev;
+      return { ...prev, [layer]: [] };
+    });
+  };
+
+  const removeLayer = (layer) => {
+    setLayerOptions((prev) => prev.filter((l) => l !== layer));
+    setActiveLayers((prev) => prev.filter((l) => l !== layer));
+    setLayerOrdering((prev) => {
+      if (!prev[layer]) return prev;
+      const { [layer]: _removed, ...rest } = prev;
+      return rest;
+    });
+    requestRefreshChannel();
+  };
+
+  const toggleLayer = (layer) => {
+    setActiveLayers((prev) =>
+      prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer]
+    );
+    requestRefreshChannel();
+  };
+
+  const clearLayers = useCallback(({ resetOrdering = true } = {}) => {
+    setLayerOptions([]);
+    setActiveLayers([]);
+    if (resetOrdering) {
+      setLayerOrdering({});
+    }
+  }, []);
+
+  const handleStateSwitch = async (stateName) => {
+    if (!stateName || !stateName.trim()) return;
+
+    try {
+      await handleWriteBack(rowData);
+      const states = await listStates();
+      setAvailableStates(states);
+      await switchState(stateName);
+      setActiveState(stateName);
+      toast.success(`Switched to state: ${stateName}`);
+    } catch (error) {
+      console.error('Failed to switch state:', error);
+      toast.error('Failed to switch state');
+    }
+  };
+
+  const handleRemoveState = async (stateName = activeState) => {
+    if (stateName === 'base') {
+      toast.error('Cannot remove base state');
+      return;
+    }
+
+    try {
+      await removeState(stateName);
+      if (stateName === activeState) {
+        setActiveState('base');
+      }
+      const states = await listStates();
+      setAvailableStates(states);
+      toast.success(`Removed state: ${stateName}`);
+    } catch (error) {
+      console.error('Failed to remove state:', error);
+      toast.error('Failed to remove state');
+    }
+  };
+
+  const handleClearStates = async () => {
+    try {
+      await clearStates();
+      setActiveState('base');
+      setAvailableStates([]);
+      toast.success('Cleared all states');
+    } catch (error) {
+      console.error('Failed to clear states:', error);
+      toast.error('Failed to clear states');
+    }
+  };
+
   const [filterEdgesByHandleX, setFilterEdgesByHandleX] = useState(false);
 
   const defaultFlowGridBounds = useMemo(
@@ -134,7 +258,8 @@ export const AppProvider = ({ children }) => {
   const flowGridStatesEqual = useCallback((a, b) => {
     if (a === b) return true;
     if (!a || !b) return false;
-    return (
+    // Compose focused providers so consumers only subscribe to the slices they need.
+  return (
       shallowArrayEqual(a.rows, b.rows)
       && shallowArrayEqual(a.columns, b.columns)
       && boundsEqual(a.bounds, b.bounds)
@@ -228,234 +353,7 @@ export const AppProvider = ({ children }) => {
   const [influencersMap, setInfluencersMap] = useState({});
   const influencersSigRef = useRef("");
 
-  useEffect(() => {
-    async function fetchParentChildMap() {
-      const allIds = rowData.map(r => r.id);
-      if (allIds.length === 0) return;
-      const result = await manyChildren(allIds);
-      setParentChildMap(result || []);
-    }
-    fetchParentChildMap();
-  }, [rowData]); // or other dependencies as needed
 
-
-  // State management functions
-  const handleStateSwitch = async (stateName) => {
-    if (!stateName.trim()) return;
-
-    try {
-      // Persist current state before switching
-      await handleWriteBack(rowData);
-
-      // Refresh available states to include newly saved state
-      const states = await listStates();
-      setAvailableStates(states);
-
-      await switchState(stateName);
-      setActiveState(stateName);
-
-      // Request refresh for components that depend on state changes
-      // requestRefreshChannel();
-
-      toast.success(`Switched to state: ${stateName}`);
-    } catch (error) {
-      console.error("Failed to switch state:", error);
-      toast.error("Failed to switch state");
-    }
-  };
-
-  const handleRemoveState = async (stateName = activeState) => {
-    if (stateName === "base") {
-      toast.error("Cannot remove base state");
-      return;
-    }
-
-    try {
-      await removeState(stateName);
-
-      // If we deleted the current active state, switch to base
-      if (stateName === activeState) {
-        setActiveState("base");
-        // requestRefreshChannel();
-      }
-
-      // Refresh available states
-      const states = await listStates();
-      setAvailableStates(states);
-
-      toast.success(`Removed state: ${stateName}`);
-    } catch (error) {
-      console.error("Failed to remove state:", error);
-      toast.error("Failed to remove state");
-    }
-  };
-
-  const handleClearStates = async () => {
-    try {
-      await clearStates();
-      setActiveState("base");
-      setAvailableStates([]);
-      // requestRefreshChannel();
-      toast.success("Cleared all states");
-    } catch (error) {
-      console.error("Failed to clear states:", error);
-      toast.error("Failed to clear states");
-    }
-  };
-
-  const normalizeId = (value) => {
-    if (value == null) return '';
-    return typeof value === 'string' ? value : value.toString();
-  };
-
-  const arraysEqual = (a = [], b = []) => {
-    if (a === b) return true;
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-      if (a[i] !== b[i]) return false;
-    }
-    return true;
-  };
-
-  const sanitizeOrder = useCallback((order = []) => {
-    const seen = new Set();
-    const result = [];
-    order.forEach((raw) => {
-      const id = normalizeId(raw);
-      if (!id || seen.has(id)) return;
-      seen.add(id);
-      result.push(id);
-    });
-    return result;
-  }, []);
-
-  const updateLayerOrderingForLayer = useCallback((layer, updater) => {
-    if (!layer || typeof updater !== 'function') return;
-    setLayerOrdering((prev) => {
-      const prevOrder = Array.isArray(prev?.[layer]) ? prev[layer] : [];
-      const nextOrder = sanitizeOrder(updater(prevOrder));
-      if (arraysEqual(prevOrder, nextOrder)) return prev;
-      return { ...prev, [layer]: nextOrder };
-    });
-  }, [sanitizeOrder]);
-
-  const addLayer = (layer) => {
-    setLayerOptions((prev) =>
-      prev.includes(layer) ? prev : [...prev, layer]
-    );
-    setLayerOrdering((prev) => {
-      if (!layer || prev[layer]) return prev;
-      return { ...prev, [layer]: [] };
-    });
-  };
-
-  const removeLayer = (layer) => {
-    setLayerOptions((prev) => prev.filter((l) => l !== layer));
-    setActiveLayers((prev) => prev.filter((l) => l !== layer));
-    setLayerOrdering((prev) => {
-      if (!prev[layer]) return prev;
-      const { [layer]: _removed, ...rest } = prev;
-      return rest;
-    });
-    requestRefreshChannel();
-  };
-
-  const toggleLayer = (layer) => {
-    setActiveLayers((prev) =>
-      prev.includes(layer)
-        ? prev.filter((l) => l !== layer)
-        : [...prev, layer]
-    );
-    requestRefreshChannel();
-  };
-
-  const clearLayers = useCallback(({ resetOrdering = true } = {}) => {
-    setLayerOptions([]);
-    setActiveLayers([]);
-    if (resetOrdering) {
-      setLayerOrdering({});
-    }
-  }, []);
-
-  useEffect(() => {
-    const mapping = {
-      rowData: setRowData,
-      activeLayers: setActiveLayers,
-      activeState: setActiveState,
-      availableStates: setAvailableStates,
-      cellWidthInput: setCellWidthInput,
-      cellHeightInput: setCellHeightInput,
-      columnSelectedLayer: setColumnSelectedLayer,
-      comparatorState: setComparatorState,
-      diffDict: setDiffDict,
-      differences: setDifferences,
-      differencesTrigger: setDifferencesTrigger,
-      editingCell: setEditingCell,
-      flipped: setFlipped,
-      flowGridDimensions: setFlowGridDimensions,
-      filterEdgesByHandleX: setFilterEdgesByHandleX,
-      hiddenLayers: setHiddenLayers,
-      hideEmpty: setHideEmpty,
-      hoveredCell: setHoveredCell,
-      hoveredFrom: setHoveredFrom,
-      hoveredRowId: setHoveredRowId,
-      lastLoadedFile: setLastLoadedFile,
-      layerDropdownOpen: setLayerDropdownOpen,
-      layerOptions: setLayerOptions,
-      layerOrdering: setLayerOrdering,
-      loading: setLoading,
-      loadingDifferences: setLoadingDifferences,
-      rawDifferences: setRawDifferences,
-      rowSelectedLayer: setRowSelectedLayer,
-      selectedContentLayer: setSelectedContentLayer,
-      selectedFromLayer: setSelectedFromLayer,
-      selectedToLayer: setSelectedToLayer,
-      showDropdowns: setShowDropdowns,
-      flowRowHeights: setFlowRowHeights,
-      flowCanvasViewport: setFlowCanvasViewport,
-    };
-
-    Object.entries(mapping).forEach(([key, setter]) => registerStateSetter(key, setter));
-
-    return () => {
-      Object.entries(mapping).forEach(([key, setter]) => unregisterStateSetter(key, setter));
-    };
-  }, [
-    setActiveLayers,
-    setActiveState,
-    setAvailableStates,
-    setColumnSelectedLayer,
-    setFilterEdgesByHandleX,
-    setComparatorState,
-    setDiffDict,
-    setDifferences,
-    setDifferencesTrigger,
-    setEditingCell,
-    setFlipped,
-    setFlowGridDimensions,
-    setHiddenLayers,
-    setHideEmpty,
-    setHoveredCell,
-    setHoveredFrom,
-    setHoveredRowId,
-    setLastLoadedFile,
-    setLayerDropdownOpen,
-    setLayerOptions,
-    setLayerOrdering,
-    setLoading,
-    setLoadingDifferences,
-    setRawDifferences,
-    setRowData,
-    setRowSelectedLayer,
-    setSelectedContentLayer,
-    setSelectedFromLayer,
-    setSelectedToLayer,
-    setShowDropdowns,
-    setCellWidthInput,
-    setCellHeightInput,
-    setFlowRowHeights,
-    setFlowCanvasViewport
-  ]);
 
   useEffect(() => {
     if (!Array.isArray(rowData)) return;
@@ -564,44 +462,146 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  const value = {
+  const stateSetters = useMemo(() => ({
+    rowData: setRowData,
+    activeLayers: setActiveLayers,
+    activeState: setActiveState,
+    availableStates: setAvailableStates,
+    cellWidthInput: setCellWidthInput,
+    cellHeightInput: setCellHeightInput,
+    columnSelectedLayer: setColumnSelectedLayer,
+    comparatorState: setComparatorState,
+    diffDict: setDiffDict,
+    differences: setDifferences,
+    differencesTrigger: setDifferencesTrigger,
+    editingCell: setEditingCell,
+    flipped: setFlipped,
+    flowGridDimensions: setFlowGridDimensions,
+    filterEdgesByHandleX: setFilterEdgesByHandleX,
+    hiddenLayers: setHiddenLayers,
+    hideEmpty: setHideEmpty,
+    hoveredCell: setHoveredCell,
+    hoveredFrom: setHoveredFrom,
+    hoveredRowId: setHoveredRowId,
+    lastLoadedFile: setLastLoadedFile,
+    layerDropdownOpen: setLayerDropdownOpen,
+    layerOptions: setLayerOptions,
+    layerOrdering: setLayerOrdering,
+    loading: setLoading,
+    loadingDifferences: setLoadingDifferences,
+    rawDifferences: setRawDifferences,
+    rowSelectedLayer: setRowSelectedLayer,
+    selectedContentLayer: setSelectedContentLayer,
+    selectedFromLayer: setSelectedFromLayer,
+    selectedToLayer: setSelectedToLayer,
+    showDropdowns: setShowDropdowns,
+    flowRowHeights: setFlowRowHeights,
+    flowCanvasViewport: setFlowCanvasViewport,
+  }), [
+    setRowData,
+    setActiveLayers,
+    setActiveState,
+    setAvailableStates,
+    setCellWidthInput,
+    setCellHeightInput,
+    setColumnSelectedLayer,
+    setComparatorState,
+    setDiffDict,
+    setDifferences,
+    setDifferencesTrigger,
+    setEditingCell,
+    setFlipped,
+    setFlowGridDimensions,
+    setFilterEdgesByHandleX,
+    setHiddenLayers,
+    setHideEmpty,
+    setHoveredCell,
+    setHoveredFrom,
+    setHoveredRowId,
+    setLastLoadedFile,
+    setLayerDropdownOpen,
+    setLayerOptions,
+    setLayerOrdering,
+    setLoading,
+    setLoadingDifferences,
+    setRawDifferences,
+    setRowSelectedLayer,
+    setSelectedContentLayer,
+    setSelectedFromLayer,
+    setSelectedToLayer,
+    setShowDropdowns,
+    setFlowRowHeights,
+    setFlowCanvasViewport,
+  ]);
+
+  const applyStateVariables = useCallback((stateVariables = {}) => {
+    if (!stateVariables || typeof stateVariables !== "object") return;
+    Object.entries(stateVariables).forEach(([key, value]) => {
+      const setter = stateSetters[key];
+      if (typeof setter !== "function") {
+        console.warn(`No setter registered for state variable \"${key}\".`);
+        return;
+      }
+      if (key === "hiddenLayers") {
+        let normalized;
+        if (value instanceof Set) {
+          normalized = value;
+        } else if (Array.isArray(value)) {
+          normalized = new Set(value);
+        } else if (value && typeof value === "object") {
+          normalized = new Set(Object.keys(value));
+        } else {
+          normalized = new Set();
+        }
+        setter(normalized);
+        return;
+      }
+      setter(value);
+    });
+  }, [stateSetters]);
+
+  const mapValue = useMemo(() => ({
     rowData,
     setRowData,
+    nodes,
+    setNodes,
+    onNodesChange,
+    edges,
+    setEdges,
+    lastLoadedFile,
+    setLastLoadedFile,
+    parentChildMap,
+    setParentChildMap,
+  }), [
+    rowData,
+    setRowData,
+    nodes,
+    setNodes,
+    onNodesChange,
+    edges,
+    setEdges,
+    lastLoadedFile,
+    setLastLoadedFile,
+    parentChildMap,
+    setParentChildMap,
+  ]);
+
+  const layerValue = useMemo(() => ({
     layerOptions,
     setLayerOptions,
     layerOrdering,
     setLayerOrdering,
+    activeLayers,
+    setActiveLayers,
     updateLayerOrderingForLayer,
     addLayer,
     removeLayer,
-    activeLayers,
-    setActiveLayers,
     toggleLayer,
     clearLayers,
-    nodes,
-    setNodes,
-    edges,
-    setEdges,
-    onNodesChange,
-    lastLoadedFile,
-    setLastLoadedFile,
-    // State management
-    activeState,
-    availableStates,
-    setAvailableStates,
-    comparatorState,
-    setComparatorState,
-    diffDict,
-    setDiffDict,
-    handleStateSwitch,
-    handleRemoveState,
-    handleClearStates,
-    // Layer dropdown state
     layerDropdownOpen,
     setLayerDropdownOpen,
     hiddenLayers,
     setHiddenLayers,
-    // Content layer filter (add these)
     selectedContentLayer,
     setSelectedContentLayer,
     rowSelectedLayer,
@@ -610,13 +610,69 @@ export const AppProvider = ({ children }) => {
     setColumnSelectedLayer,
     filterEdgesByHandleX,
     setFilterEdgesByHandleX,
+    showDropdowns,
+    setShowDropdowns,
+    selectedFromLayer,
+    setSelectedFromLayer,
+    selectedToLayer,
+    setSelectedToLayer,
+  }), [
+    layerOptions,
+    setLayerOptions,
+    layerOrdering,
+    setLayerOrdering,
+    activeLayers,
+    setActiveLayers,
+    updateLayerOrderingForLayer,
+    addLayer,
+    removeLayer,
+    toggleLayer,
+    clearLayers,
+    layerDropdownOpen,
+    setLayerDropdownOpen,
+    hiddenLayers,
+    setHiddenLayers,
+    selectedContentLayer,
+    setSelectedContentLayer,
+    rowSelectedLayer,
+    setRowSelectedLayer,
+    columnSelectedLayer,
+    setColumnSelectedLayer,
+    filterEdgesByHandleX,
+    setFilterEdgesByHandleX,
+    showDropdowns,
+    setShowDropdowns,
+    selectedFromLayer,
+    setSelectedFromLayer,
+    selectedToLayer,
+    setSelectedToLayer,
+  ]);
+
+  const flowValue = useMemo(() => ({
     flowGridDimensions,
     setFlowGridDimensions,
     flowRowHeights,
     setFlowRowHeights,
     flowCanvasViewport,
     setFlowCanvasViewport,
-    // Matrix management
+    cellWidthInput,
+    setCellWidthInput,
+    cellHeightInput,
+    setCellHeightInput,
+  }), [
+    flowGridDimensions,
+    setFlowGridDimensions,
+    flowRowHeights,
+    setFlowRowHeights,
+    flowCanvasViewport,
+    setFlowCanvasViewport,
+    cellWidthInput,
+    setCellWidthInput,
+    cellHeightInput,
+    setCellHeightInput,
+  ]);
+
+  const matrixValue = useMemo(() => ({
     loading,
     setLoading,
     editingCell,
@@ -631,39 +687,121 @@ export const AppProvider = ({ children }) => {
     setHoveredRowId,
     flipped,
     setFlipped,
-    selectedFromLayer,
-    setSelectedFromLayer,
-    selectedToLayer,
-    setSelectedToLayer,
     differences,
     setDifferences,
     loadingDifferences,
     setLoadingDifferences,
     differencesTrigger,
     setDifferencesTrigger,
-    showDropdowns,
-    setShowDropdowns,
     rawDifferences,
     setRawDifferences,
-    // Parent-child relationship map
-    parentChildMap,
-    setParentChildMap,
-    // Influencers shared API
+  }), [
+    loading,
+    setLoading,
+    editingCell,
+    setEditingCell,
+    hideEmpty,
+    setHideEmpty,
+    hoveredCell,
+    setHoveredCell,
+    hoveredFrom,
+    setHoveredFrom,
+    hoveredRowId,
+    setHoveredRowId,
+    flipped,
+    setFlipped,
+    differences,
+    setDifferences,
+    loadingDifferences,
+    setLoadingDifferences,
+    differencesTrigger,
+    setDifferencesTrigger,
+    rawDifferences,
+    setRawDifferences,
+  ]);
+
+  const stateManagementValue = useMemo(() => ({
+    activeState,
+    setActiveState,
+    availableStates,
+    setAvailableStates,
+    comparatorState,
+    setComparatorState,
+    diffDict,
+    setDiffDict,
+    handleStateSwitch,
+    handleRemoveState,
+    handleClearStates,
+    applyStateVariables,
+  }), [
+    activeState,
+    setActiveState,
+    availableStates,
+    setAvailableStates,
+    comparatorState,
+    setComparatorState,
+    diffDict,
+    setDiffDict,
+    handleStateSwitch,
+    handleRemoveState,
+    handleClearStates,
+    applyStateVariables,
+  ]);
+
+  const influencerValue = useMemo(() => ({
     influencersMap,
     setInfluencersMap,
     refreshInfluencers,
     refreshInfluencerPair,
-    // Cell size inputs
-    cellWidthInput,
-    setCellWidthInput,
-    cellHeightInput,
-    setCellHeightInput
-  };
+  }), [
+    influencersMap,
+    setInfluencersMap,
+    refreshInfluencers,
+    refreshInfluencerPair,
+  ]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  const appValue = useMemo(() => ({
+    ...mapValue,
+    ...stateManagementValue,
+    ...layerValue,
+    ...flowValue,
+    ...matrixValue,
+    ...influencerValue,
+  }), [
+    mapValue,
+    stateManagementValue,
+    layerValue,
+    flowValue,
+    matrixValue,
+    influencerValue,
+  ]);
+  return (
+    <MapContext.Provider value={mapValue}>
+      <StateManagementContext.Provider value={stateManagementValue}>
+        <LayerContext.Provider value={layerValue}>
+          <FlowContext.Provider value={flowValue}>
+            <MatrixContext.Provider value={matrixValue}>
+              <InfluencerContext.Provider value={influencerValue}>
+                <AppContext.Provider value={appValue}>
+                  {children}
+                </AppContext.Provider>
+              </InfluencerContext.Provider>
+            </MatrixContext.Provider>
+          </FlowContext.Provider>
+        </LayerContext.Provider>
+      </StateManagementContext.Provider>
+    </MapContext.Provider>
+  );
 };
 
 export const useAppContext = () => useContext(AppContext);
+export const useMapContext = () => useContext(MapContext);
+export const useLayerContext = () => useContext(LayerContext);
+export const useMatrixContext = () => useContext(MatrixContext);
+export const useFlowContext = () => useContext(FlowContext);
+export const useStateManagementContext = () => useContext(StateManagementContext);
+export const useInfluencerContext = () => useContext(InfluencerContext);
+
 
 // Utility to check if a row belongs to any active layer
 export const rowInLayers = (rowData, layers = []) => {

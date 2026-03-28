@@ -179,18 +179,14 @@ export const useDropDownEffect = () => {
 
 // Effect to load data from the server and attach listener to loadDataButton
 export const useReloadEffect = () => {
-    const { lastLoadedFile, clearLayers } = useAppContext();
+    const { lastLoadedFile, clearLayers, applyStateVariables } = useAppContext();
     useEffect(() => {
         console.log("Using ReLoad loadDataButton effect...");
         const loadDataButton = document.getElementById("loadDataButton");
 
-        const handleLoadData = () => {
+        const handleLoadData = async () => {
             console.log("Load data button clicked");
-            loadContainers(lastLoadedFile).then((data) => {
-                // console.log("Loaded data:", data);
-            });
-            // clearLayers();
-            // Broadcast a message to requestRefreshChannel
+            await loadContainers(lastLoadedFile, { onStateVariables: applyStateVariables });
             setTimeout(() => {
                 const channel = new BroadcastChannel('requestRefreshChannel');
                 channel.postMessage({ type: 'refresh' });
@@ -206,7 +202,7 @@ export const useReloadEffect = () => {
                 loadDataButton.removeEventListener("click", handleLoadData);
             }
         };
-    }, [lastLoadedFile, clearLayers]);
+    }, [lastLoadedFile, clearLayers, applyStateVariables]);
 };
 
 export const useRefreshEffect = (rowData, setRowData, fetchContainers, sendFilteredRows) => {

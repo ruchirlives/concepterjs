@@ -8,7 +8,7 @@ Modal.setAppElement("#app");
 const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContainer, merge }) => {
     const [list, setList] = useState([]);
 
-    const { setLastLoadedFile, clearLayers } = useAppContext();
+    const { setLastLoadedFile, clearLayers, applyStateVariables } = useAppContext();
 
     const closeModal = () => {
         setIsOpen(false);
@@ -24,7 +24,7 @@ const LoadModal = ({ isOpen, setIsOpen, setRowData, gridApiRef, setCurrentContai
         if (merge) {
             await importContainers(item);
         } else {
-            await loadContainers(item);
+            await loadContainers(item, { onStateVariables: applyStateVariables });
         }
         setLastLoadedFile(item);
 

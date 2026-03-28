@@ -4,7 +4,6 @@ import { handleWriteBack, requestRefreshChannel } from "./hooks/effectsShared";
 import ModalAddRow from "./components/ModalAddRow";
 import { ContextMenu, useMenuHandlers } from "./hooks/useContextMenu";
 import { setPosition, layerToContainer } from "./api";
-import { getStateSetter } from "./stateSetterRegistry";
 
 // Excel export button
 function ExcelButton({ handleExportExcel }) {
@@ -22,9 +21,11 @@ function ExcelButton({ handleExportExcel }) {
 const AppLayers = () => {
   const {
     layerOptions,
+    setLayerOptions,
     addLayer,
     removeLayer,
     activeLayers,
+    setActiveLayers,
     toggleLayer,
     rowData,
     setRowData,
@@ -642,8 +643,6 @@ const AppLayers = () => {
           return;
         }
 
-        const layerOptionsSetter = getStateSetter("layerOptions");
-        const activeLayersSetter = getStateSetter("activeLayers");
 
         const wasActive = activeLayers.includes(layer);
         const layerIndex = layerOptions.indexOf(layer);
@@ -678,20 +677,18 @@ const AppLayers = () => {
           requestRefreshChannel();
         }
 
-        if (typeof layerOptionsSetter === "function") {
-          layerOptionsSetter((prev) => {
-            const withoutNew = prev.filter((name) => name !== trimmed);
-            const next = withoutNew.map((name) => (name === layer ? trimmed : name));
-            if (!next.includes(trimmed)) {
-              if (layerIndex >= 0 && layerIndex <= next.length) {
-                next.splice(layerIndex, 0, trimmed);
-              } else {
-                next.push(trimmed);
-              }
+        setLayerOptions((prev) => {
+          const withoutNew = prev.filter((name) => name !== trimmed);
+          const next = withoutNew.map((name) => (name === layer ? trimmed : name));
+          if (!next.includes(trimmed)) {
+            if (layerIndex >= 0 && layerIndex <= next.length) {
+              next.splice(layerIndex, 0, trimmed);
+            } else {
+              next.push(trimmed);
             }
-            return next;
-          });
-        }
+          }
+          return next;
+        });
 
         updateLayerOrderingForLayer(trimmed, () => {
           const existing = Array.isArray(layerOrdering?.[layer]) ? layerOrdering[layer] : [];
@@ -699,15 +696,13 @@ const AppLayers = () => {
         });
         updateLayerOrderingForLayer(layer, () => []);
 
-        if (typeof activeLayersSetter === "function") {
-          activeLayersSetter((prev) => {
-            const next = prev.filter((name) => name !== layer && name !== trimmed);
-            if (wasActive) {
-              next.push(trimmed);
-            }
-            return next;
-          });
-        }
+        setActiveLayers((prev) => {
+          const next = prev.filter((name) => name !== layer && name !== trimmed);
+          if (wasActive) {
+            next.push(trimmed);
+          }
+          return next;
+        });
       },
     },
   ];

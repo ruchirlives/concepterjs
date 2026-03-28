@@ -74,6 +74,7 @@
   },
   "devDependencies": {
     "@craco/craco": "^7.1.0",
+    "@testing-library/react": "^16.3.2",
     "license-webpack-plugin": "^4.0.2",
     "postcss-flexbugs-fixes": "^4.2.1",
     "postcss-preset-env": "^10.2.4",

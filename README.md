@@ -34,6 +34,11 @@ Configuration
 - Set API URL and optional passcode in `src/apiConfig.js` or via your own wiring.
 - At runtime, you can set the passcode in the header input; a server selector is available in the footer panel.
 
+### Environment variables
+- `REACT_APP_API_URLS` (optional) must serialize to a JSON object mapping friendly names to API endpoints (for example `{"local":"http://localhost:5000","prod":"https://concepter.example.com"}`).
+- The app falls back to an empty mapping and logs a warning when the variable is missing or malformed.
+- Supply local defaults by creating a `.env.local` file with the JSON string — Create React App automatically picks it up.
+
 ---
 
 ## Usage Highlights

@@ -1,8 +1,55 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, useMenuHandlers } from "./useContextMenu";
 import { writeBackData } from "../api";
 import { useAppContext } from "../AppContext";
+
+export const buildParentChildLookup = (parentChildMap = []) => {
+    const parentToChildren = new Map();
+    const childIds = new Set();
+    if (!Array.isArray(parentChildMap)) return { parentToChildren, childIds };
+    parentChildMap.forEach((entry) => {
+        if (!entry) return;
+        const parentId = String(entry.container_id ?? entry.parent_id ?? entry.id ?? "");
+        if (!parentId) return;
+        const children = Array.isArray(entry.children) ? entry.children : [];
+        parentToChildren.set(parentId, children);
+        children.forEach((child) => {
+            const childId = child?.id ?? child?.container_id ?? child;
+            if (childId != null) {
+                childIds.add(String(childId));
+            }
+        });
+    });
+    return { parentToChildren, childIds };
+};
+
+export const buildNodeLookup = (incomingNodes = []) => {
+    const lookup = new Map();
+    if (!Array.isArray(incomingNodes)) return lookup;
+    incomingNodes.forEach((node) => {
+        if (!node) return;
+        const id = node.id ?? node.container_id;
+        if (id != null) {
+            lookup.set(String(id), node);
+        }
+    });
+    return lookup;
+};
+
+export const getTopLevelNodes = (incomingNodes = [], childIds = new Set(), selectedLayer) => {
+    if (!Array.isArray(incomingNodes)) return [];
+    if (selectedLayer) {
+        return incomingNodes.filter((row) => {
+            const tags = (row?.Tags || "").split(",").map((t) => t.trim());
+            return tags.includes(selectedLayer);
+        });
+    }
+    return incomingNodes.filter((row) => {
+        const id = row?.id;
+        return id != null && !childIds.has(String(id));
+    });
+};
 
 /**
  * Hook integrating nodes rendering and dragging with an InfiniteCanvas instance.
@@ -95,44 +142,32 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     useEffect(() => {
         if (!incomingNodes) return;
 
-        const safeParentChildMap = parentChildMap || [];
-        // Helper: get children for a parent node
         const getChildren = (parentId) => {
-            const entry = safeParentChildMap.find(e => e.container_id === parentId);
-            return entry?.children || [];
+            if (parentId == null) return [];
+            return parentToChildren.get(String(parentId)) || [];
         };
-        // Helper: get node by id
-        const getNodeById = (id) => incomingNodes.find(r => r.id === id);
+        const getNodeById = (id) => nodeLookup.get(String(id ?? ""));
 
-        // Recursive node adder for levels
         const positioned = [];
         const addNode = (row, index, parentPos = null, level = 0, parentRadius = null) => {
             if (level > LEVELS) return; // Only render up to grandchildren
 
-            // Color and size by level
-            // Programmatic color: use HSL for visually distinct colors by level
-            // Hash node id to generate a unique HSL color per node
             const getNodeColor = (level, id) => {
-                // Simple hash function for string/number id
                 let hash = 0;
                 const str = String(id ?? "");
-                for (let i = 0; i < str.length; i++) {
+                for (let i = 0; i < str.length; i += 1) {
                     hash = str.charCodeAt(i) + ((hash << 5) - hash);
                 }
-                // Use hash to get hue (0-359)
                 const hue = Math.abs(hash) % 360;
-                const saturation = 70;
-                const lightness = 70;
-                return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                return `hsl(${hue}, 70%, 70%)`;
             };
 
             const radius =
                 level === 0 && row.MapRadius != null ? row.MapRadius
                     : parentRadius != null ? parentRadius * RADIUS_SCALE
                         : BASE_RADIUS * Math.pow(RADIUS_SCALE, level);
-            const fontSize = BASE_FONT_SIZE * radius / BASE_RADIUS
+            const fontSize = BASE_FONT_SIZE * radius / BASE_RADIUS;
 
-            // For root nodes, use their own Position or grid
             let nodeX = parentPos
                 ? parentPos.x
                 : row.x ?? row.Position?.x ?? 100 + (index % 5) * 150;
@@ -140,19 +175,15 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 ? parentPos.y
                 : row.y ?? row.Position?.y ?? 100 + Math.floor(index / 5) * 100;
 
-            // For children/grandchildren, arrange in a circle inside parent
             if (parentPos) {
-                // Orbit scales exponentially with level, just like radius
                 const orbit = radius * 3;
                 const angle = (2 * Math.PI * index) / parentPos.childCount;
                 nodeX = parentPos.x + Math.cos(angle) * orbit;
                 nodeY = parentPos.y + Math.sin(angle) * orbit;
             }
 
-            // Label logic: prefer label, then name/Name, then id, wrapped to multiple lines
             let label = row.label || row.name || row.Name || row.id || `Node ${index}`;
-            // Wrap label into lines of max 16 chars, up to 6 lines
-            function wrapLabel(text, maxLen = 16, maxLines = 10) {
+            const wrapLabel = (text, maxLen = 16, maxLines = 10) => {
                 if (typeof text !== "string") return [String(text)];
                 const words = text.split(' ');
                 const lines = [];
@@ -168,7 +199,7 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 }
                 if (current && lines.length < maxLines) lines.push(current);
                 return lines;
-            }
+            };
             const labelLines = wrapLabel(label);
 
             positioned.push({
@@ -183,15 +214,12 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 parentId: parentPos ? parentPos.id : null,
             });
 
-            // Render children (only if within level limit)
             if (level < LEVELS) {
                 const children = getChildren(row.id);
                 children.forEach((child, childIdx) => {
                     let childRow;
                     if (typeof child === "object") {
-                        childRow = child.id
-                            ? child
-                            : getNodeById(child.container_id);
+                        childRow = child.id ? child : getNodeById(child.container_id);
                     } else {
                         childRow = getNodeById(child);
                     }
@@ -208,42 +236,18 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
             }
         };
 
+        const selectedLayer = selectedLayerRef?.current;
+        const topLevelNodes = getTopLevelNodes(incomingNodes, childIds, selectedLayer);
 
-        // Add all top-level nodes (not children in parentChildMap) in a circular arrangement
-        const childIds = new Set();
-        safeParentChildMap.forEach(entry => {
-            (entry.children || []).forEach(child => childIds.add(child.id || child));
-        });
-
-        let topLevelNodes;
-        const selectedLayer = selectedLayerRef && selectedLayerRef.current;
-        // console.log("Filtering top-level nodes by layer:", selectedLayer);
-        // console.log("Incoming nodes:", incomingNodes);
-        if (selectedLayer) {
-            // When filtering by layer, still only include true top-level nodes (not children)
-            topLevelNodes = incomingNodes.filter(row => {
-                const tags = (row.Tags || "").split(",").map(t => t.trim());
-                return tags.includes(selectedLayer);
-            });
-            // console.log("Filtered top-level nodes:", topLevelNodes);
-        } else {
-            // Default: only nodes not children in parentChildMap
-            topLevelNodes = incomingNodes.filter((row) => !childIds.has(row.id));
-        }
-
-        // Defensive: if no nodes, don't update state
-        if (!topLevelNodes || topLevelNodes.length === 0) return;
+        if (!topLevelNodes.length) return;
 
         const N = topLevelNodes.length;
-        // Center and radius for the circle
         const centerX = 0;
         const centerY = 0;
-        // Scale radius so nodes don't overlap: based on BASE_RADIUS and node count
-        const minSpacing = BASE_RADIUS * 2.5; // desired spacing between node centers along the circle
-        const minCircleRadius = BASE_RADIUS * 2; // dynamic minimum so it scales with BASE_RADIUS
+        const minSpacing = BASE_RADIUS * 2.5;
+        const minCircleRadius = BASE_RADIUS * 2;
         const circleRadius = Math.max(minCircleRadius, (N * minSpacing) / (2 * Math.PI));
         topLevelNodes.forEach((row, index) => {
-            // If the node already has a Position (x/y or Position.x/Position.y), use it; otherwise, lay out in a circle
             let x = row.x;
             let y = row.y;
             if (x == null && row.Position && row.Position.x != null) x = row.Position.x;
@@ -253,13 +257,13 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
                 x = centerX + Math.cos(angle) * circleRadius;
                 y = centerY + Math.sin(angle) * circleRadius;
             }
-            // Use MapRadius if present, otherwise fallback to BASE_RADIUS
             const nodeRadius = row.MapRadius != null ? row.MapRadius : BASE_RADIUS;
             addNode({ ...row, x, y, radius: nodeRadius }, index, null, 0);
         });
 
         setNodes(positioned);
-    }, [incomingNodes, parentChildMap, LEVELS, selectedLayerRef]);
+    }, [incomingNodes, parentChildMap, parentToChildren, childIds, nodeLookup, LEVELS, selectedLayerRef]);
+
 
     // Drawing helpers
     const drawGrid = (ctx) => {
