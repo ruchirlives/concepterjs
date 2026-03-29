@@ -1,7 +1,7 @@
 // apiConfig.js
 import API_URLS from './hooks/globalconfig';
 
-let apiUrl = API_URLS.cloudhost; // Holds the current API URL
+let apiUrl = API_URLS.cloudhost || Object.values(API_URLS)[0] || ""; // Holds the current API URL
 let passcode = ''; // Holds the current passcode
 
 export const getApiUrl = () => apiUrl; // Function to retrieve the current API URL
