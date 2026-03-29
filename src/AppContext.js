@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { requestRefreshChannel, handleWriteBack } from './hooks/effectsShared';
 import { useNodesState, useEdgesState } from '@xyflow/react';
-import { listStates, switchState, removeState, clearStates, manyChildren, getInfluencers as fetchInfluencers } from './api';
+import { listStates, switchState, removeState, clearStates, getInfluencers as fetchInfluencers } from './api';
 import toast from "react-hot-toast";
 
 const AppContext = createContext();
@@ -89,17 +89,17 @@ export const AppProvider = ({ children }) => {
       if (arraysEqual(prevOrder, nextOrder)) return prev;
       return { ...prev, [layer]: nextOrder };
     });
-  }, [sanitizeOrder]);
+  }, [arraysEqual, sanitizeOrder]);
 
-  const addLayer = (layer) => {
+  const addLayer = useCallback((layer) => {
     setLayerOptions((prev) => (prev.includes(layer) ? prev : [...prev, layer]));
     setLayerOrdering((prev) => {
       if (!layer || prev[layer]) return prev;
       return { ...prev, [layer]: [] };
     });
-  };
+  }, []);
 
-  const removeLayer = (layer) => {
+  const removeLayer = useCallback((layer) => {
     setLayerOptions((prev) => prev.filter((l) => l !== layer));
     setActiveLayers((prev) => prev.filter((l) => l !== layer));
     setLayerOrdering((prev) => {
@@ -108,14 +108,14 @@ export const AppProvider = ({ children }) => {
       return rest;
     });
     requestRefreshChannel();
-  };
+  }, []);
 
-  const toggleLayer = (layer) => {
+  const toggleLayer = useCallback((layer) => {
     setActiveLayers((prev) =>
       prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer]
     );
     requestRefreshChannel();
-  };
+  }, []);
 
   const clearLayers = useCallback(({ resetOrdering = true } = {}) => {
     setLayerOptions([]);
@@ -125,7 +125,7 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  const handleStateSwitch = async (stateName) => {
+  const handleStateSwitch = useCallback(async (stateName) => {
     if (!stateName || !stateName.trim()) return;
 
     try {
@@ -139,9 +139,9 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to switch state:', error);
       toast.error('Failed to switch state');
     }
-  };
+  }, [rowData]);
 
-  const handleRemoveState = async (stateName = activeState) => {
+  const handleRemoveState = useCallback(async (stateName = activeState) => {
     if (stateName === 'base') {
       toast.error('Cannot remove base state');
       return;
@@ -159,9 +159,9 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to remove state:', error);
       toast.error('Failed to remove state');
     }
-  };
+  }, [activeState]);
 
-  const handleClearStates = async () => {
+  const handleClearStates = useCallback(async () => {
     try {
       await clearStates();
       setActiveState('base');
@@ -171,7 +171,7 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to clear states:', error);
       toast.error('Failed to clear states');
     }
-  };
+  }, []);
 
   const [filterEdgesByHandleX, setFilterEdgesByHandleX] = useState(false);
 
@@ -409,7 +409,7 @@ export const AppProvider = ({ children }) => {
       if (!changed) return prev;
       return next;
     });
-  }, [rowData, layerOptions, sanitizeOrder]);
+  }, [arraysEqual, layerOptions, normalizeId, rowData, sanitizeOrder]);
 
   // Influencers helpers
   const normalizePairs = (pairs) => {
@@ -539,7 +539,7 @@ export const AppProvider = ({ children }) => {
     Object.entries(stateVariables).forEach(([key, value]) => {
       const setter = stateSetters[key];
       if (typeof setter !== "function") {
-        console.warn(`No setter registered for state variable \"${key}\".`);
+        console.warn(`No setter registered for state variable "${key}".`);
         return;
       }
       if (key === "hiddenLayers") {
