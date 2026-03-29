@@ -1,9 +1,11 @@
 const DEFAULT_API_URLS = {};
 let API_URLS = DEFAULT_API_URLS;
 
-if (typeof process !== "undefined" && process.env?.REACT_APP_API_URLS) {
+const rawEnv = process.env.REACT_APP_API_URLS;
+
+if (rawEnv) {
   try {
-    const parsed = JSON.parse(process.env.REACT_APP_API_URLS);
+    const parsed = JSON.parse(rawEnv);
     if (parsed && typeof parsed === "object") {
       API_URLS = parsed;
     } else {
