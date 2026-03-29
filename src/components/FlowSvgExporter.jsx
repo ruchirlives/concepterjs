@@ -112,8 +112,15 @@ const getMeasureContext = (() => {
   return () => {
     if (context) return context;
     if (typeof document === "undefined") return null;
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent || "")) {
+      return null;
+    }
     canvas = canvas || document.createElement("canvas");
-    context = canvas.getContext("2d");
+    try {
+      context = canvas.getContext("2d");
+    } catch (_error) {
+      context = null;
+    }
     return context;
   };
 })();

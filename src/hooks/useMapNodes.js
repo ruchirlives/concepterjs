@@ -69,6 +69,11 @@ export const useNodes = (infiniteCanvas, incomingNodes = [], drawUnderlay, selec
     const pendingPosRef = useRef(null);
     const lastAppliedRef = useRef(null);
     const { parentChildMap, rowData, setRowData } = useAppContext() || {};
+    const { parentToChildren, childIds } = useMemo(
+        () => buildParentChildLookup(parentChildMap),
+        [parentChildMap]
+    );
+    const nodeLookup = useMemo(() => buildNodeLookup(incomingNodes), [incomingNodes]);
 
     const canvasTransformToWorld = useCallback(
         (event) => {

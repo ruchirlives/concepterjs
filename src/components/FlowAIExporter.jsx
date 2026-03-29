@@ -289,6 +289,18 @@ export const serializeFlowAiSummary = ({
     candidates.filter(Boolean).forEach((candidate) => allowedIds.add(candidate));
   });
 
+  const knownIds = new Set();
+  safeNodes.forEach((node, index) => {
+    [
+      resolveNodeId(node, index),
+      asStringOrNull(node?.id),
+      asStringOrNull(node?.data?.id),
+      asStringOrNull(node?.data?.originalId),
+    ]
+      .filter(Boolean)
+      .forEach((candidate) => knownIds.add(candidate));
+  });
+
   const emptyMapping = () => ({ exports: [], idMap: new Map() });
   const { exports: rowExports, idMap: rowIdMap } = includeRows
     ? buildSegmentExports(rows, "row")
@@ -298,6 +310,8 @@ export const serializeFlowAiSummary = ({
     : emptyMapping();
 
   const nodeMetadata = new Map();
+
+  const restrictChildrenToAllowed = selectedNodes.length > 0;
 
   const nodeExports = includedNodes.map((node, index) => {
     const nodeId = resolveNodeId(node, index);
@@ -311,9 +325,17 @@ export const serializeFlowAiSummary = ({
       "column"
     );
     const tags = normalizeTags(node);
-    const children = collectChildIds(node).filter((childId) =>
-      allowedIds.has(asStringOrNull(childId))
-    );
+    const children = collectChildIds(node).filter((childId) => {
+      const normalized = asStringOrNull(childId);
+      if (!normalized) return false;
+      if (restrictChildrenToAllowed) {
+        return allowedIds.has(normalized);
+      }
+      if (!knownIds.has(normalized)) {
+        return true;
+      }
+      return allowedIds.has(normalized);
+    });
     const position = (node && (node.positionAbsolute || node.position)) || { x: 0, y: 0 };
     const x = safeNumber(position?.x, 0);
     const y = safeNumber(position?.y, 0);
@@ -328,10 +350,12 @@ export const serializeFlowAiSummary = ({
     const exportNode = {
       id: nodeId,
       name,
-      row,
-      column,
       children,
     };
+    if (!isRowOrColumnNode(node)) {
+      exportNode.row = row;
+      exportNode.column = column;
+    }
     if (tags.length) {
       exportNode.tags = tags;
     }

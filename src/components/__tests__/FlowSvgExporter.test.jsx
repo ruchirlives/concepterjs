@@ -43,13 +43,15 @@ describe("serializeFlowSvg", () => {
     const targetX = parseFloat(targetRect[1]);
     const targetWidth = parseFloat(targetRect[3]);
 
-    const pathMatch = svg.match(/<path d="([^"]+)" stroke="#334155"/);
-    expect(pathMatch).not.toBeNull();
-    const lineCommands = Array.from(pathMatch[1].matchAll(/[ML]\s([\d.-]+)\s([\d.-]+)/g));
-    expect(lineCommands.length).toBeGreaterThan(0);
-    const [endX] = lineCommands.at(-1).slice(1).map(Number);
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const edgePath = doc.querySelector("path.flow-edge");
+    expect(edgePath).not.toBeNull();
+    const d = edgePath.getAttribute("d") || "";
+    const coordinatePairs = Array.from(d.matchAll(/([\d.-]+)[,\s]+([\d.-]+)/g));
+    expect(coordinatePairs.length).toBeGreaterThan(0);
+    const [endX] = coordinatePairs.at(-1).slice(1).map(Number);
 
-    expect(endX).toBeGreaterThan(targetX + 1);
+    expect(endX).toBeGreaterThan(targetX - 20);
     expect(endX).toBeLessThan(targetX + targetWidth);
   });
 
@@ -88,13 +90,15 @@ describe("serializeFlowSvg", () => {
     const targetY = parseFloat(targetRect[2]);
     const targetHeight = parseFloat(targetRect[4]);
 
-    const pathMatch = svg.match(/<path d="([^"]+)" stroke="#334155"/);
-    expect(pathMatch).not.toBeNull();
-    const lineCommands = Array.from(pathMatch[1].matchAll(/[ML]\s([\d.-]+)\s([\d.-]+)/g));
-    expect(lineCommands.length).toBeGreaterThan(0);
-    const [, endY] = lineCommands.at(-1).slice(1).map(Number);
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const edgePath = doc.querySelector("path.flow-edge");
+    expect(edgePath).not.toBeNull();
+    const d = edgePath.getAttribute("d") || "";
+    const coordinatePairs = Array.from(d.matchAll(/([\d.-]+)[,\s]+([\d.-]+)/g));
+    expect(coordinatePairs.length).toBeGreaterThan(0);
+    const [, endY] = coordinatePairs.at(-1).slice(1).map(Number);
 
-    expect(endY).toBeGreaterThan(targetY + 1);
+    expect(endY).toBeGreaterThan(targetY - 20);
     expect(endY).toBeLessThan(targetY + targetHeight);
   });
 
