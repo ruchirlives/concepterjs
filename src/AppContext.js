@@ -349,6 +349,16 @@ export const AppProvider = ({ children }) => {
   // Parent-child relationship map
   const [parentChildMap, setParentChildMap] = useState([]);
 
+  useEffect(() => {
+    async function fetchParentChildMap() {
+      const allIds = rowData.map(r => r.id);
+      if (allIds.length === 0) return;
+      const result = await manyChildren(allIds);
+      setParentChildMap(result || []);
+    }
+    fetchParentChildMap();
+  }, [rowData]);
+
   // Influencers cache shared across sub-apps
   const [influencersMap, setInfluencersMap] = useState({});
   const influencersSigRef = useRef("");
