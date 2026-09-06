@@ -7,19 +7,16 @@ import './index.css';
 import AppGrid from './AppGrid';
 import AppFlow from './AppFlow';
 import AppLayers from './AppLayers';
-import AppMap from './AppMap';
 import CreateFromContentModal from './components/CreateFromContentModal';
 import reportWebVitals from './reportWebVitals';
 import { setPasscode, setApiUrl } from './apiConfig';
 import API_URLS from './hooks/globalconfig';
 import { recopyValues } from './api';
 
-const AppTiptap = React.lazy(() => import('./AppTiptap'));
 const AppMatrix = React.lazy(() => import('./AppMatrix'));
 const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
-const AppD3Vis = React.lazy(() => import('./AppD3Vis'));
 // const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
 // Simple Tabs-based navigation for subapps
@@ -41,19 +38,6 @@ const tabs = [
       <Suspense fallback={<div className="p-4">Loading states...</div>}>
         <AppState />
       </Suspense>
-    ) },
-  { key: 'donut', label: 'Vis', render: () => <AppD3Vis /> },
-  { key: 'editor', label: 'Editor', render: () => (
-      <Suspense fallback={<div className="p-4">Loading editor...</div>}>
-        <AppTiptap />
-      </Suspense>
-    ) },
-  { key: 'map', label: 'Map', render: (state) => (
-      <div className="h-[600px]">
-        <Suspense fallback={<div className="p-4">Loading map...</div>}>
-          <AppMap isActive={state?.isActive} />
-        </Suspense>
-      </div>
     ) },
   { key: 'mermaid', label: 'Mermaid', render: () => (
       <Suspense fallback={<div className="p-4">Loading diagram...</div>}>
@@ -133,15 +117,6 @@ const App = () => {
   React.useEffect(() => {
     if (server) setApiUrl(server);
   }, [server]);
-
-  // Ensure canvases/layouts re-measure whenever the Map tab becomes active
-  React.useEffect(() => {
-    if (activeTab === 'map') {
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-      });
-    }
-  }, [activeTab]);
 
   const activeTabConfig = tabs.find((t) => t.key === activeTab);
 
