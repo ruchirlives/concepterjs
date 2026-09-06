@@ -5,7 +5,6 @@
 @import '@/styles/_variables.scss';
 @import '@/styles/_keyframe-animations.scss';
 
-/* Override Tiptap SimpleEditor global styles that prevent scrolling */
 body {
   overflow-y: auto !important;
   overflow-x: hidden !important;
@@ -19,24 +18,4 @@ body {
 /* Alternative: if you want to be more specific, you can target the main content area */
 main {
   overflow-y: auto !important;
-}
-
-/* Add this to your CSS file or component styles */
-.simple-editor-content {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-.content-wrapper {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-.ghost-text {
-  opacity: 0.5;
-  color: gray;
-  font-style: italic;
-  pointer-events: none;
-  user-select: none;
-  white-space: pre;
 }

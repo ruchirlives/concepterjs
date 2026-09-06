@@ -429,17 +429,6 @@ export const getInfluencers = async (pairsOrSourceId, maybeTargetId) => {
     }
 };
 
-// getNarratives
-export const getNarratives = async () => {
-    try {
-        const response = await apiClient.get(`${getApiUrl()}/get_narratives`);
-        return response.data || [];
-    } catch (error) {
-        console.error("Error fetching narratives:", error);
-        return [];
-    }
-};
-
 export const fetchAutoComplete = async (prompt) => {
     try {
         // console.log("Fetching autocomplete suggestions from API...");
@@ -469,21 +458,6 @@ export const setPosition = async (sourceId, targetId, label) => {
         return null;
     }
 };
-
-export const setNarrative = async (sourceId, targetId, narrative) => {
-    try {
-        console.log("Setting narrative in API...");
-        const response = await apiClient.post(`${getApiUrl()}/set_position`, {
-            source_id: sourceId,
-            target_id: targetId,
-            position: { "narrative": narrative },
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error setting narrative:", error);
-        return null;
-    }
-}
 
 // convert_to_tag
 export const convertToTag = async (containerIds) => {

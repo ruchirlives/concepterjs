@@ -1,7 +1,6 @@
 import React, { useState, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AppProvider } from './AppContext';
-import { TiptapProvider } from './TiptapContext';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import AppGrid from './AppGrid';
@@ -17,7 +16,6 @@ const AppMatrix = React.lazy(() => import('./AppMatrix'));
 const AppKanban = React.lazy(() => import('./AppKanban'));
 const AppState = React.lazy(() => import('./AppState'));
 const AppMermaid = React.lazy(() => import('./AppMermaid'));
-// const AppWordcloud = React.lazy(() => import('./AppWordcloud'));
 
 // Simple Tabs-based navigation for subapps
 const tabs = [
@@ -217,9 +215,7 @@ const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(
   <React.StrictMode>
     <AppProvider>
-      <TiptapProvider>
-        <App />
-      </TiptapProvider>
+      <App />
     </AppProvider>
   </React.StrictMode>
 );

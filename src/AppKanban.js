@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useMatrixLogic } from './hooks/useMatrixLogic';
 import { useAppContext } from "./AppContext";
-import { addChildren, removeChildren, setPosition, getPosition, setNarrative } from "./api";
+import { addChildren, removeChildren, setPosition, getPosition } from "./api";
 import ModalAddRow from "./components/ModalAddRow";
 import { requestRefreshChannel } from "hooks/effectsShared";
 import { removeFromLayer } from "./AppLayers";
@@ -543,7 +543,6 @@ const AppKanban = () => {
           await addChildren(item.id, [source.id.toString()]);
           if (position) {
             if (position.label) await setPosition(item.id, source.id.toString(), position.label);
-            if (position.narrative) await setNarrative(item.id, source.id.toString(), position.narrative);
           }
         } else {
           const position = await getPosition(item.id, source.id);
@@ -551,7 +550,6 @@ const AppKanban = () => {
           await addChildren(source.id, [item.id.toString()]);
           if (position) {
             if (position.label) await setPosition(source.id, item.id.toString(), position.label);
-            if (position.narrative) await setNarrative(source.id, item.id.toString(), position.narrative);
           }
         }
       }

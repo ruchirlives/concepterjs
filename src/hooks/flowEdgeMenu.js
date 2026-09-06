@@ -1,18 +1,16 @@
 import React, { useRef, useState } from "react";
 import { handleEdgeRemoval } from './flowFunctions';
 import useCreateNewRow from '../components/ModalNewContainer';
-import { addChildren, removeChildren, getPosition, setPosition, setNarrative, suggestRelationship, addRelationship, removeRelationship } from "../api";
+import { addChildren, removeChildren, getPosition, setPosition, suggestRelationship, addRelationship, removeRelationship } from "../api";
 import { requestRefreshChannel } from "./effectsShared"; // Import the function to handle edge removal
 import { displayContextMenu } from './flowFunctions';
 import { useAppContext } from '../AppContext';
-import { useTiptapContext } from '../TiptapContext';
 import { useOnEdgeDoubleClick } from './flowEffects'; // Import the onEdgeDoubleClick function
 
 export const useEdgeMenu = (flowWrapperRef) => {
     const menuRef = useRef(null);
     const [currentEdge, setCurrentEdge] = useState(null);
     const { setEdges, refreshInfluencerPair } = useAppContext();
-    const { tiptapContent, setTiptapContent } = useTiptapContext();
     const onEdgeDoubleClick = useOnEdgeDoubleClick(setEdges);
     const newRowFunc = useCreateNewRow();
 
@@ -67,9 +65,6 @@ export const useEdgeMenu = (flowWrapperRef) => {
             if (position) {
                 if (position.label) {
                     await setPosition(targetNodeId, sourceNodeId, position.label);
-                }
-                if (position.narrative) {
-                    await setNarrative(targetNodeId, sourceNodeId, position.narrative);
                 }
             }
 
@@ -129,31 +124,6 @@ export const useEdgeMenu = (flowWrapperRef) => {
             console.log("Suggested Relationship:", suggestedRelationship);
             // reload the channel to reflect the suggested relationship
             requestRefreshChannel();
-        }
-        else if (action === "edit narrative" && edgeId) {
-            // Handle edit narrative action here
-            console.log("Edit narrative action triggered");
-            // Get the narrative from the edge
-            const position = await getPosition(sourceNodeId, targetNodeId);
-            const narrative = position?.narrative || null;
-
-            // If narrative is null, then setNarrative to []
-            if (!narrative) {
-                await setNarrative(sourceNodeId, targetNodeId, []);
-            }
-            setTiptapContent(narrative); // Set the narrative in the AppContext
-            console.log("setTiptapContent called with:", narrative);
-        }
-        else if (action === "replace narrative" && edgeId) {
-            // Handle replace narrative action here
-            console.log("Replace narrative action triggered");
-            // You can implement the logic to replace the narrative of the edge here
-            console.log("Tiptap Content:", tiptapContent); // Log the tiptapContent from AppContext
-            // Set relationship position content using export const setPosition = async (sourceId, targetId, label) => {
-            const narrative = tiptapContent; // Replace with the actual narrative you want to set
-            console.log("Setting narrative to:", narrative);
-            const response = await setNarrative(sourceNodeId, targetNodeId, narrative);
-            console.log("Response from setNarrative:", response);
         }
         else if (action === "add influencer" && edgeId) {
             // Add influencer containers to this edge's relationship
@@ -258,8 +228,6 @@ const EdgeMenu = React.forwardRef(({ onMenuItemClick, rowData, setRowData, edges
         "rename",
         "insert node",
         "flip edge",
-        "edit narrative",
-        "replace narrative",
         "suggest relationship",
         "add influencer",
     ];
